@@ -31,6 +31,10 @@ Komga is a media server for your comics, mangas, BDs, magazines and eBooks.
 - Import books from outside your libraries directly into your series folder
 - Import ComicRack `cbl` read lists
 
+- NEW: Downloader, Metadata Plugins, Follow List per Libary to automatic get new Chapters - with Cron Timer
+- Custom series.json with alternate Titels for Sources like Mangadex
+- basic Plugin Support
+
 ## Installation
 
 Refer to the [website](https://komga.org/docs/category/installation) for instructions.
