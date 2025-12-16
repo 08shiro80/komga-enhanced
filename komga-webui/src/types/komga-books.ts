@@ -152,3 +152,15 @@ export interface BookThumbnailDto {
   width: number,
   height: number,
 }
+
+export interface OversizedPageDto {
+  bookId: string,
+  bookName: string,
+  seriesId: string,
+  seriesTitle: string,
+  pageNumber: number,
+  width: number,
+  height: number,
+  fileSize: number,
+  mediaType: string,
+}

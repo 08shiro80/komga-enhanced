@@ -47,6 +47,10 @@
             <v-icon left class="hidden-xs-only">mdi-account-multiple</v-icon>
             {{ $t('dialog.edit_series.tab_sharing') }}
           </v-tab>
+          <v-tab class="justify-start" v-if="single">
+            <v-icon left class="hidden-xs-only">mdi-cloud-search</v-icon>
+            {{ $t('dialog.edit_series.tab_metadata') }}
+          </v-tab>
 
           <!--  Tab: General  -->
           <v-tab-item>
@@ -66,11 +70,18 @@
                                   @change="form.titleLock = true"
                     >
                       <template v-slot:prepend>
-                        <v-icon :color="form.titleLock ? 'secondary' : ''"
-                                @click="form.titleLock = !form.titleLock"
-                        >
-                          {{ form.titleLock ? 'mdi-lock' : 'mdi-lock-open' }}
-                        </v-icon>
+                        <v-tooltip bottom>
+                          <template v-slot:activator="{ on, attrs }">
+                            <v-icon :color="getLockColor('title')"
+                                    @click="form.titleLock = !form.titleLock"
+                                    v-bind="attrs"
+                                    v-on="on"
+                            >
+                              {{ getLockIcon('title') }}
+                            </v-icon>
+                          </template>
+                          <span>{{ getSourceTooltip('title') }}</span>
+                        </v-tooltip>
                       </template>
                     </v-text-field>
                   </v-col>
@@ -89,11 +100,18 @@
                                   @change="form.titleSortLock = true"
                     >
                       <template v-slot:prepend>
-                        <v-icon :color="form.titleSortLock ? 'secondary' : ''"
-                                @click="form.titleSortLock = !form.titleSortLock"
-                        >
-                          {{ form.titleSortLock ? 'mdi-lock' : 'mdi-lock-open' }}
-                        </v-icon>
+                        <v-tooltip bottom>
+                          <template v-slot:activator="{ on, attrs }">
+                            <v-icon :color="getLockColor('titleSort')"
+                                    @click="form.titleSortLock = !form.titleSortLock"
+                                    v-bind="attrs"
+                                    v-on="on"
+                            >
+                              {{ getLockIcon('titleSort') }}
+                            </v-icon>
+                          </template>
+                          <span>{{ getSourceTooltip('titleSort') }}</span>
+                        </v-tooltip>
                       </template>
                     </v-text-field>
                   </v-col>
@@ -541,6 +559,109 @@
               </v-container>
             </v-card>
           </v-tab-item>
+
+          <!--  Tab: Metadata  -->
+          <v-tab-item v-if="single">
+            <v-card flat>
+              <v-container fluid>
+                <v-row>
+                  <v-col cols="12">
+                    <v-alert type="info" text dense>
+                      Search online databases to automatically populate series metadata
+                    </v-alert>
+                  </v-col>
+                </v-row>
+
+                <!-- Plugin Selector -->
+                <v-row v-if="metadataSearch.availablePlugins.length > 0">
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="metadataSearch.selectedPlugin"
+                      :items="metadataSearch.availablePlugins"
+                      item-text="name"
+                      item-value="id"
+                      label="Metadata Provider"
+                      filled
+                      dense
+                    ></v-select>
+                  </v-col>
+                </v-row>
+
+                <!-- No Plugins Available Message -->
+                <v-row v-else>
+                  <v-col cols="12">
+                    <v-alert type="warning" text dense>
+                      {{ metadataSearch.errorMessage || 'No metadata plugins enabled. Enable MangaDex or AniList in Plugin Manager.' }}
+                    </v-alert>
+                  </v-col>
+                </v-row>
+
+                <!-- Search Field -->
+                <v-row v-if="metadataSearch.availablePlugins.length > 0">
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="metadataSearch.query"
+                      label="Search Title"
+                      filled
+                      dense
+                      append-icon="mdi-magnify"
+                      @click:append="performMetadataSearch"
+                      @keydown.enter="performMetadataSearch"
+                      :loading="metadataSearch.searching"
+                      clearable
+                      hint="Press Enter or click the search icon to search"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <!-- Search Results -->
+                <v-row v-if="metadataSearch.results.length > 0">
+                  <v-col
+                    cols="12" sm="6" md="4"
+                    v-for="result in metadataSearch.results"
+                    :key="result.externalId"
+                  >
+                    <v-card @click="applyMetadataResult(result)" hover>
+                      <v-img
+                        :src="result.coverUrl || ''"
+                        aspect-ratio="0.7"
+                        class="white--text"
+                      >
+                        <template v-slot:placeholder>
+                          <v-row class="fill-height ma-0" align="center" justify="center">
+                            <v-icon size="64">mdi-book</v-icon>
+                          </v-row>
+                        </template>
+                      </v-img>
+                      <v-card-title class="subtitle-2">{{ result.title }}</v-card-title>
+                      <v-card-subtitle v-if="result.author">
+                        <v-icon small>mdi-account</v-icon>
+                        {{ result.author }}
+                      </v-card-subtitle>
+                      <v-card-subtitle v-if="result.year">
+                        <v-icon small>mdi-calendar</v-icon>
+                        {{ result.year }}
+                      </v-card-subtitle>
+                      <v-card-actions>
+                        <v-btn text small color="primary">
+                          Apply Metadata
+                        </v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-col>
+                </v-row>
+
+                <!-- No Results Message -->
+                <v-row v-else-if="metadataSearch.searched && !metadataSearch.searching">
+                  <v-col cols="12">
+                    <v-alert type="warning" text>
+                      No results found. Try a different search term or provider.
+                    </v-alert>
+                  </v-col>
+                </v-row>
+              </v-container>
+            </v-card>
+          </v-tab-item>
         </v-tabs>
 
         <v-card-actions class="hidden-xs-only">
@@ -562,6 +683,7 @@ import {SeriesDto, SeriesThumbnailDto} from '@/types/komga-series'
 import {ERROR, ErrorEvent} from '@/types/events'
 import DropZone from '@/components/DropZone.vue'
 import ThumbnailCard from '@/components/ThumbnailCard.vue'
+// Plugins service is available via this.$komgaPlugins (installed by Vue plugin)
 
 const tags = require('language-tags')
 
@@ -622,6 +744,16 @@ export default Vue.extend({
       genresAvailable: [] as string[],
       tagsAvailable: [] as string[],
       sharingLabelsAvailable: [] as string[],
+      metadataSearch: {
+        availablePlugins: [] as any[],
+        selectedPlugin: '',
+        query: '',
+        results: [] as any[],
+        searching: false,
+        searched: false,
+        errorMessage: '',
+      },
+      metadataSources: {} as Record<string, { source: string; updatedAt: string }>,
     }
   },
   props: {
@@ -641,6 +773,11 @@ export default Vue.extend({
         this.loadAvailableTags()
         this.loadAvailableGenres()
         this.loadAvailableSharingLabels()
+        this.loadAvailablePlugins()
+        // Load metadata sources for single series
+        if (!Array.isArray(this.series)) {
+          this.loadMetadataSources((this.series as SeriesDto).id)
+        }
       } else {
         this.dialogCancel()
       }
@@ -727,6 +864,68 @@ export default Vue.extend({
       if (!!this.$_.trim(text)) return true
       return this.$t('common.required').toString()
     },
+    // Metadata source helper methods
+    getLockIcon(field: string): string {
+      const lockField = `${field}Lock` as keyof typeof this.form
+      const isLocked = this.form[lockField]
+      const source = this.metadataSources[field]?.source
+
+      // Show special icon for auto-locked MangaDex fields
+      if (isLocked && source === 'MangaDex') {
+        return 'mdi-lock-check'
+      }
+      return isLocked ? 'mdi-lock' : 'mdi-lock-open'
+    },
+    getLockColor(field: string): string {
+      const lockField = `${field}Lock` as keyof typeof this.form
+      const isLocked = this.form[lockField]
+      const source = this.metadataSources[field]?.source
+
+      if (!isLocked) return ''
+
+      // Color based on source
+      switch (source) {
+        case 'MangaDex':
+          return 'primary'
+        case 'ComicInfo':
+        case 'series.json':
+        case 'Mylar':
+          return 'info'
+        case 'gallery-dl':
+          return 'success'
+        default:
+          return 'secondary'
+      }
+    },
+    getSourceTooltip(field: string): string {
+      const lockField = `${field}Lock` as keyof typeof this.form
+      const isLocked = this.form[lockField]
+      const sourceInfo = this.metadataSources[field]
+
+      if (!sourceInfo) {
+        return isLocked ? 'Locked (Manual)' : 'Unlocked - click to lock'
+      }
+
+      const source = sourceInfo.source
+      const updatedAt = sourceInfo.updatedAt
+        ? new Date(sourceInfo.updatedAt).toLocaleDateString()
+        : ''
+
+      if (isLocked) {
+        return `Locked by ${source}${updatedAt ? ` (${updatedAt})` : ''}`
+      }
+      return `Source: ${source}${updatedAt ? ` (${updatedAt})` : ''} - click to lock`
+    },
+    async loadMetadataSources(seriesId: string) {
+      try {
+        // Try to load metadata sources from API
+        const response = await this.$http.get(`/api/v1/series/${seriesId}/metadata-sources`)
+        this.metadataSources = response.data?.sources || {}
+      } catch (e) {
+        // API might not exist yet, use empty sources
+        this.metadataSources = {}
+      }
+    },
     linksLabelRules(label: string): boolean | string {
       if (!!this.$_.trim(label)) return true
       return this.$t('common.required').toString()
@@ -749,6 +948,96 @@ export default Vue.extend({
     },
     async loadAvailableSharingLabels() {
       this.sharingLabelsAvailable = await this.$komgaReferential.getSharingLabels()
+    },
+    async loadAvailablePlugins() {
+      this.metadataSearch.errorMessage = ''
+      try {
+        const allPlugins = await this.$komgaPlugins.getPlugins()
+        // Debug: show what we received
+        if (!allPlugins || allPlugins.length === 0) {
+          this.metadataSearch.errorMessage = 'API returned no plugins'
+          return
+        }
+        // Filter to only show enabled METADATA plugins
+        this.metadataSearch.availablePlugins = allPlugins.filter(
+          (p: any) => p.pluginType === 'METADATA' && p.enabled,
+        )
+        if (this.metadataSearch.availablePlugins.length === 0) {
+          // Show what plugins were returned for debugging
+          const pluginInfo = allPlugins.map((p: any) => `${p.name}(${p.pluginType},${p.enabled})`).join(', ')
+          this.metadataSearch.errorMessage = `Found ${allPlugins.length} plugins but none are METADATA+enabled: ${pluginInfo}`
+        } else {
+          this.metadataSearch.selectedPlugin = this.metadataSearch.availablePlugins[0].id
+        }
+      } catch (e: any) {
+        this.metadataSearch.errorMessage = `API error: ${e.message || e.response?.status || 'unknown'}`
+      }
+    },
+    async performMetadataSearch() {
+      if (!this.metadataSearch.query || !this.metadataSearch.selectedPlugin) return
+
+      this.metadataSearch.searching = true
+      this.metadataSearch.results = []
+
+      try {
+        this.metadataSearch.results = await this.$komgaPlugins.searchMetadata(
+          this.metadataSearch.selectedPlugin,
+          this.metadataSearch.query,
+        )
+        this.metadataSearch.searched = true
+      } catch (e) {
+        // Metadata search failed
+        this.$eventHub.$emit(ERROR, {message: 'Failed to search metadata'} as ErrorEvent)
+      } finally {
+        this.metadataSearch.searching = false
+      }
+    },
+    async applyMetadataResult(result: any) {
+      try {
+        // Fetch detailed metadata
+        const metadata = await this.$komgaPlugins.getMetadata(
+          this.metadataSearch.selectedPlugin,
+          result.externalId,
+        )
+
+        // Apply metadata to form fields
+        if (metadata.title) {
+          this.form.title = metadata.title
+          this.form.titleLock = true
+        }
+        if (metadata.summary) {
+          this.form.summary = metadata.summary
+          this.form.summaryLock = true
+        }
+        if (metadata.publisher) {
+          this.form.publisher = metadata.publisher
+          this.form.publisherLock = true
+        }
+        if (metadata.ageRating) {
+          this.form.ageRating = metadata.ageRating
+          this.form.ageRatingLock = true
+        }
+        if (metadata.language) {
+          this.form.language = metadata.language
+          this.form.languageLock = true
+        }
+        if (metadata.genres && metadata.genres.length > 0) {
+          this.form.genres = metadata.genres
+          this.form.genresLock = true
+        }
+        if (metadata.tags && metadata.tags.length > 0) {
+          this.form.tags = metadata.tags
+          this.form.tagsLock = true
+        }
+
+        // Switch to General tab to show applied metadata
+        this.tab = 0
+
+        this.$eventHub.$emit(ERROR, {message: 'Metadata applied successfully'} as ErrorEvent)
+      } catch (e) {
+        // Failed to apply metadata
+        this.$eventHub.$emit(ERROR, {message: 'Failed to apply metadata'} as ErrorEvent)
+      }
     },
     requiredErrors(fieldName: string): string[] {
       const errors = [] as string[]

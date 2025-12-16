@@ -79,6 +79,12 @@ const router = new Router({
           component: () => import(/* webpackChunkName: "dashboard" */ './views/DashboardView.vue'),
         },
         {
+          path: '/downloads',
+          name: 'downloads',
+          component: () => import(/* webpackChunkName: "downloads" */ './views/DownloadDashboard.vue'),
+        },
+        // /follow-lists route removed - functionality integrated into /downloads configuration tab
+        {
           path: '/settings/users',
           name: 'settings-users',
           beforeEnter: adminGuard,
@@ -102,6 +108,18 @@ const router = new Router({
           name: 'settings-ui',
           beforeEnter: adminGuard,
           component: () => import(/* webpackChunkName: "settings-ui" */ './views/UISettings.vue'),
+        },
+        {
+          path: '/settings/backup',
+          name: 'settings-backup',
+          beforeEnter: adminGuard,
+          component: () => import(/* webpackChunkName: "settings-backup" */ './views/SettingsBackup.vue'),
+        },
+        {
+          path: '/settings/plugins',
+          name: 'settings-plugins',
+          beforeEnter: adminGuard,
+          component: () => import(/* webpackChunkName: "settings-plugins" */ './views/PluginManager.vue'),
         },
         {
           path: '/settings/metrics',
@@ -150,6 +168,12 @@ const router = new Router({
           name: 'settings-duplicate-pages-unknown',
           beforeEnter: adminGuard,
           component: () => import(/* webpackChunkName: "duplicate-pages-new" */ './views/DuplicatePagesUnknown.vue'),
+        },
+        {
+          path: '/media-management/oversized-pages',
+          name: 'settings-oversized-pages',
+          beforeEnter: adminGuard,
+          component: () => import(/* webpackChunkName: "oversized-pages" */ './views/OversizedPages.vue'),
         },
         {
           path: '/history',

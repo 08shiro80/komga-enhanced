@@ -65,6 +65,7 @@ class LibraryContentLifecycle(
   private val thumbnailBookRepository: ThumbnailBookRepository,
   private val eventPublisher: ApplicationEventPublisher,
   private val thumbnailSeriesRepository: ThumbnailSeriesRepository,
+  private val chapterUrlImporter: ChapterUrlImporter,
 ) {
   fun scanRootFolder(
     library: Library,
@@ -255,6 +256,18 @@ class LibraryContentLifecycle(
           .let { sidecars ->
             sidecarRepository.deleteByLibraryIdAndUrls(library.id, sidecars.map { it.url })
           }
+      }
+
+      // Import chapter URLs from .chapter-urls.json files (for duplicate download prevention)
+      try {
+        val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()))
+        if (importResults.isNotEmpty()) {
+          val totalImported = importResults.sumOf { it.imported }
+          val totalSkipped = importResults.sumOf { it.skippedDuplicates }
+          logger.info { "Chapter URL import: $totalImported imported, $totalSkipped duplicates skipped from ${importResults.size} series" }
+        }
+      } catch (e: Exception) {
+        logger.warn(e) { "Failed to import chapter URLs for library ${library.name}" }
       }
 
       if (library.emptyTrashAfterScan)

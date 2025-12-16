@@ -132,12 +132,14 @@ class SeriesMetadataLifecycle(
     series: Series,
   ) {
     patch?.let { sPatch ->
-      seriesMetadataRepository.findById(series.id).let {
-        logger.debug { "Apply metadata for series: $series" }
+      seriesMetadataRepository.findById(series.id).let { original ->
+        logger.info { "Apply metadata for series: ${series.name}" }
+        logger.info { "Patch alternateTitles: ${sPatch.alternateTitles?.size ?: 0}, Original alternateTitles: ${original.alternateTitles.size}, Lock: ${original.alternateTitlesLock}" }
 
-        logger.debug { "Original metadata: $it" }
+        logger.debug { "Original metadata: $original" }
         logger.debug { "Patch: $sPatch" }
-        val patched = metadataApplier.apply(sPatch, it)
+        val patched = metadataApplier.apply(sPatch, original)
+        logger.info { "Patched alternateTitles: ${patched.alternateTitles.size}" }
         logger.debug { "Patched metadata: $patched" }
 
         seriesMetadataRepository.update(patched)

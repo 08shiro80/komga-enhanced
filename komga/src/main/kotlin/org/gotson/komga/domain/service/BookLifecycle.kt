@@ -379,10 +379,24 @@ class BookLifecycle(
 
   fun softDeleteMany(books: Collection<Book>) {
     logger.info { "Soft delete books: $books" }
-    val deletedDate = LocalDateTime.now()
-    bookRepository.update(books.map { it.copy(deletedDate = deletedDate) })
 
-    books.forEach { eventPublisher.publishEvent(DomainEvent.BookUpdated(it)) }
+    // Filter out protected books - they cannot be deleted
+    val protectedBooks = books.filter { it.protectedFromDeletion }
+    val deletableBooks = books.filterNot { it.protectedFromDeletion }
+
+    if (protectedBooks.isNotEmpty()) {
+      logger.info { "Skipping soft delete for ${protectedBooks.size} protected books: ${protectedBooks.map { it.id }}" }
+    }
+
+    if (deletableBooks.isEmpty()) {
+      logger.info { "No books to soft delete (all are protected)" }
+      return
+    }
+
+    val deletedDate = LocalDateTime.now()
+    bookRepository.update(deletableBooks.map { it.copy(deletedDate = deletedDate) })
+
+    deletableBooks.forEach { eventPublisher.publishEvent(DomainEvent.BookUpdated(it)) }
   }
 
   fun deleteMany(books: Collection<Book>) {

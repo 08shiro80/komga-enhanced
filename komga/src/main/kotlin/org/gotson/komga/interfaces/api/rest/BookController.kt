@@ -767,4 +767,36 @@ class BookController(
   ) {
     taskEmitter.findBookThumbnailsToRegenerate(forBiggerResultOnly, LOWEST_PRIORITY)
   }
+
+  @Operation(summary = "Protect book from deletion", description = "Mark a book as protected to prevent automatic deletion", tags = [OpenApiConfiguration.TagNames.BOOKS])
+  @PostMapping("api/v1/books/{bookId}/protect")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun protectBook(
+    @PathVariable bookId: String,
+  ) {
+    bookRepository.findByIdOrNull(bookId)?.let { book ->
+      if (!book.protectedFromDeletion) {
+        val updatedBook = book.copy(protectedFromDeletion = true)
+        bookRepository.update(updatedBook)
+        eventPublisher.publishEvent(DomainEvent.BookUpdated(updatedBook))
+      }
+    } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+  }
+
+  @Operation(summary = "Unprotect book from deletion", description = "Remove deletion protection from a book", tags = [OpenApiConfiguration.TagNames.BOOKS])
+  @DeleteMapping("api/v1/books/{bookId}/protect")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun unprotectBook(
+    @PathVariable bookId: String,
+  ) {
+    bookRepository.findByIdOrNull(bookId)?.let { book ->
+      if (book.protectedFromDeletion) {
+        val updatedBook = book.copy(protectedFromDeletion = false)
+        bookRepository.update(updatedBook)
+        eventPublisher.publishEvent(DomainEvent.BookUpdated(updatedBook))
+      }
+    } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+  }
 }

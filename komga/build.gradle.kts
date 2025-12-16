@@ -15,7 +15,7 @@ plugins {
   id("org.flywaydb.flyway") version "11.7.2"
   id("com.github.johnrengelman.processes") version "0.5.0"
   id("org.springdoc.openapi-gradle-plugin") version "1.9.0"
-  id("com.google.devtools.ksp") version "2.2.0-2.0.2"
+  id("com.google.devtools.ksp") version "2.2.21-2.0.4"
   jacoco
 }
 
@@ -42,6 +42,7 @@ dependencies {
 
   api("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
+  implementation("org.springframework.boot:spring-boot-starter-websocket")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-security")

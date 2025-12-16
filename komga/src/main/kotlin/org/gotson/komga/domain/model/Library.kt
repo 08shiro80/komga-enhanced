@@ -35,6 +35,7 @@ data class Library(
   val hashKoreader: Boolean = false,
   val analyzeDimensions: Boolean = true,
   val oneshotsDirectory: String? = null,
+  val downloadFolder: String? = null,
   val unavailableDate: LocalDateTime? = null,
   val id: String = TsidCreator.getTsid256().toString(),
   override val createdDate: LocalDateTime = LocalDateTime.now(),

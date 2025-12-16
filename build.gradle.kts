@@ -7,14 +7,14 @@ import kotlin.io.path.exists
 
 plugins {
   run {
-    val kotlinVersion = "2.2.0"
+    val kotlinVersion = "2.2.21"
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.spring") version kotlinVersion
     kotlin("kapt") version kotlinVersion
   }
-  id("org.jlleitschuh.gradle.ktlint") version "13.0.0"
-  id("com.github.ben-manes.versions") version "0.52.0"
-  id("org.jreleaser") version "1.19.0"
+  id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
+  id("com.github.ben-manes.versions") version "0.53.0"
+  id("org.jreleaser") version "1.21.0"
 }
 
 fun isNonStable(version: String): Boolean {

@@ -67,6 +67,15 @@
             </v-list-item-content>
           </v-list-item>
 
+          <v-list-item :to="{name: 'downloads'}">
+            <v-list-item-icon>
+              <v-icon>mdi-download</v-icon>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title>Downloads</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
           <!--   LIBRARIES     -->
           <v-list-item :to="{name:'libraries', params: {libraryId: LIBRARIES_ALL}}">
             <v-list-item-icon>
@@ -206,6 +215,10 @@
                 <v-list-item-title>{{ $t('duplicate_pages.new') }}</v-list-item-title>
               </v-list-item>
             </v-list-group>
+
+            <v-list-item :to="{name: 'settings-oversized-pages'}">
+              <v-list-item-title>{{ $t('oversized_pages.title') }}</v-list-item-title>
+            </v-list-item>
           </v-list-group>
 
           <v-list-item :to="{name: 'history'}" v-if="isAdmin">
@@ -246,6 +259,14 @@
 
             <v-list-item :to="{name: 'settings-ui'}">
               <v-list-item-title>{{ $t('common.ui') }}</v-list-item-title>
+            </v-list-item>
+
+            <v-list-item :to="{name: 'settings-backup'}">
+              <v-list-item-title>Backup</v-list-item-title>
+            </v-list-item>
+
+            <v-list-item :to="{name: 'settings-plugins'}">
+              <v-list-item-title>Plugins</v-list-item-title>
             </v-list-item>
 
             <v-list-item :to="{name: 'metrics'}">

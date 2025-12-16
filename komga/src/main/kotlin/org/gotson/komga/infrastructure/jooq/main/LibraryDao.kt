@@ -111,6 +111,7 @@ class LibraryDao(
       .set(l.HASH_KOREADER, library.hashKoreader)
       .set(l.ANALYZE_DIMENSIONS, library.analyzeDimensions)
       .set(l.ONESHOTS_DIRECTORY, library.oneshotsDirectory)
+      .set(l.DOWNLOAD_FOLDER, library.downloadFolder)
       .set(l.UNAVAILABLE_DATE, library.unavailableDate)
       .execute()
 
@@ -148,6 +149,7 @@ class LibraryDao(
       .set(l.HASH_KOREADER, library.hashKoreader)
       .set(l.ANALYZE_DIMENSIONS, library.analyzeDimensions)
       .set(l.ONESHOTS_DIRECTORY, library.oneshotsDirectory)
+      .set(l.DOWNLOAD_FOLDER, library.downloadFolder)
       .set(l.UNAVAILABLE_DATE, library.unavailableDate)
       .set(l.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z")))
       .where(l.ID.eq(library.id))
@@ -204,6 +206,7 @@ class LibraryDao(
       hashKoreader = hashKoreader,
       analyzeDimensions = analyzeDimensions,
       oneshotsDirectory = oneshotsDirectory,
+      downloadFolder = downloadFolder,
       unavailableDate = unavailableDate,
       id = id,
       createdDate = createdDate.toCurrentTimeZone(),

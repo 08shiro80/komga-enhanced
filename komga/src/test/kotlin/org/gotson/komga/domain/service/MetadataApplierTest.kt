@@ -141,6 +141,7 @@ class MetadataApplierTest {
           genres = setOf("shonen"),
           totalBookCount = 12,
           collections = emptySet(),
+          alternateTitles = null,
         )
 
       val patched = metadataApplier.apply(patch, metadata)
@@ -178,6 +179,7 @@ class MetadataApplierTest {
           genres = setOf("shonen"),
           totalBookCount = 12,
           collections = emptySet(),
+          alternateTitles = null,
         )
 
       val patched = metadataApplier.apply(patch, metadata)

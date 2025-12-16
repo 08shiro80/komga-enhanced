@@ -112,10 +112,12 @@ class UserController(
               restrictions =
                 ContentRestrictions(
                   ageRestriction =
-                    if (ageRestriction == null || ageRestriction.restriction == AllowExcludeDto.NONE)
-                      null
-                    else
-                      AgeRestriction(ageRestriction.age, ageRestriction.restriction.toDomain()),
+                    ageRestriction?.let { ar ->
+                      if (ar.restriction == AllowExcludeDto.NONE)
+                        null
+                      else
+                        AgeRestriction(ar.age, ar.restriction.toDomain())
+                    },
                   labelsAllow = labelsAllow ?: emptySet(),
                   labelsExclude = labelsExclude ?: emptySet(),
                 ),

@@ -18,6 +18,7 @@ data class Book(
   val seriesId: String = "",
   val libraryId: String = "",
   val deletedDate: LocalDateTime? = null,
+  val protectedFromDeletion: Boolean = false,
   val oneshot: Boolean = false,
   override val createdDate: LocalDateTime = LocalDateTime.now(),
   override val lastModifiedDate: LocalDateTime = createdDate,

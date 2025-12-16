@@ -43,6 +43,10 @@
             <v-icon left class="hidden-xs-only">mdi-image</v-icon>
             {{ $t('dialog.edit_books.tab_poster') }}
           </v-tab>
+          <v-tab class="justify-start" v-if="single">
+            <v-icon left class="hidden-xs-only">mdi-cloud-search</v-icon>
+            {{ $t('dialog.edit_books.tab_metadata') }}
+          </v-tab>
 
           <!--  Tab: General  -->
           <v-tab-item v-if="single">
@@ -412,6 +416,100 @@
               </v-container>
             </v-card>
           </v-tab-item>
+
+          <!--  Tab: Metadata  -->
+          <v-tab-item v-if="single">
+            <v-card flat>
+              <v-container fluid>
+                <v-row>
+                  <v-col cols="12">
+                    <v-alert type="info" text dense>
+                      Search online databases to automatically populate book metadata
+                    </v-alert>
+                  </v-col>
+                </v-row>
+
+                <!-- Plugin Selector -->
+                <v-row>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="metadataSearch.selectedPlugin"
+                      :items="metadataSearch.availablePlugins"
+                      item-text="name"
+                      item-value="id"
+                      label="Metadata Provider"
+                      filled
+                      dense
+                    ></v-select>
+                  </v-col>
+                </v-row>
+
+                <!-- Search Field -->
+                <v-row>
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="metadataSearch.query"
+                      label="Search Title"
+                      filled
+                      dense
+                      append-icon="mdi-magnify"
+                      @click:append="performMetadataSearch"
+                      @keydown.enter="performMetadataSearch"
+                      :loading="metadataSearch.searching"
+                      clearable
+                      hint="Press Enter or click the search icon to search"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <!-- Search Results -->
+                <v-row v-if="metadataSearch.results.length > 0">
+                  <v-col
+                    cols="12" sm="6" md="4"
+                    v-for="result in metadataSearch.results"
+                    :key="result.externalId"
+                  >
+                    <v-card @click="applyMetadataResult(result)" hover>
+                      <v-img
+                        :src="result.coverUrl || ''"
+                        aspect-ratio="0.7"
+                        class="white--text"
+                      >
+                        <template v-slot:placeholder>
+                          <v-row class="fill-height ma-0" align="center" justify="center">
+                            <v-icon size="64">mdi-book</v-icon>
+                          </v-row>
+                        </template>
+                      </v-img>
+                      <v-card-title class="subtitle-2">{{ result.title }}</v-card-title>
+                      <v-card-subtitle v-if="result.author">
+                        <v-icon small>mdi-account</v-icon>
+                        {{ result.author }}
+                      </v-card-subtitle>
+                      <v-card-subtitle v-if="result.year">
+                        <v-icon small>mdi-calendar</v-icon>
+                        {{ result.year }}
+                      </v-card-subtitle>
+                      <v-card-actions>
+                        <v-btn text small color="primary">
+                          Apply Metadata
+                        </v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-col>
+                </v-row>
+
+                <!-- No Results Message -->
+                <v-row v-else-if="metadataSearch.searched && !metadataSearch.searching">
+                  <v-col cols="12">
+                    <v-alert type="warning" text>
+                      No results found. Try a different search term or provider.
+                    </v-alert>
+                  </v-col>
+                </v-row>
+              </v-container>
+            </v-card>
+          </v-tab-item>
         </v-tabs>
 
         <v-card-actions class="hidden-xs-only">
@@ -437,6 +535,7 @@ import {ERROR, ErrorEvent} from '@/types/events'
 import DropZone from '@/components/DropZone.vue'
 import ThumbnailCard from '@/components/ThumbnailCard.vue'
 import {NameValue} from '@/types/filter'
+// Plugins service is available via this.$komgaPlugins (installed by Vue plugin)
 
 const validDate = (value: string) => !helpers.req(value) || isMatch(value, 'yyyy-MM-dd') && value.length == 10
 const validIsbn = (value: string) => !helpers.req(value) || new IsbnVerify(value).isIsbn13({check_digit: true})
@@ -482,6 +581,14 @@ export default Vue.extend({
       authorSearch: [],
       authorSearchResults: [] as string[],
       tagsAvailable: [] as string[],
+      metadataSearch: {
+        availablePlugins: [] as any[],
+        selectedPlugin: '',
+        query: '',
+        results: [] as any[],
+        searching: false,
+        searched: false,
+      },
     }
   },
   props: {
@@ -499,6 +606,7 @@ export default Vue.extend({
       if (val) {
         this.getThumbnails(this.books)
         this.loadAvailableTags()
+        this.loadAvailablePlugins()
       } else {
         this.dialogCancel()
       }
@@ -590,6 +698,86 @@ export default Vue.extend({
   methods: {
     async loadAvailableTags() {
       this.tagsAvailable = await this.$komgaReferential.getTags()
+    },
+    async loadAvailablePlugins() {
+      try {
+        const allPlugins = await this.$komgaPlugins.getPlugins()
+        // Filter to only show enabled METADATA plugins
+        this.metadataSearch.availablePlugins = allPlugins.filter(
+          (p: any) => p.pluginType === 'METADATA' && p.enabled,
+        )
+        if (this.metadataSearch.availablePlugins.length > 0) {
+          this.metadataSearch.selectedPlugin = this.metadataSearch.availablePlugins[0].id
+        }
+      } catch (e) {
+        // Failed to load metadata plugins
+      }
+    },
+    async performMetadataSearch() {
+      if (!this.metadataSearch.query || !this.metadataSearch.selectedPlugin) return
+
+      this.metadataSearch.searching = true
+      this.metadataSearch.results = []
+
+      try {
+        this.metadataSearch.results = await this.$komgaPlugins.searchMetadata(
+          this.metadataSearch.selectedPlugin,
+          this.metadataSearch.query,
+        )
+        this.metadataSearch.searched = true
+      } catch (e) {
+        // Metadata search failed
+        this.$eventHub.$emit(ERROR, {message: 'Failed to search metadata'} as ErrorEvent)
+      } finally {
+        this.metadataSearch.searching = false
+      }
+    },
+    async applyMetadataResult(result: any) {
+      try {
+        // Fetch detailed metadata
+        const metadata = await this.$komgaPlugins.getMetadata(
+          this.metadataSearch.selectedPlugin,
+          result.externalId,
+        )
+
+        // Apply metadata to form fields
+        if (metadata.title) {
+          this.form.title = metadata.title
+          this.form.titleLock = true
+        }
+        if (metadata.summary) {
+          this.form.summary = metadata.summary
+          this.form.summaryLock = true
+        }
+        if (metadata.number) {
+          this.form.number = metadata.number
+          this.form.numberLock = true
+        }
+        if (metadata.numberSort) {
+          this.form.numberSort = metadata.numberSort
+          this.form.numberSortLock = true
+        }
+        if (metadata.releaseDate) {
+          this.form.releaseDate = metadata.releaseDate
+          this.form.releaseDateLock = true
+        }
+        if (metadata.isbn) {
+          this.form.isbn = metadata.isbn
+          this.form.isbnLock = true
+        }
+        if (metadata.tags && metadata.tags.length > 0) {
+          this.form.tags = metadata.tags
+          this.form.tagsLock = true
+        }
+
+        // Switch to General tab to show applied metadata
+        this.tab = 0
+
+        this.$eventHub.$emit(ERROR, {message: 'Metadata applied successfully'} as ErrorEvent)
+      } catch (e) {
+        // Failed to apply metadata
+        this.$eventHub.$emit(ERROR, {message: 'Failed to apply metadata'} as ErrorEvent)
+      }
     },
     linksLabelRules(label: string): boolean | string {
       if (!!this.$_.trim(label)) return true

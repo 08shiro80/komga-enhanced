@@ -34,6 +34,7 @@ import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.COL
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.COMICRACK
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.CURRENT_USER
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.DEPRECATED
+import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.DOWNLOADS
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.DUPLICATE_PAGES
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.FILE_SYSTEM
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.HISTORY
@@ -41,6 +42,7 @@ import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.LIB
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.MANAGEMENT
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.MIHON
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.OAUTH2
+import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.PLUGINS
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.READLISTS
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.READLIST_BOOKS
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames.READLIST_POSTER
@@ -346,6 +348,8 @@ class OpenApiConfiguration(
           RELEASES,
           ANNOUNCEMENTS,
           MANAGEMENT,
+          PLUGINS,
+          DOWNLOADS,
         ),
       ),
       TagGroup(
@@ -408,6 +412,8 @@ class OpenApiConfiguration(
     const val COMICRACK = "ComicRack"
 
     const val CLIENT_SETTINGS = "Client settings"
+    const val PLUGINS = "Plugins"
+    const val DOWNLOADS = "Downloads"
   }
 
   private val tags =
@@ -447,5 +453,7 @@ class OpenApiConfiguration(
       Tag().name(MIHON),
       Tag().name(COMICRACK),
       Tag().name(CLIENT_SETTINGS).description("Store and retrieve global and per-user settings. Those settings are not used by Komga itself, but can be stored for convenience by client applications."),
+      Tag().name(PLUGINS).description("Manage plugins for metadata providers, downloaders, and other extensions."),
+      Tag().name(DOWNLOADS).description("Manage manga downloads from external sources."),
     )
 }

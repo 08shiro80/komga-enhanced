@@ -858,6 +858,18 @@ class SeriesController(
     )
   }
 
+  @Operation(summary = "Get series metadata sources", description = "Returns information about which metadata provider set each field. Currently returns empty data.", tags = [OpenApiConfiguration.TagNames.SERIES])
+  @GetMapping("v1/series/{seriesId}/metadata-sources")
+  fun getSeriesMetadataSources(
+    @AuthenticationPrincipal principal: KomgaPrincipal,
+    @PathVariable(name = "seriesId") seriesId: String,
+  ): Map<String, Any> {
+    principal.user.checkContentRestriction(seriesId)
+    // Stub endpoint - returns empty sources for now
+    // Future: Track which metadata provider set each field
+    return mapOf("sources" to emptyMap<String, Any>())
+  }
+
   /**
    * Convenience function to check for content restriction.
    * This will retrieve data from repositories if needed.

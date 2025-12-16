@@ -13,6 +13,9 @@
         <v-list-item @click="refreshMetadata" v-if="isAdmin">
           <v-list-item-title>{{ $t('menu.refresh_metadata') }}</v-list-item-title>
         </v-list-item>
+        <v-list-item @click="searchMetadata" v-if="isAdmin">
+          <v-list-item-title>Search Online Metadata</v-list-item-title>
+        </v-list-item>
         <v-list-item @click="addToCollection" v-if="isAdmin">
           <v-list-item-title>{{ $t('menu.add_to_collection') }}</v-list-item-title>
         </v-list-item>
@@ -76,6 +79,9 @@ export default Vue.extend({
     },
     refreshMetadata() {
       this.$komgaSeries.refreshMetadata(this.series)
+    },
+    searchMetadata() {
+      this.$emit('search-metadata')
     },
     addToCollection() {
       this.$store.dispatch('dialogAddSeriesToCollection', [this.series.id])

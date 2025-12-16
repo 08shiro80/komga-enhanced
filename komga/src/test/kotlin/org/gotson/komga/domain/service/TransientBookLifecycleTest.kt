@@ -61,7 +61,7 @@ class TransientBookLifecycleTest(
       )
 
     every { mockProvider.getBookMetadataFromBook(any()) } returns BookMetadataPatch(null, null, null, 15F, null, null, null, null, null, emptyList())
-    every { mockProvider.getSeriesMetadataFromBook(any(), any()) } returns SeriesMetadataPatch("BATMAN", null, null, null, null, null, null, null, null, null, emptySet())
+    every { mockProvider.getSeriesMetadataFromBook(any(), any()) } returns SeriesMetadataPatch("BATMAN", null, null, null, null, null, null, null, null, null, emptySet(), null)
 
     val (seriesId, number) = transientBookLifecycle.getMetadata(book)
 
@@ -83,7 +83,7 @@ class TransientBookLifecycleTest(
       )
 
     every { mockProvider.getBookMetadataFromBook(any()) } returns BookMetadataPatch(null, null, null, null, null, null, null, null, null, emptyList())
-    every { mockProvider.getSeriesMetadataFromBook(any(), any()) } returns SeriesMetadataPatch(null, null, null, null, null, null, null, null, null, null, emptySet())
+    every { mockProvider.getSeriesMetadataFromBook(any(), any()) } returns SeriesMetadataPatch(null, null, null, null, null, null, null, null, null, null, emptySet(), null)
 
     val (seriesId, number) = transientBookLifecycle.getMetadata(book)
 
@@ -105,7 +105,7 @@ class TransientBookLifecycleTest(
       )
 
     every { mockProvider.getBookMetadataFromBook(any()) } returns BookMetadataPatch(null, null, null, null, null, null, null, null, null, emptyList())
-    every { mockProvider.getSeriesMetadataFromBook(any(), any()) } returns SeriesMetadataPatch(" ", null, null, null, null, null, null, null, null, null, emptySet())
+    every { mockProvider.getSeriesMetadataFromBook(any(), any()) } returns SeriesMetadataPatch(" ", null, null, null, null, null, null, null, null, null, emptySet(), null)
 
     val (seriesId, number) = transientBookLifecycle.getMetadata(book)
 

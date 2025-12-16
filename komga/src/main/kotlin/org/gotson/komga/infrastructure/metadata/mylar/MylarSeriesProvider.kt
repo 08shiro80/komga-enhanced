@@ -38,7 +38,9 @@ class MylarSeriesProvider(
         logger.debug { "Series folder does not contain any $SERIES_JSON file: $series" }
         return null
       }
+      logger.info { "Found $SERIES_JSON for series: ${series.name} at ${seriesJsonPath}" }
       val metadata = mapper.readValue(seriesJsonPath.toFile(), MylarSeries::class.java).metadata
+      logger.info { "Parsed series.json: name=${metadata.name}, alternateTitles=${metadata.alternateTitles?.size ?: 0}" }
 
       val title =
         if (metadata.volume == null || metadata.volume == 1)
@@ -77,7 +79,9 @@ class MylarSeriesProvider(
         totalBookCount = metadata.totalIssues,
         collections = emptySet(),
         alternateTitles = alternateTitles,
-      )
+      ).also {
+        logger.info { "Returning patch with ${it.alternateTitles?.size ?: 0} alternate titles for series: ${series.name}" }
+      }
     } catch (e: Exception) {
       logger.error(e) { "Error while retrieving metadata from $SERIES_JSON" }
       return null

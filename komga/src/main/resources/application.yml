@@ -24,6 +24,10 @@ komga:
   config-dir: \${user.home}/.komga
   tasks-db:
     file: \${komga.config-dir}/tasks.sqlite
+  download:
+    enabled: true
+    cron: "0 0 */6 * * *"  # Every 6 hours
+    follow-list-filename: "follow.txt"
 
 spring:
   flyway:

@@ -440,6 +440,7 @@
       "tab_authors": "Authors",
       "tab_general": "General",
       "tab_links": "Links",
+      "tab_metadata": "Metadata",
       "tab_poster": "Poster",
       "tab_tags": "Tags",
       "tags_notice_multiple_edit": "You are editing tags for multiple books. This will override existing tags of each book."
@@ -543,6 +544,7 @@
       "field_total_book_count_error": "Total book count must be 1 or more",
       "mixed": "MIXED",
       "tab_general": "General",
+      "tab_metadata": "Metadata",
       "tab_poster": "Poster",
       "tab_sharing": "Sharing",
       "tab_tags": "Tags",
@@ -678,6 +680,9 @@
     "saved_size": "Saved {size}",
     "title": "Duplicate Pages",
     "unknown_size": "Unknown size"
+  },
+  "oversized_pages": {
+    "title": "Oversized Pages"
   },
   "duplicates": {
     "file_hash": "File hash",
