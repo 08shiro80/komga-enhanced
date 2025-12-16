@@ -18,6 +18,7 @@ import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.toEntity
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.util.DefaultUriBuilderFactory
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
 
@@ -29,11 +30,15 @@ class KoboProxy(
   private val komgaSyncTokenGenerator: KomgaSyncTokenGenerator,
   private val komgaSettingsProvider: KomgaSettingsProvider,
 ) {
-  private val koboApiClient =
+  private val koboApiClient: RestClient =
     RestClient
       .builder()
-      .baseUrl("https://storeapi.kobo.com")
-      .requestFactory(
+      .uriBuilderFactory(
+        DefaultUriBuilderFactory("https://storeapi.kobo.com")
+          .apply {
+            this.encodingMode = DefaultUriBuilderFactory.EncodingMode.NONE
+          },
+      ).requestFactory(
         ClientHttpRequestFactoryBuilder.reactor().build(
           ClientHttpRequestFactorySettings
             .defaults()
@@ -42,7 +47,7 @@ class KoboProxy(
         ),
       ).build()
 
-  private val pathRegex = """\/kobo\/[-\w]*(.*)""".toRegex()
+  private val pathRegex = """/kobo/[-\w]*(.*)""".toRegex()
 
   private val headersOutInclude =
     setOf(
@@ -50,6 +55,7 @@ class KoboProxy(
       HttpHeaders.USER_AGENT,
       HttpHeaders.ACCEPT,
       HttpHeaders.ACCEPT_LANGUAGE,
+      HttpHeaders.CONTENT_TYPE,
     )
 
   private val headersOutExclude =
@@ -110,6 +116,7 @@ class KoboProxy(
         }.apply { if (body != null) body(body) }
         .retrieve()
         .onStatus(HttpStatusCode::isError) { _, response ->
+          logger.debug { "Kobo response: ${response.statusCode}: ${response.body.bufferedReader().use { it.readText() }}" }
           throw ResponseStatusException(response.statusCode, response.statusText)
         }.toEntity<JsonNode>()
 
