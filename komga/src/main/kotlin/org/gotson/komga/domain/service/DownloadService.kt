@@ -489,5 +489,6 @@ class DownloadService(
     )
   }
 
-  private fun sanitizeFileName(name: String): String = name.replace(Regex("[^a-zA-Z0-9-_ ]"), "_")
+  private fun sanitizeFileName(name: String): String =
+    name.replace(Regex("[^a-zA-Z0-9-_ ]"), "_").trim()
 }
