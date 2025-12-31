@@ -1,6 +1,7 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.DownloadQueue
 import org.gotson.komga.domain.model.DownloadStatus
 import org.gotson.komga.domain.model.SourceType
@@ -9,6 +10,7 @@ import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.interfaces.api.websocket.DownloadProgressDto
 import org.gotson.komga.interfaces.api.websocket.DownloadProgressHandler
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.nio.file.Paths
@@ -20,13 +22,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 private val logger = KotlinLogging.logger {}
 
 @Service
-class DownloadService(
+class DownloadExecutor(
   private val downloadQueueRepository: DownloadQueueRepository,
   private val libraryRepository: LibraryRepository,
   private val galleryDlWrapper: GalleryDlWrapper,
   private val libraryLifecycle: LibraryLifecycle,
   private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
   private val downloadProgressHandler: DownloadProgressHandler,
+  private val eventPublisher: ApplicationEventPublisher,
 ) {
   private val processing = AtomicBoolean(false)
   private val activeDownloads = ConcurrentHashMap<String, DownloadQueue>()
@@ -94,7 +97,9 @@ class DownloadService(
         retriable.filter { download ->
           val waitMinutes = (download.retryCount + 1) * 5L // 5, 10, 15 minutes for retries 1, 2, 3
           val lastModified = download.lastModifiedDate
-          java.time.Duration.between(lastModified, now).toMinutes() >= waitMinutes
+          java.time.Duration
+            .between(lastModified, now)
+            .toMinutes() >= waitMinutes
         }
 
       if (toRetry.isEmpty()) {
@@ -244,6 +249,35 @@ class DownloadService(
   }
 
   /**
+   * Clear all downloads with a specific status
+   * @param status The status of downloads to clear (COMPLETED, FAILED, CANCELLED)
+   * @return Number of downloads deleted
+   */
+  fun clearDownloadsByStatus(status: DownloadStatus): Int {
+    val count = downloadQueueRepository.deleteByStatus(status)
+    logger.info { "Cleared $count downloads with status: $status" }
+    return count
+  }
+
+  /**
+   * Clear all completed downloads from queue
+   * @return Number of downloads deleted
+   */
+  fun clearCompletedDownloads(): Int = clearDownloadsByStatus(DownloadStatus.COMPLETED)
+
+  /**
+   * Clear all failed downloads from queue
+   * @return Number of downloads deleted
+   */
+  fun clearFailedDownloads(): Int = clearDownloadsByStatus(DownloadStatus.FAILED)
+
+  /**
+   * Clear all cancelled downloads from queue
+   * @return Number of downloads deleted
+   */
+  fun clearCancelledDownloads(): Int = clearDownloadsByStatus(DownloadStatus.CANCELLED)
+
+  /**
    * Process a follow.txt file to add manga URLs to download queue
    */
   fun processFollowList(
@@ -292,7 +326,7 @@ class DownloadService(
       // Mark as downloading
       updateDownloadStatus(download, DownloadStatus.DOWNLOADING, startedDate = LocalDateTime.now())
 
-      // Broadcast download started via WebSocket
+      // Broadcast download started via WebSocket + SSE
       downloadProgressHandler.broadcastProgress(
         DownloadProgressDto(
           type = "started",
@@ -306,6 +340,15 @@ class DownloadService(
           filesDownloaded = 0,
           percentage = 0,
           error = null,
+        ),
+      )
+      eventPublisher.publishEvent(
+        DomainEvent.DownloadStarted(
+          downloadId = download.id,
+          title = download.title,
+          sourceUrl = download.sourceUrl,
+          libraryId = download.libraryId,
+          totalChapters = download.totalChapters,
         ),
       )
 
@@ -351,7 +394,7 @@ class DownloadService(
             ),
           )
 
-          // Broadcast progress via WebSocket
+          // Broadcast progress via WebSocket + SSE
           downloadProgressHandler.broadcastProgress(
             DownloadProgressDto(
               type = "progress",
@@ -365,6 +408,17 @@ class DownloadService(
               filesDownloaded = progress.currentChapter,
               percentage = progress.percent,
               error = null,
+            ),
+          )
+          eventPublisher.publishEvent(
+            DomainEvent.DownloadProgress(
+              downloadId = download.id,
+              title = download.title,
+              status = "DOWNLOADING",
+              progressPercent = progress.percent,
+              currentChapter = progress.currentChapter,
+              totalChapters = if (progress.totalChapters > 0) progress.totalChapters else download.totalChapters,
+              message = progress.message,
             ),
           )
         }
@@ -386,7 +440,7 @@ class DownloadService(
           destinationPath = finalPath.toString(),
         )
 
-        // Broadcast completion via WebSocket
+        // Broadcast completion via WebSocket + SSE
         downloadProgressHandler.broadcastProgress(
           DownloadProgressDto(
             type = "completed",
@@ -400,6 +454,14 @@ class DownloadService(
             filesDownloaded = result.filesDownloaded,
             percentage = 100,
             error = null,
+          ),
+        )
+        eventPublisher.publishEvent(
+          DomainEvent.DownloadCompleted(
+            downloadId = download.id,
+            title = finalTitle ?: download.title,
+            libraryId = download.libraryId,
+            filesDownloaded = result.filesDownloaded,
           ),
         )
 
@@ -418,7 +480,7 @@ class DownloadService(
           errorMessage = result.errorMessage ?: "Download failed",
         )
 
-        // Broadcast failure via WebSocket
+        // Broadcast failure via WebSocket + SSE
         downloadProgressHandler.broadcastProgress(
           DownloadProgressDto(
             type = "failed",
@@ -434,6 +496,13 @@ class DownloadService(
             error = result.errorMessage ?: "Download failed",
           ),
         )
+        eventPublisher.publishEvent(
+          DomainEvent.DownloadFailed(
+            downloadId = download.id,
+            title = download.title,
+            errorMessage = result.errorMessage ?: "Download failed",
+          ),
+        )
 
         logger.error { "Download failed: ${download.id} - ${result.errorMessage}" }
       }
@@ -446,7 +515,7 @@ class DownloadService(
         errorMessage = e.message ?: "Unknown error",
       )
 
-      // Broadcast error via WebSocket
+      // Broadcast error via WebSocket + SSE
       downloadProgressHandler.broadcastProgress(
         DownloadProgressDto(
           type = "error",
@@ -460,6 +529,13 @@ class DownloadService(
           filesDownloaded = 0,
           percentage = null,
           error = e.message ?: "Unknown error",
+        ),
+      )
+      eventPublisher.publishEvent(
+        DomainEvent.DownloadFailed(
+          downloadId = download.id,
+          title = download.title,
+          errorMessage = e.message ?: "Unknown error",
         ),
       )
     } finally {
@@ -489,6 +565,5 @@ class DownloadService(
     )
   }
 
-  private fun sanitizeFileName(name: String): String =
-    name.replace(Regex("[^a-zA-Z0-9-_ ]"), "_").trim()
+  private fun sanitizeFileName(name: String): String = name.replace(Regex("[^a-zA-Z0-9-_ ]"), "_").trim()
 }

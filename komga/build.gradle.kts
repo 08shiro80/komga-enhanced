@@ -8,6 +8,7 @@ import org.springframework.boot.gradle.plugin.SpringBootPlugin
 plugins {
   kotlin("jvm")
   kotlin("plugin.spring")
+  kotlin("plugin.serialization")
   kotlin("kapt")
   id("org.springframework.boot") version libs.versions.springboot.get()
   alias(libs.plugins.gradleGitProperties)
@@ -63,6 +64,9 @@ dependencies {
 
   implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
   implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+
+  // Kotlinx Serialization for Tachiyomi backup parsing
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.8.1")
 
   implementation("commons-io:commons-io:2.19.0")
   implementation("org.apache.commons:commons-lang3:3.18.0")

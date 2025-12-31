@@ -11,11 +11,12 @@ COPY --from=eclipse-temurin:23-jre $JAVA_HOME $JAVA_HOME
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 RUN sed -i -re 's/([a-z]{2}\.)?archive.ubuntu.com|security.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt -y update && \
-    apt -y install ca-certificates locales libjxl-dev libheif-dev libwebp-dev libarchive-dev wget curl && \
+    apt -y install ca-certificates locales libjxl-dev libheif-dev libwebp-dev libarchive-dev wget curl python3 python3-pip && \
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && \
     locale-gen en_US.UTF-8 && \
     wget "https://github.com/pgaskin/kepubify/releases/latest/download/kepubify-linux-64bit" -O /usr/bin/kepubify && \
     chmod +x /usr/bin/kepubify && \
+    pip3 install --break-system-packages gallery-dl && \
     apt -y autoremove && rm -rf /var/lib/apt/lists/*
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu"
 
@@ -26,20 +27,22 @@ COPY --from=eclipse-temurin:23-jre $JAVA_HOME $JAVA_HOME
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 RUN sed -i -re 's/([a-z]{2}\.)?ports.ubuntu.com\/ubuntu-ports/old-releases.ubuntu.com\/ubuntu/g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt -y update && \
-    apt -y install ca-certificates locales libjxl-dev libheif-dev libwebp-dev libarchive-dev wget curl && \
+    apt -y install ca-certificates locales libjxl-dev libheif-dev libwebp-dev libarchive-dev wget curl python3 python3-pip && \
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && \
     locale-gen en_US.UTF-8 && \
     wget "https://github.com/pgaskin/kepubify/releases/latest/download/kepubify-linux-arm64" -O /usr/bin/kepubify && \
     chmod +x /usr/bin/kepubify && \
+    pip3 install --break-system-packages gallery-dl && \
     apt -y autoremove && rm -rf /var/lib/apt/lists/*
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu"
 
 # arm builder: uses temurin-17, as arm32 support was dropped in JDK 21
 FROM eclipse-temurin:17-jre as build-arm
 RUN apt -y update && \
-    apt -y install wget curl && \
+    apt -y install wget curl python3 python3-pip && \
     wget "https://github.com/pgaskin/kepubify/releases/latest/download/kepubify-linux-arm" -O /usr/bin/kepubify && \
     chmod +x /usr/bin/kepubify && \
+    pip3 install --break-system-packages gallery-dl && \
     apt -y autoremove && rm -rf /var/lib/apt/lists/*
 
 FROM build-${TARGETARCH} AS runner

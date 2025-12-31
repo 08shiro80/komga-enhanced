@@ -3,16 +3,16 @@ package org.gotson.komga.interfaces.api.rest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.infrastructure.mangadex.MangaDexClient
-import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-import org.springframework.http.HttpStatus
 import java.io.File
 import java.time.LocalDateTime
 import javax.sql.DataSource
@@ -26,9 +26,11 @@ class HealthCheckController(
   private val galleryDlWrapper: GalleryDlWrapper,
   private val mangaDexClient: MangaDexClient,
   private val dataSource: DataSource,
-  @Value("\${komga.config-dir:#{systemProperties['user.home']+'/.komga'}}")
-  private val configDir: String,
+  private val komgaProperties: KomgaProperties,
 ) {
+  private val configDir: String
+    get() = komgaProperties.configDir ?: System.getProperty("user.home") + "/.komga"
+
   /**
    * Comprehensive health check for all download-related components.
    */

@@ -82,7 +82,7 @@ class KepubConverter(
     try {
       if (Files.isExecutable(path)) return true
       // path may be an executable in the PATH, try running it
-      val process = Runtime.getRuntime().exec(path.toString())
+      val process = ProcessBuilder(path.toString()).start()
       process.waitFor(3, TimeUnit.SECONDS)
 
       return process.exitValue() == 0

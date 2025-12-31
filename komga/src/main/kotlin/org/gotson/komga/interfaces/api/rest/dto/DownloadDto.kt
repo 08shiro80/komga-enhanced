@@ -61,3 +61,9 @@ data class SchedulerSettingsUpdateDto(
   val enabled: Boolean,
   val intervalHours: Int,
 )
+
+data class ClearResultDto(
+  val deletedCount: Int,
+  val status: String,
+  val message: String,
+)

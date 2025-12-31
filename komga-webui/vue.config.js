@@ -13,6 +13,24 @@ module.exports = {
     },
   },
 
+  // Silence Vuetify SASS deprecation warnings (from node_modules)
+  css: {
+    loaderOptions: {
+      sass: {
+        sassOptions: {
+          quietDeps: true,
+          silenceDeprecations: ['slash-div', 'legacy-js-api'],
+        },
+      },
+      scss: {
+        sassOptions: {
+          quietDeps: true,
+          silenceDeprecations: ['slash-div', 'legacy-js-api'],
+        },
+      },
+    },
+  },
+
   devServer: {
     allowedHosts: 'all',
     client: {

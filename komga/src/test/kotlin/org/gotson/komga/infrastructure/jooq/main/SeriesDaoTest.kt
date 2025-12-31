@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.net.URI
 import java.net.URL
 import java.time.LocalDateTime
 
@@ -43,7 +44,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = now,
         libraryId = library.id,
         deletedDate = now,
@@ -67,7 +68,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = now,
         libraryId = library.id,
       )
@@ -79,7 +80,7 @@ class SeriesDaoTest(
     val updated =
       seriesDao.findByIdOrNull(series.id)!!.copy(
         name = "Updated",
-        url = URL("file://updated"),
+        url = URI("file://updated").toURL(),
         fileLastModified = modificationDate,
         bookCount = 5,
         deletedDate = LocalDateTime.now(),
@@ -94,7 +95,7 @@ class SeriesDaoTest(
       .isCloseTo(modificationDate, offset)
       .isNotEqualTo(updated.lastModifiedDate)
     assertThat(modified.name).isEqualTo("Updated")
-    assertThat(modified.url).isEqualTo(URL("file://updated"))
+    assertThat(modified.url).isEqualTo(URI("file://updated").toURL())
     assertThat(modified.fileLastModified).isEqualToIgnoringNanos(modificationDate)
     assertThat(modified.bookCount).isEqualTo(5)
     assertThat(modified.deletedDate).isEqualToIgnoringNanos(updated.deletedDate)
@@ -105,7 +106,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = LocalDateTime.now(),
         libraryId = library.id,
       )
@@ -124,7 +125,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = now,
         libraryId = library.id,
       )
@@ -132,7 +133,7 @@ class SeriesDaoTest(
     val series2 =
       Series(
         name = "Series2",
-        url = URL("file://series2"),
+        url = URI("file://series2").toURL(),
         fileLastModified = now,
         libraryId = library.id,
       )
@@ -152,7 +153,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = now,
         libraryId = library.id,
       )
@@ -160,7 +161,7 @@ class SeriesDaoTest(
     val series2 =
       Series(
         name = "Series2",
-        url = URL("file://series2"),
+        url = URI("file://series2").toURL(),
         fileLastModified = now,
         libraryId = library.id,
       )
@@ -179,7 +180,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = LocalDateTime.now(),
         libraryId = library.id,
       )
@@ -204,7 +205,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = LocalDateTime.now(),
         libraryId = library.id,
       )
@@ -221,7 +222,7 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = LocalDateTime.now(),
         libraryId = library.id,
       )
@@ -237,14 +238,14 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = LocalDateTime.now(),
         libraryId = library.id,
       )
     seriesDao.insert(series)
 
-    val found = seriesDao.findAllNotDeletedByLibraryIdAndUrlNotIn(library.id, listOf(URL("file://series2")))
-    val notFound = seriesDao.findAllNotDeletedByLibraryIdAndUrlNotIn(library.id, listOf(URL("file://series")))
+    val found = seriesDao.findAllNotDeletedByLibraryIdAndUrlNotIn(library.id, listOf(URI("file://series2").toURL()))
+    val notFound = seriesDao.findAllNotDeletedByLibraryIdAndUrlNotIn(library.id, listOf(URI("file://series").toURL()))
 
     assertThat(found).hasSize(1)
     assertThat(found.first().name).isEqualTo("Series")
@@ -257,16 +258,16 @@ class SeriesDaoTest(
     val series =
       Series(
         name = "Series",
-        url = URL("file://series"),
+        url = URI("file://series").toURL(),
         fileLastModified = LocalDateTime.now(),
         libraryId = library.id,
       )
     seriesDao.insert(series)
 
-    val found = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id, URL("file://series"))
-    val notFound1 = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id, URL("file://series2"))
-    val notFound2 = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id + 1, URL("file://series"))
-    val notFound3 = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id + 1, URL("file://series2"))
+    val found = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id, URI("file://series").toURL())
+    val notFound1 = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id, URI("file://series2").toURL())
+    val notFound2 = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id + 1, URI("file://series").toURL())
+    val notFound3 = seriesDao.findNotDeletedByLibraryIdAndUrlOrNull(library.id + 1, URI("file://series2").toURL())
 
     assertThat(found).isNotNull
     assertThat(found?.name).isEqualTo("Series")

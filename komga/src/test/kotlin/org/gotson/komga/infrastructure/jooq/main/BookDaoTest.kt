@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.Pageable
+import java.net.URI
 import java.net.URL
 import java.time.LocalDateTime
 
@@ -54,7 +55,7 @@ class BookDaoTest(
     val book =
       Book(
         name = "Book",
-        url = URL("file://book"),
+        url = URI("file://book").toURL(),
         fileLastModified = now,
         fileSize = 3,
         fileHash = "abc",
@@ -82,7 +83,7 @@ class BookDaoTest(
     val book =
       Book(
         name = "Book",
-        url = URL("file://book"),
+        url = URI("file://book").toURL(),
         fileLastModified = LocalDateTime.now(),
         fileSize = 3,
         seriesId = series.id,
@@ -96,7 +97,7 @@ class BookDaoTest(
       with(bookDao.findByIdOrNull(book.id)!!) {
         copy(
           name = "Updated",
-          url = URL("file://updated"),
+          url = URI("file://updated").toURL(),
           fileLastModified = modificationDate,
           fileSize = 5,
           fileHash = "def",
@@ -113,7 +114,7 @@ class BookDaoTest(
       .isCloseTo(modificationDate, offset)
       .isNotEqualTo(updated.lastModifiedDate)
     assertThat(modified.name).isEqualTo("Updated")
-    assertThat(modified.url).isEqualTo(URL("file://updated"))
+    assertThat(modified.url).isEqualTo(URI("file://updated").toURL())
     assertThat(modified.fileLastModified).isEqualToIgnoringNanos(modificationDate)
     assertThat(modified.fileSize).isEqualTo(5)
     assertThat(modified.fileHash).isEqualTo("def")
@@ -125,7 +126,7 @@ class BookDaoTest(
     val book =
       Book(
         name = "Book",
-        url = URL("file://book"),
+        url = URI("file://book").toURL(),
         fileLastModified = LocalDateTime.now(),
         fileSize = 3,
         seriesId = series.id,

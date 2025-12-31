@@ -125,7 +125,7 @@ class ThumbnailSeriesDao(
   private fun ThumbnailSeriesRecord.toDomain() =
     ThumbnailSeries(
       thumbnail = thumbnail,
-      url = url?.let { URL(it) },
+      url = url?.let { java.net.URI(it).toURL() },
       selected = selected,
       type = ThumbnailSeries.Type.valueOf(type),
       mediaType = mediaType,

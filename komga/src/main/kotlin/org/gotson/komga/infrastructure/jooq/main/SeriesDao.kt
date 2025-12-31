@@ -217,7 +217,7 @@ class SeriesDao(
   private fun SeriesRecord.toDomain() =
     Series(
       name = name,
-      url = URL(url),
+      url = java.net.URI(url).toURL(),
       fileLastModified = fileLastModified,
       id = id,
       libraryId = libraryId,

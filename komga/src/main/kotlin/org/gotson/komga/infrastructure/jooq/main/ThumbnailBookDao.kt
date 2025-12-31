@@ -150,7 +150,7 @@ class ThumbnailBookDao(
   private fun ThumbnailBookRecord.toDomain() =
     ThumbnailBook(
       thumbnail = thumbnail,
-      url = url?.let { URL(it) },
+      url = url?.let { java.net.URI(it).toURL() },
       selected = selected,
       type = ThumbnailBook.Type.valueOf(type),
       mediaType = mediaType,

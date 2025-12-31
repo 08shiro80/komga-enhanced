@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletResponse
 import org.gotson.komga.domain.service.BackupInfo
-import org.gotson.komga.domain.service.BackupService
+import org.gotson.komga.domain.service.BackupLifecycle
 import org.gotson.komga.domain.service.FullBackupInfo
 import org.gotson.komga.domain.service.RestoreInfo
 import org.springframework.core.io.FileSystemResource
@@ -35,14 +35,14 @@ private val logger = KotlinLogging.logger {}
 @RequestMapping("/api/v1/backup", produces = [MediaType.APPLICATION_JSON_VALUE])
 @PreAuthorize("hasRole('ADMIN')")
 class BackupController(
-  private val backupService: BackupService,
+  private val backupLifecycle: BackupLifecycle,
 ) {
   @GetMapping
   @Operation(
     summary = "List all backups",
     description = "Get a list of all available database backups",
   )
-  fun listBackups(): List<BackupDto> = backupService.listBackups().map { it.toDto() }
+  fun listBackups(): List<BackupDto> = backupLifecycle.listBackups().map { it.toDto() }
 
   @PostMapping
   @Operation(
@@ -55,7 +55,7 @@ class BackupController(
   )
   fun createBackup(): ResponseEntity<BackupDto> =
     try {
-      val backup = backupService.createBackup()
+      val backup = backupLifecycle.createBackup()
       logger.info { "Backup created via API: ${backup.fileName}" }
       ResponseEntity.status(HttpStatus.CREATED).body(backup.toDto())
     } catch (e: Exception) {
@@ -74,7 +74,7 @@ class BackupController(
   )
   fun createFullBackup(): ResponseEntity<FullBackupDto> =
     try {
-      val backup = backupService.createFullBackup()
+      val backup = backupLifecycle.createFullBackup()
       logger.info { "Full backup created via API" }
       ResponseEntity.status(HttpStatus.CREATED).body(backup.toDto())
     } catch (e: Exception) {
@@ -102,7 +102,7 @@ class BackupController(
     response: HttpServletResponse,
   ): ResponseEntity<FileSystemResource> =
     try {
-      val file = backupService.getBackupFile(fileName)
+      val file = backupLifecycle.getBackupFile(fileName)
 
       if (!file.exists()) {
         throw ResponseStatusException(HttpStatus.NOT_FOUND, "Backup file not found: $fileName")
@@ -143,7 +143,7 @@ class BackupController(
     fileName: String,
   ): ResponseEntity<Void> =
     try {
-      val deleted = backupService.deleteBackup(fileName)
+      val deleted = backupLifecycle.deleteBackup(fileName)
 
       if (deleted) {
         logger.info { "Deleted backup via API: $fileName" }
@@ -173,7 +173,7 @@ class BackupController(
     keep: Int,
   ): ResponseEntity<CleanupResultDto> =
     try {
-      val deleted = backupService.cleanOldBackups(keep)
+      val deleted = backupLifecycle.cleanOldBackups(keep)
       logger.info { "Cleaned $deleted old backups via API" }
 
       ResponseEntity.ok(
@@ -203,7 +203,7 @@ class BackupController(
     fileName: String,
   ): ResponseEntity<RestoreInfoDto> =
     try {
-      val restoreInfo = backupService.restoreBackup(fileName)
+      val restoreInfo = backupLifecycle.restoreBackup(fileName)
       logger.warn { "Restore initiated via API: $fileName (requires restart)" }
 
       ResponseEntity.ok(restoreInfo.toDto())

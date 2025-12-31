@@ -20,7 +20,7 @@ class DownloadQueueDao(
   DownloadQueueRepository {
   private val dq = Tables.DOWNLOAD_QUEUE
 
-  override fun findById(id: String): DownloadQueue = findByIdOrNull(id) ?: throw Exception("DownloadQueue not found: $id")
+  override fun findById(id: String): DownloadQueue = findByIdOrNull(id) ?: throw NoSuchElementException("DownloadQueue not found: $id")
 
   override fun findByIdOrNull(id: String): DownloadQueue? =
     dslRO
@@ -156,6 +156,12 @@ class DownloadQueueDao(
     dslRO
       .fetchCount(dq, dq.STATUS.eq(status.name))
       .toLong()
+
+  override fun deleteByStatus(status: DownloadStatus): Int =
+    dslRW
+      .deleteFrom(dq)
+      .where(dq.STATUS.eq(status.name))
+      .execute()
 
   private fun DownloadQueueRecord.toDomain() =
     DownloadQueue(

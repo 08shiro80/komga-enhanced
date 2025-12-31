@@ -45,6 +45,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
+import java.net.URI
 import java.net.URL
 
 const val BOOKS_UNREAD_COUNT = "booksUnreadCount"
@@ -394,7 +395,10 @@ class SeriesDtoDao(
     id = id,
     libraryId = libraryId,
     name = name,
-    url = URL(url).toFilePath(),
+    url =
+      URI(url)
+        .toURL()
+        .toFilePath(),
     created = createdDate,
     lastModified = lastModifiedDate,
     fileLastModified = fileLastModified,

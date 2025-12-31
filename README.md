@@ -31,10 +31,39 @@ Komga is a media server for your comics, mangas, BDs, magazines and eBooks.
 - Import books from outside your libraries directly into your series folder
 - Import ComicRack `cbl` read lists
 
-- NEW: Downloader, Metadata Plugins, Follow List per Libary to automatic get new Chapters - with Cron Timer
-- before trying to Download you must run **pip install gallery-dl**
-- Custom series.json with alternate Titels for Sources like Mangadex
-- basic Plugin Support
+## Fork Features
+
+This fork adds:
+
+### MangaDex Integration & Downloads
+- **Automatic Downloads**: Download manga directly from MangaDex using gallery-dl
+- **Follow Lists**: Configure `follow.txt` per library to automatically check for new chapters
+- **Scheduled Downloads**: Cron-based automatic chapter checking
+- **Real-time Progress**: SSE-based download progress updates in the UI
+- **ComicInfo.xml Injection**: Automatic metadata injection into downloaded CBZ files
+- **Incremental Download Tracking**: Each chapter is saved immediately after download - if Komga crashes, downloads resume from where they left off
+- **Download Queue Management**: Clear completed, failed, or cancelled downloads from the queue
+
+### Metadata Plugins
+- **MangaDex Metadata Plugin**: Fetch metadata from MangaDex API
+- **AniList Metadata Plugin**: Fetch metadata from AniList with configurable title language
+- **Custom series.json**: Support for alternate titles from various sources
+
+### Tachiyomi/Mihon Integration
+- **Backup Import**: Import MangaDex URLs from Tachiyomi/Mihon backup files (.tachibk, .proto.gz)
+
+### Media Management
+- **Oversized Pages Detection**: Scan for pages with very high resolutions
+- **Split Tall Images**: Split tall/long strip images into multiple pages (like TachiyomiSY's "split tall images" feature)
+- **Configurable Split Height**: Set custom maximum height threshold for page splitting
+
+### Additional Features
+- **Health Check API**: System health monitoring at `/api/v1/health`
+- **Chapter URL Tracking**: Prevent duplicate downloads
+- **Clear Downloaded Chapters**: Re-download chapters if ComicInfo.xml was broken
+
+### Requirements
+- For downloads: `pip install gallery-dl` (included in Docker image)
 
 ## Installation
 

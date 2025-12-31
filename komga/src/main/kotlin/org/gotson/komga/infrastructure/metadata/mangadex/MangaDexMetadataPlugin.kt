@@ -3,6 +3,7 @@ package org.gotson.komga.infrastructure.metadata.mangadex
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.service.Author
 import org.gotson.komga.domain.service.MetadataDetails
 import org.gotson.komga.domain.service.MetadataSearchResult
@@ -13,15 +14,139 @@ import org.springframework.web.client.RestClientException
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * MangaDex metadata provider with configurable title language
+ *
+ * Configuration (via Plugin Settings):
+ * - preferred_title_language: Language code for titles (en, ja, ja-ro, ko, zh, etc.)
+ *   Default: "en" (English)
+ *
+ * Available languages: en, ja, ja-ro (romanized Japanese), ko, zh, zh-hk, pt-br, es, fr, de, it, ru, etc.
+ */
 @Service
 class MangaDexMetadataPlugin(
   private val objectMapper: ObjectMapper,
+  private val pluginConfigRepository: PluginConfigRepository,
 ) : OnlineMetadataProvider {
   private val restClient = RestClient.create("https://api.mangadex.org")
+  private val pluginId = "mangadex-metadata"
+
+  /**
+   * Get the preferred title language from config, default to "en"
+   */
+  private fun getPreferredLanguage(): String = pluginConfigRepository.findByPluginIdAndKey(pluginId, "preferred_title_language")?.configValue ?: "en"
+
+  /**
+   * Extract title in preferred language with fallbacks
+   * Priority: preferred language → en → first available
+   */
+  private fun extractTitle(
+    titleNode: JsonNode?,
+    preferredLang: String,
+  ): String {
+    if (titleNode == null) return "Unknown"
+
+    // Try preferred language first
+    titleNode
+      .get(preferredLang)
+      ?.asText()
+      ?.takeIf { it.isNotBlank() }
+      ?.let { return it }
+
+    // Fallback to English if not preferred
+    if (preferredLang != "en") {
+      titleNode
+        .get("en")
+        ?.asText()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return it }
+    }
+
+    // Fallback to any available language
+    titleNode.fields()?.let { fields ->
+      if (fields.hasNext()) {
+        return fields.next().value?.asText() ?: "Unknown"
+      }
+    }
+
+    return "Unknown"
+  }
+
+  /**
+   * Extract description in preferred language with fallbacks
+   */
+  private fun extractDescription(
+    descNode: JsonNode?,
+    preferredLang: String,
+  ): String? {
+    if (descNode == null) return null
+
+    // Try preferred language first
+    descNode
+      .get(preferredLang)
+      ?.asText()
+      ?.takeIf { it.isNotBlank() }
+      ?.let { return it }
+
+    // Fallback to English
+    if (preferredLang != "en") {
+      descNode
+        .get("en")
+        ?.asText()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return it }
+    }
+
+    // Fallback to any available
+    descNode.fields()?.let { fields ->
+      if (fields.hasNext()) {
+        return fields.next().value?.asText()
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Extract all alternative titles from both main title node and altTitles array
+   * Returns a map of title -> language code, excluding the primary title
+   */
+  private fun extractAlternativeTitles(
+    attributes: JsonNode?,
+    primaryTitle: String,
+  ): Map<String, String> {
+    if (attributes == null) return emptyMap()
+
+    val alternativeTitles = mutableMapOf<String, String>()
+
+    // Extract from main title node (different language versions)
+    attributes.get("title")?.fields()?.forEach { entry ->
+      val lang = entry.key
+      val title = entry.value?.asText()
+      if (!title.isNullOrBlank() && title != primaryTitle) {
+        alternativeTitles[title] = lang
+      }
+    }
+
+    // Extract from altTitles array (additional titles like romanized, localized names)
+    attributes.get("altTitles")?.forEach { altTitleNode ->
+      altTitleNode?.fields()?.forEach { entry ->
+        val lang = entry.key
+        val title = entry.value?.asText()
+        if (!title.isNullOrBlank() && title != primaryTitle && !alternativeTitles.containsKey(title)) {
+          alternativeTitles[title] = lang
+        }
+      }
+    }
+
+    return alternativeTitles
+  }
 
   override fun search(query: String): List<MetadataSearchResult> {
     return try {
       logger.info { "Searching MangaDex for: $query" }
+      val preferredLang = getPreferredLanguage()
+      logger.debug { "Using preferred language: $preferredLang" }
 
       val response =
         restClient
@@ -48,29 +173,28 @@ class MangaDexMetadataPlugin(
       dataArray.map { item ->
         val id = item.get("id").asText()
         val attributes = item.get("attributes")
-        val title =
-          attributes.get("title")?.get("en")?.asText()
-            ?: attributes
-              .get("title")
-              ?.fields()
-              ?.next()
-              ?.value
-              ?.asText()
-            ?: "Unknown"
-        val description = attributes.get("description")?.get("en")?.asText()
+        val title = extractTitle(attributes.get("title"), preferredLang)
+        val description = extractDescription(attributes.get("description"), preferredLang)
         val status = attributes.get("status")?.asText()
         val year = attributes.get("year")?.asInt()
 
-        // Extract tags
+        // Extract tags in preferred language with fallback
         val tags =
           attributes
             .get("tags")
-            ?.map { tag ->
-              tag
-                .get("attributes")
-                ?.get("name")
-                ?.get("en")
-                ?.asText() ?: ""
+            ?.mapNotNull { tag ->
+              val nameNode = tag.get("attributes")?.get("name")
+              nameNode
+                ?.get(preferredLang)
+                ?.asText()
+                ?: nameNode
+                  ?.get("en")
+                  ?.asText()
+                ?: nameNode
+                  ?.fields()
+                  ?.next()
+                  ?.value
+                  ?.asText()
             }?.filter { it.isNotEmpty() } ?: emptyList()
 
         // Extract cover URL
@@ -123,6 +247,7 @@ class MangaDexMetadataPlugin(
   override fun getMetadata(externalId: String): MetadataDetails? {
     return try {
       logger.info { "Fetching MangaDex metadata for ID: $externalId" }
+      val preferredLang = getPreferredLanguage()
 
       val response =
         restClient
@@ -137,29 +262,28 @@ class MangaDexMetadataPlugin(
       val data = json.get("data") ?: return null
       val attributes = data.get("attributes") ?: return null
 
-      val title =
-        attributes.get("title")?.get("en")?.asText()
-          ?: attributes
-            .get("title")
-            ?.fields()
-            ?.next()
-            ?.value
-            ?.asText()
-          ?: "Unknown"
-
-      val description = attributes.get("description")?.get("en")?.asText()
+      val title = extractTitle(attributes.get("title"), preferredLang)
+      val alternativeTitles = extractAlternativeTitles(attributes, title)
+      val description = extractDescription(attributes.get("description"), preferredLang)
       val status = attributes.get("status")?.asText()
       val year = attributes.get("year")?.asInt()
       val contentRating = attributes.get("contentRating")?.asText()
 
-      // Extract tags and genres
+      // Extract tags in preferred language with fallback
       val tags =
         attributes.get("tags")?.mapNotNull { tag ->
-          tag
-            .get("attributes")
-            ?.get("name")
-            ?.get("en")
+          val nameNode = tag.get("attributes")?.get("name")
+          nameNode
+            ?.get(preferredLang)
             ?.asText()
+            ?: nameNode
+              ?.get("en")
+              ?.asText()
+            ?: nameNode
+              ?.fields()
+              ?.next()
+              ?.value
+              ?.asText()
         } ?: emptyList()
 
       // Extract cover URL
@@ -191,6 +315,8 @@ class MangaDexMetadataPlugin(
         }
       }
 
+      logger.info { "Extracted ${alternativeTitles.size} alternative titles for '$title'" }
+
       MetadataDetails(
         title = title,
         titleSort = null,
@@ -207,9 +333,10 @@ class MangaDexMetadataPlugin(
         authors = authors,
         tags = tags,
         genres = emptyList(),
-        language = "en",
+        language = preferredLang,
         status = status,
         coverUrl = coverUrl,
+        alternativeTitles = alternativeTitles,
       )
     } catch (e: RestClientException) {
       logger.error(e) { "Error fetching MangaDex metadata" }

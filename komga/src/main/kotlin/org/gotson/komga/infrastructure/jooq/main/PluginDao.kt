@@ -19,7 +19,7 @@ class PluginDao(
   PluginRepository {
   private val p = Tables.PLUGIN
 
-  override fun findById(pluginId: String): Plugin = findByIdOrNull(pluginId) ?: throw Exception("Plugin not found: $pluginId")
+  override fun findById(pluginId: String): Plugin = findByIdOrNull(pluginId) ?: throw NoSuchElementException("Plugin not found: $pluginId")
 
   override fun findByIdOrNull(pluginId: String): Plugin? =
     dslRO

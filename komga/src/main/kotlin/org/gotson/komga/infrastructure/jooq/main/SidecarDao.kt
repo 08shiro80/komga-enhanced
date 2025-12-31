@@ -74,8 +74,8 @@ class SidecarDao(
 
   private fun SidecarRecord.toDomain() =
     SidecarStored(
-      url = URL(url),
-      parentUrl = URL(parentUrl),
+      url = java.net.URI(url).toURL(),
+      parentUrl = java.net.URI(parentUrl).toURL(),
       lastModifiedTime = lastModifiedTime,
       libraryId = libraryId,
     )

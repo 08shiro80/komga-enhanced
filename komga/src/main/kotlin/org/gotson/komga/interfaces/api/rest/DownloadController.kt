@@ -6,10 +6,11 @@ import org.gotson.komga.domain.model.FollowConfig
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.domain.service.DownloadExecutor
 import org.gotson.komga.domain.service.DownloadScheduler
-import org.gotson.komga.domain.service.DownloadService
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
+import org.gotson.komga.interfaces.api.rest.dto.ClearResultDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadActionDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadCreateDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadDto
@@ -38,7 +39,7 @@ import org.springframework.web.server.ResponseStatusException
 @RequestMapping("api/v1/downloads", produces = [MediaType.APPLICATION_JSON_VALUE])
 @PreAuthorize("hasRole('ADMIN')")
 class DownloadController(
-  private val downloadService: DownloadService,
+  private val downloadExecutor: DownloadExecutor,
   private val downloadQueueRepository: DownloadQueueRepository,
   private val followConfigRepository: FollowConfigRepository,
   private val downloadScheduler: DownloadScheduler,
@@ -68,7 +69,7 @@ class DownloadController(
     @AuthenticationPrincipal principal: KomgaPrincipal,
   ): DownloadDto =
     try {
-      downloadService
+      downloadExecutor
         .createDownload(
           sourceUrl = create.sourceUrl,
           libraryId = create.libraryId,
@@ -89,8 +90,8 @@ class DownloadController(
   ) {
     try {
       when (action.action.lowercase()) {
-        "cancel" -> downloadService.cancelDownload(id)
-        "retry" -> downloadService.retryDownload(id)
+        "cancel" -> downloadExecutor.cancelDownload(id)
+        "retry" -> downloadExecutor.retryDownload(id)
         else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown action: ${action.action}")
       }
     } catch (e: IllegalArgumentException) {
@@ -107,10 +108,43 @@ class DownloadController(
     @PathVariable id: String,
   ) {
     try {
-      downloadService.deleteDownload(id)
+      downloadExecutor.deleteDownload(id)
     } catch (e: Exception) {
       throw ResponseStatusException(HttpStatus.NOT_FOUND, "Download not found: $id")
     }
+  }
+
+  @DeleteMapping("clear/completed")
+  @Operation(summary = "Clear all completed downloads", tags = [TagNames.DOWNLOADS])
+  fun clearCompletedDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearCompletedDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "COMPLETED",
+      message = "Cleared $count completed downloads",
+    )
+  }
+
+  @DeleteMapping("clear/failed")
+  @Operation(summary = "Clear all failed downloads", tags = [TagNames.DOWNLOADS])
+  fun clearFailedDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearFailedDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "FAILED",
+      message = "Cleared $count failed downloads",
+    )
+  }
+
+  @DeleteMapping("clear/cancelled")
+  @Operation(summary = "Clear all cancelled downloads", tags = [TagNames.DOWNLOADS])
+  fun clearCancelledDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearCancelledDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "CANCELLED",
+      message = "Cleared $count cancelled downloads",
+    )
   }
 
   // =====================

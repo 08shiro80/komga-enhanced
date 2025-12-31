@@ -307,6 +307,47 @@ class ChapterUrlDao(
       .fetch()
       .map { it.toDomain() }
 
+  override fun deleteAll(): Long =
+    dslRW
+      .deleteFrom(table)
+      .execute()
+      .toLong()
+
+  override fun deleteByDateRange(
+    from: LocalDateTime,
+    to: LocalDateTime,
+  ): Long =
+    dslRW
+      .deleteFrom(table)
+      .where(downloadedAtField.ge(from))
+      .and(downloadedAtField.le(to))
+      .execute()
+      .toLong()
+
+  override fun countByDateRange(
+    from: LocalDateTime,
+    to: LocalDateTime,
+  ): Long =
+    dslRO
+      .selectCount()
+      .from(table)
+      .where(downloadedAtField.ge(from))
+      .and(downloadedAtField.le(to))
+      .fetchOne(0, Long::class.java) ?: 0L
+
+  override fun findByDateRange(
+    from: LocalDateTime,
+    to: LocalDateTime,
+  ): Collection<ChapterUrl> =
+    dslRO
+      .select()
+      .from(table)
+      .where(downloadedAtField.ge(from))
+      .and(downloadedAtField.le(to))
+      .orderBy(downloadedAtField.desc())
+      .fetch()
+      .map { it.toDomain() }
+
   private fun Record.toDomain(): ChapterUrl =
     ChapterUrl(
       id = get(idField)!!,

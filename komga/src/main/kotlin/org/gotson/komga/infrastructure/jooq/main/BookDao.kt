@@ -424,7 +424,7 @@ class BookDao(
   private fun BookRecord.toDomain() =
     Book(
       name = name,
-      url = URL(url),
+      url = java.net.URI(url).toURL(),
       fileLastModified = fileLastModified,
       fileSize = fileSize,
       fileHash = fileHash,

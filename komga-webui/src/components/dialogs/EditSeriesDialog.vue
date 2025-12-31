@@ -1001,33 +1001,47 @@ export default Vue.extend({
         )
 
         // Apply metadata to form fields
-        if (metadata.title) {
+        // IMPORTANT: Only apply if:
+        // 1. Metadata has a value
+        // 2. Field is not already locked
+        // 3. Don't set lock = true, let user decide to lock manually
+        if (metadata.title && !this.form.titleLock) {
           this.form.title = metadata.title
-          this.form.titleLock = true
+          // Mark field as dirty so it gets saved
+          this.$v.form?.title?.$touch()
         }
-        if (metadata.summary) {
+        if (metadata.summary && !this.form.summaryLock) {
           this.form.summary = metadata.summary
-          this.form.summaryLock = true
+          this.$v.form?.summary?.$touch()
         }
-        if (metadata.publisher) {
+        if (metadata.publisher && !this.form.publisherLock) {
           this.form.publisher = metadata.publisher
-          this.form.publisherLock = true
+          this.$v.form?.publisher?.$touch()
         }
-        if (metadata.ageRating) {
+        if (metadata.ageRating && !this.form.ageRatingLock) {
           this.form.ageRating = metadata.ageRating
-          this.form.ageRatingLock = true
+          this.$v.form?.ageRating?.$touch()
         }
-        if (metadata.language) {
+        if (metadata.language && !this.form.languageLock) {
           this.form.language = metadata.language
-          this.form.languageLock = true
+          this.$v.form?.language?.$touch()
         }
-        if (metadata.genres && metadata.genres.length > 0) {
+        if (metadata.genres && metadata.genres.length > 0 && !this.form.genresLock) {
           this.form.genres = metadata.genres
-          this.form.genresLock = true
+          this.$v.form?.genres?.$touch()
         }
-        if (metadata.tags && metadata.tags.length > 0) {
+        if (metadata.tags && metadata.tags.length > 0 && !this.form.tagsLock) {
           this.form.tags = metadata.tags
-          this.form.tagsLock = true
+          this.$v.form?.tags?.$touch()
+        }
+
+        // Apply alternative titles (convert from {title: lang} map to [{label, title}] array)
+        if (metadata.alternativeTitles && Object.keys(metadata.alternativeTitles).length > 0 && !this.form.alternateTitlesLock) {
+          this.form.alternateTitles = Object.entries(metadata.alternativeTitles).map(([title, lang]) => ({
+            label: lang,
+            title: title,
+          }))
+          this.$v.form?.alternateTitles?.$touch()
         }
 
         // Switch to General tab to show applied metadata

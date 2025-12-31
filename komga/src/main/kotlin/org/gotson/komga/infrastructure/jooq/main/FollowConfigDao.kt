@@ -18,7 +18,8 @@ class FollowConfigDao(
   dslRW: DSLContext,
   @Qualifier("dslContextRO") dslRO: DSLContext,
   private val objectMapper: ObjectMapper,
-) : SplitDslDaoBase(dslRW, dslRO), FollowConfigRepository {
+) : SplitDslDaoBase(dslRW, dslRO),
+  FollowConfigRepository {
   private val s = Tables.SERVER_SETTINGS
 
   override fun findByIdOrNull(id: String): FollowConfig? = findDefault()

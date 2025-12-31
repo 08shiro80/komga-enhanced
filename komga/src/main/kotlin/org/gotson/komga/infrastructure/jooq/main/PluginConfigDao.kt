@@ -20,7 +20,7 @@ class PluginConfigDao(
   PluginConfigRepository {
   private val pc = Tables.PLUGIN_CONFIG
 
-  override fun findById(id: String): PluginConfig = findByIdOrNull(id) ?: throw Exception("PluginConfig not found: $id")
+  override fun findById(id: String): PluginConfig = findByIdOrNull(id) ?: throw NoSuchElementException("PluginConfig not found: $id")
 
   override fun findByIdOrNull(id: String): PluginConfig? =
     dslRO

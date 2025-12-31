@@ -3,6 +3,7 @@ package org.gotson.komga.infrastructure.metadata.anilist
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.service.Author
 import org.gotson.komga.domain.service.MetadataDetails
 import org.gotson.komga.domain.service.MetadataSearchResult
@@ -14,15 +15,103 @@ import org.springframework.web.client.RestClientException
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * AniList metadata provider with configurable title language
+ *
+ * Configuration (via Plugin Settings):
+ * - preferred_title_language: Title type to prefer (english, romaji, native)
+ *   Default: "english"
+ *
+ * Available options:
+ * - english: English title (e.g., "Attack on Titan")
+ * - romaji: Romanized Japanese (e.g., "Shingeki no Kyojin")
+ * - native: Original script (e.g., "進撃の巨人")
+ */
 @Service
 class AniListMetadataPlugin(
   private val objectMapper: ObjectMapper,
+  private val pluginConfigRepository: PluginConfigRepository,
 ) : OnlineMetadataProvider {
   private val restClient = RestClient.create("https://graphql.anilist.co")
+  private val pluginId = "anilist-metadata"
+
+  /**
+   * Get the preferred title type from config, default to "english"
+   */
+  private fun getPreferredTitleType(): String = pluginConfigRepository.findByPluginIdAndKey(pluginId, "preferred_title_language")?.configValue ?: "english"
+
+  /**
+   * Extract title based on preferred type with fallbacks
+   * Priority: preferred type → english → romaji → native
+   */
+  private fun extractTitle(
+    titleNode: JsonNode?,
+    preferredType: String,
+  ): String {
+    if (titleNode == null) return "Unknown"
+
+    // Try preferred type first
+    titleNode
+      .get(preferredType)
+      ?.asText()
+      ?.takeIf { it.isNotBlank() }
+      ?.let { return it }
+
+    // Fallback chain: english → romaji → native
+    val fallbackOrder =
+      when (preferredType) {
+        "english" -> listOf("romaji", "native")
+        "romaji" -> listOf("english", "native")
+        "native" -> listOf("english", "romaji")
+        else -> listOf("english", "romaji", "native")
+      }
+
+    for (fallback in fallbackOrder) {
+      titleNode
+        .get(fallback)
+        ?.asText()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return it }
+    }
+
+    return "Unknown"
+  }
+
+  /**
+   * Extract all alternative titles (excluding the primary title)
+   * Returns a map of title -> language code
+   */
+  private fun extractAlternativeTitles(
+    titleNode: JsonNode?,
+    primaryTitle: String,
+  ): Map<String, String> {
+    if (titleNode == null) return emptyMap()
+
+    val alternativeTitles = mutableMapOf<String, String>()
+
+    // Map AniList title types to language codes
+    val typeToLangMap =
+      mapOf(
+        "english" to "en",
+        "romaji" to "ja-ro",
+        "native" to "ja",
+      )
+
+    typeToLangMap.forEach { (type, lang) ->
+      val title = titleNode.get(type)?.asText()
+      if (!title.isNullOrBlank() && title != primaryTitle) {
+        alternativeTitles[title] = lang
+      }
+    }
+
+    return alternativeTitles
+  }
 
   override fun search(query: String): List<MetadataSearchResult> {
     return try {
       logger.info { "Searching AniList for: $query" }
+      val preferredType = getPreferredTitleType()
+      logger.debug { "Using preferred title type: $preferredType" }
 
       val graphQLQuery =
         """
@@ -86,11 +175,7 @@ class AniListMetadataPlugin(
       mediaArray.map { item ->
         val id = item.get("id").asText()
         val titleNode = item.get("title")
-        val title =
-          titleNode?.get("english")?.asText()
-            ?: titleNode?.get("romaji")?.asText()
-            ?: titleNode?.get("native")?.asText()
-            ?: "Unknown"
+        val title = extractTitle(titleNode, preferredType)
 
         val description = item.get("description")?.asText()?.let { stripHtml(it) }
         val coverUrl = item.get("coverImage")?.get("large")?.asText()
@@ -144,6 +229,7 @@ class AniListMetadataPlugin(
   override fun getMetadata(externalId: String): MetadataDetails? {
     return try {
       logger.info { "Fetching AniList metadata for ID: $externalId" }
+      val preferredType = getPreferredTitleType()
 
       val graphQLQuery =
         """
@@ -203,11 +289,8 @@ class AniListMetadataPlugin(
       val media = json.get("data")?.get("Media") ?: return null
 
       val titleNode = media.get("title")
-      val title =
-        titleNode?.get("english")?.asText()
-          ?: titleNode?.get("romaji")?.asText()
-          ?: titleNode?.get("native")?.asText()
-          ?: "Unknown"
+      val title = extractTitle(titleNode, preferredType)
+      val alternativeTitles = extractAlternativeTitles(titleNode, title)
 
       val description = media.get("description")?.asText()?.let { stripHtml(it) }
       val coverUrl = media.get("coverImage")?.get("large")?.asText()
@@ -256,9 +339,20 @@ class AniListMetadataPlugin(
       val genres = media.get("genres")?.map { it.asText() } ?: emptyList()
       val tags = media.get("tags")?.map { it.get("name").asText() } ?: emptyList()
 
+      // Map preferred type to language code
+      val languageCode =
+        when (preferredType) {
+          "english" -> "en"
+          "romaji" -> "ja-ro"
+          "native" -> "ja"
+          else -> "en"
+        }
+
+      logger.info { "Extracted ${alternativeTitles.size} alternative titles for '$title'" }
+
       MetadataDetails(
         title = title,
-        titleSort = titleNode?.get("romaji")?.asText(),
+        titleSort = titleNode?.get("romaji")?.asText(), // Always use romaji for sorting
         summary = description,
         publisher = null,
         ageRating = if (isAdult) 18 else 13,
@@ -266,9 +360,10 @@ class AniListMetadataPlugin(
         authors = authors,
         tags = tags,
         genres = genres,
-        language = "en",
+        language = languageCode,
         status = status,
         coverUrl = coverUrl,
+        alternativeTitles = alternativeTitles,
       )
     } catch (e: RestClientException) {
       logger.error(e) { "Error fetching AniList metadata" }

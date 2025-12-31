@@ -40,6 +40,11 @@ export const THUMBNAILCOLLECTION_DELETED = 'thumbnailcollection-deleted'
 
 export const SESSION_EXPIRED = 'session-expired'
 
+export const DOWNLOAD_STARTED = 'download-started'
+export const DOWNLOAD_PROGRESS = 'download-progress'
+export const DOWNLOAD_COMPLETED = 'download-completed'
+export const DOWNLOAD_FAILED = 'download-failed'
+
 export const ERROR = 'error'
 export const NOTIFICATION = 'notification'
 

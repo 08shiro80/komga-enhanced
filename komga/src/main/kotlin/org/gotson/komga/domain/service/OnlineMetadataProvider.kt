@@ -40,6 +40,8 @@ data class MetadataDetails(
   val language: String?,
   val status: String?,
   val coverUrl: String?,
+  /** Alternative titles in different languages, mapped as title -> language code */
+  val alternativeTitles: Map<String, String> = emptyMap(),
 )
 
 data class Author(

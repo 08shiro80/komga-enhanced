@@ -131,4 +131,33 @@ interface ChapterUrlRepository {
     minChapter: Double,
     maxChapter: Double,
   ): Collection<ChapterUrl>
+
+  /**
+   * Delete all chapter URLs
+   */
+  fun deleteAll(): Long
+
+  /**
+   * Delete chapter URLs downloaded within a date range
+   */
+  fun deleteByDateRange(
+    from: java.time.LocalDateTime,
+    to: java.time.LocalDateTime,
+  ): Long
+
+  /**
+   * Count chapter URLs downloaded within a date range
+   */
+  fun countByDateRange(
+    from: java.time.LocalDateTime,
+    to: java.time.LocalDateTime,
+  ): Long
+
+  /**
+   * Find chapter URLs by date range
+   */
+  fun findByDateRange(
+    from: java.time.LocalDateTime,
+    to: java.time.LocalDateTime,
+  ): Collection<ChapterUrl>
 }

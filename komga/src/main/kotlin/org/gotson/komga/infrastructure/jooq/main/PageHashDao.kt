@@ -163,7 +163,7 @@ class PageHashDao(
         .fetch {
           PageHashMatch(
             bookId = it.value1(),
-            url = URL(it.value2()),
+            url = java.net.URI(it.value2()).toURL(),
             pageNumber = it.value3() + 1,
             fileName = it.value4(),
             fileSize = it.value5(),

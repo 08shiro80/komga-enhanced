@@ -132,4 +132,36 @@ sealed class DomainEvent {
   data class UserDeleted(
     val user: KomgaUser,
   ) : DomainEvent()
+
+  // Download events
+  data class DownloadStarted(
+    val downloadId: String,
+    val title: String?,
+    val sourceUrl: String,
+    val libraryId: String?,
+    val totalChapters: Int?,
+  ) : DomainEvent()
+
+  data class DownloadProgress(
+    val downloadId: String,
+    val title: String?,
+    val status: String,
+    val progressPercent: Int,
+    val currentChapter: Int?,
+    val totalChapters: Int?,
+    val message: String?,
+  ) : DomainEvent()
+
+  data class DownloadCompleted(
+    val downloadId: String,
+    val title: String?,
+    val libraryId: String?,
+    val filesDownloaded: Int,
+  ) : DomainEvent()
+
+  data class DownloadFailed(
+    val downloadId: String,
+    val title: String?,
+    val errorMessage: String?,
+  ) : DomainEvent()
 }

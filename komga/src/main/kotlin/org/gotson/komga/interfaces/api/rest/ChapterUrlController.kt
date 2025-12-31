@@ -251,6 +251,168 @@ class ChapterUrlController(
     logger.info { "Deleted chapter URL: $id" }
     return ResponseEntity.noContent().build()
   }
+
+  /**
+   * Delete all chapter URLs.
+   * This allows re-downloading all chapters (useful when ComicInfo.xml was broken).
+   * DANGEROUS: Requires confirmation parameter.
+   */
+  @DeleteMapping("/chapter-urls")
+  @Operation(
+    summary = "Delete all chapter URLs",
+    description = "Deletes ALL chapter URLs from the database. Requires confirm=true parameter.",
+  )
+  fun deleteAllChapterUrls(
+    @Parameter(description = "Set to 'true' to confirm deletion")
+    @RequestParam(defaultValue = "false")
+    confirm: Boolean,
+  ): ResponseEntity<Any> {
+    if (!confirm) {
+      return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(
+          mapOf(
+            "error" to "Confirmation required",
+            "message" to "This will delete ALL chapter URLs. Set confirm=true to proceed.",
+            "currentCount" to chapterUrlRepository.count(),
+          ),
+        )
+    }
+
+    val count = chapterUrlRepository.deleteAll()
+    logger.info { "Deleted ALL $count chapter URLs" }
+
+    return ResponseEntity
+      .status(HttpStatus.OK)
+      .body(mapOf("deleted" to count, "message" to "All chapter URLs deleted. Chapters can now be re-downloaded."))
+  }
+
+  /**
+   * Delete chapter URLs by date range.
+   * Useful for clearing chapters downloaded during a specific period (e.g., when ComicInfo.xml was broken).
+   */
+  @DeleteMapping("/chapter-urls/by-date")
+  @Operation(
+    summary = "Delete chapter URLs by date range",
+    description = "Deletes chapter URLs downloaded within the specified date range. Useful for fixing broken downloads.",
+  )
+  fun deleteChapterUrlsByDateRange(
+    @Parameter(description = "Start date (ISO format, e.g., 2025-12-01T00:00:00)")
+    @RequestParam
+    from: String,
+    @Parameter(description = "End date (ISO format, e.g., 2025-12-31T23:59:59)")
+    @RequestParam
+    to: String,
+    @Parameter(description = "Set to 'true' to confirm deletion (without it, only returns count)")
+    @RequestParam(defaultValue = "false")
+    confirm: Boolean,
+  ): ResponseEntity<Any> {
+    val fromDate =
+      try {
+        java.time.LocalDateTime.parse(from)
+      } catch (e: Exception) {
+        return ResponseEntity
+          .status(HttpStatus.BAD_REQUEST)
+          .body(mapOf("error" to "Invalid 'from' date format. Use ISO format: 2025-12-01T00:00:00"))
+      }
+
+    val toDate =
+      try {
+        java.time.LocalDateTime.parse(to)
+      } catch (e: Exception) {
+        return ResponseEntity
+          .status(HttpStatus.BAD_REQUEST)
+          .body(mapOf("error" to "Invalid 'to' date format. Use ISO format: 2025-12-31T23:59:59"))
+      }
+
+    if (fromDate.isAfter(toDate)) {
+      return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(mapOf("error" to "'from' date must be before 'to' date"))
+    }
+
+    val count = chapterUrlRepository.countByDateRange(fromDate, toDate)
+
+    if (!confirm) {
+      return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(
+          mapOf(
+            "from" to from,
+            "to" to to,
+            "count" to count,
+            "message" to "Found $count chapter URLs in date range. Set confirm=true to delete.",
+          ),
+        )
+    }
+
+    val deleted = chapterUrlRepository.deleteByDateRange(fromDate, toDate)
+    logger.info { "Deleted $deleted chapter URLs from date range $from to $to" }
+
+    return ResponseEntity
+      .status(HttpStatus.OK)
+      .body(
+        mapOf(
+          "from" to from,
+          "to" to to,
+          "deleted" to deleted,
+          "message" to "Deleted $deleted chapter URLs. These chapters can now be re-downloaded.",
+        ),
+      )
+  }
+
+  /**
+   * Preview chapter URLs in a date range (without deleting).
+   */
+  @GetMapping("/chapter-urls/by-date")
+  @Operation(
+    summary = "Get chapter URLs by date range",
+    description = "Returns chapter URLs downloaded within the specified date range.",
+  )
+  fun getChapterUrlsByDateRange(
+    @Parameter(description = "Start date (ISO format)")
+    @RequestParam
+    from: String,
+    @Parameter(description = "End date (ISO format)")
+    @RequestParam
+    to: String,
+    @Parameter(description = "Maximum number of results")
+    @RequestParam(defaultValue = "100")
+    limit: Int,
+  ): ResponseEntity<Any> {
+    val fromDate =
+      try {
+        java.time.LocalDateTime.parse(from)
+      } catch (e: Exception) {
+        return ResponseEntity
+          .status(HttpStatus.BAD_REQUEST)
+          .body(mapOf("error" to "Invalid 'from' date format"))
+      }
+
+    val toDate =
+      try {
+        java.time.LocalDateTime.parse(to)
+      } catch (e: Exception) {
+        return ResponseEntity
+          .status(HttpStatus.BAD_REQUEST)
+          .body(mapOf("error" to "Invalid 'to' date format"))
+      }
+
+    val chapters = chapterUrlRepository.findByDateRange(fromDate, toDate).take(limit)
+    val total = chapterUrlRepository.countByDateRange(fromDate, toDate)
+
+    return ResponseEntity
+      .status(HttpStatus.OK)
+      .body(
+        mapOf(
+          "from" to from,
+          "to" to to,
+          "total" to total,
+          "showing" to chapters.size,
+          "chapters" to chapters.map { it.toDto() },
+        ),
+      )
+  }
 }
 
 // --- DTOs ---

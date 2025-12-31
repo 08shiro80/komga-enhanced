@@ -19,7 +19,7 @@ class DownloadItemDao(
   DownloadItemRepository {
   private val di = Tables.DOWNLOAD_ITEM
 
-  override fun findById(id: String): DownloadItem = findByIdOrNull(id) ?: throw Exception("DownloadItem not found: $id")
+  override fun findById(id: String): DownloadItem = findByIdOrNull(id) ?: throw NoSuchElementException("DownloadItem not found: $id")
 
   override fun findByIdOrNull(id: String): DownloadItem? =
     dslRO

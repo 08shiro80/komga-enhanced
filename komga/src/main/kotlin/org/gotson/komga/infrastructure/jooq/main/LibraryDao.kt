@@ -179,7 +179,7 @@ class LibraryDao(
   private fun LibraryRecord.toDomain(directoryExclusions: Set<String>) =
     Library(
       name = name,
-      root = URL(root),
+      root = java.net.URI(root).toURL(),
       importComicInfoBook = importComicinfoBook,
       importComicInfoSeries = importComicinfoSeries,
       importComicInfoCollection = importComicinfoCollection,

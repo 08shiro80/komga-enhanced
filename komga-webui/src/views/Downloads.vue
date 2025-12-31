@@ -18,6 +18,29 @@
                 <v-icon left>mdi-plus</v-icon>
                 Add Download
               </v-btn>
+              <v-menu offset-y>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-btn text v-bind="attrs" v-on="on" class="ml-2">
+                    <v-icon left>mdi-broom</v-icon>
+                    Clear
+                    <v-icon right>mdi-menu-down</v-icon>
+                  </v-btn>
+                </template>
+                <v-list dense>
+                  <v-list-item @click="clearByStatus('completed')" :disabled="!hasStatus('COMPLETED')">
+                    <v-list-item-icon><v-icon color="success">mdi-check-circle</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Completed ({{ countByStatus('COMPLETED') }})</v-list-item-content>
+                  </v-list-item>
+                  <v-list-item @click="clearByStatus('failed')" :disabled="!hasStatus('FAILED')">
+                    <v-list-item-icon><v-icon color="error">mdi-alert-circle</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Failed ({{ countByStatus('FAILED') }})</v-list-item-content>
+                  </v-list-item>
+                  <v-list-item @click="clearByStatus('cancelled')" :disabled="!hasStatus('CANCELLED')">
+                    <v-list-item-icon><v-icon color="warning">mdi-cancel</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Cancelled ({{ countByStatus('CANCELLED') }})</v-list-item-content>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
               <v-btn icon @click="loadDownloads" :loading="loading" class="ml-2">
                 <v-icon>mdi-refresh</v-icon>
               </v-btn>
@@ -82,7 +105,7 @@
                 </template>
 
                 <template v-slot:item.actions="{ item }">
-                  <v-tooltip bottom v-if="item.status === 'DOWNLOADING'">
+                  <v-tooltip bottom v-if="item.status === 'DOWNLOADING' || item.status === 'PENDING'">
                     <template v-slot:activator="{ on }">
                       <v-btn icon small v-on="on" @click="cancelDownload(item)" color="warning">
                         <v-icon small>mdi-stop</v-icon>
@@ -389,6 +412,21 @@ export default {
       this.snackbarText = message
       this.snackbarColor = 'error'
       this.snackbar = true
+    },
+    hasStatus(status) {
+      return this.downloads.some(d => d.status === status)
+    },
+    countByStatus(status) {
+      return this.downloads.filter(d => d.status === status).length
+    },
+    async clearByStatus(status) {
+      try {
+        const response = await this.$http.delete(`/api/v1/downloads/clear/${status}`)
+        this.showSuccessSnackbar(response.data.message || `Cleared ${status} downloads`)
+        await this.loadDownloads()
+      } catch (error) {
+        this.showErrorSnackbar(`Failed to clear ${status} downloads: ` + error.message)
+      }
     },
   },
 }

@@ -27,4 +27,6 @@ interface DownloadQueueRepository {
   fun count(): Long
 
   fun countByStatus(status: DownloadStatus): Long
+
+  fun deleteByStatus(status: DownloadStatus): Int
 }

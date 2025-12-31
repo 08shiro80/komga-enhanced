@@ -10,6 +10,7 @@ import org.gotson.komga.infrastructure.web.toFilePath
 import org.gotson.komga.interfaces.sse.dto.BookImportSseDto
 import org.gotson.komga.interfaces.sse.dto.BookSseDto
 import org.gotson.komga.interfaces.sse.dto.CollectionSseDto
+import org.gotson.komga.interfaces.sse.dto.DownloadSseDto
 import org.gotson.komga.interfaces.sse.dto.LibrarySseDto
 import org.gotson.komga.interfaces.sse.dto.ReadListSseDto
 import org.gotson.komga.interfaces.sse.dto.ReadProgressSeriesSseDto
@@ -104,6 +105,80 @@ class SseController(
 
       is DomainEvent.UserUpdated -> if (event.expireSession) emitSse("SessionExpired", SessionExpiredDto(event.user.id), userIdOnly = event.user.id)
       is DomainEvent.UserDeleted -> emitSse("SessionExpired", SessionExpiredDto(event.user.id), userIdOnly = event.user.id)
+
+      // Download events (admin only)
+      is DomainEvent.DownloadStarted ->
+        emitSse(
+          "DownloadStarted",
+          DownloadSseDto(
+            downloadId = event.downloadId,
+            title = event.title,
+            sourceUrl = event.sourceUrl,
+            status = "DOWNLOADING",
+            progressPercent = 0,
+            currentChapter = null,
+            totalChapters = event.totalChapters,
+            libraryId = event.libraryId,
+            filesDownloaded = null,
+            errorMessage = null,
+            message = null,
+          ),
+          adminOnly = true,
+        )
+      is DomainEvent.DownloadProgress ->
+        emitSse(
+          "DownloadProgress",
+          DownloadSseDto(
+            downloadId = event.downloadId,
+            title = event.title,
+            sourceUrl = null,
+            status = event.status,
+            progressPercent = event.progressPercent,
+            currentChapter = event.currentChapter,
+            totalChapters = event.totalChapters,
+            libraryId = null,
+            filesDownloaded = null,
+            errorMessage = null,
+            message = event.message,
+          ),
+          adminOnly = true,
+        )
+      is DomainEvent.DownloadCompleted ->
+        emitSse(
+          "DownloadCompleted",
+          DownloadSseDto(
+            downloadId = event.downloadId,
+            title = event.title,
+            sourceUrl = null,
+            status = "COMPLETED",
+            progressPercent = 100,
+            currentChapter = null,
+            totalChapters = null,
+            libraryId = event.libraryId,
+            filesDownloaded = event.filesDownloaded,
+            errorMessage = null,
+            message = null,
+          ),
+          adminOnly = true,
+        )
+      is DomainEvent.DownloadFailed ->
+        emitSse(
+          "DownloadFailed",
+          DownloadSseDto(
+            downloadId = event.downloadId,
+            title = event.title,
+            sourceUrl = null,
+            status = "FAILED",
+            progressPercent = 0,
+            currentChapter = null,
+            totalChapters = null,
+            libraryId = null,
+            filesDownloaded = null,
+            errorMessage = event.errorMessage,
+            message = null,
+          ),
+          adminOnly = true,
+        )
     }
   }
 

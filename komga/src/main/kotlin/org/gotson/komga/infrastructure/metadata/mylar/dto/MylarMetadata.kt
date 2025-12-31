@@ -13,12 +13,12 @@ data class AlternateTitleEntry(
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class MylarMetadata(
   val type: String = "comicSeries",
-  val publisher: String = "Unknown",
+  val publisher: String,
   val imprint: String? = null,
   val name: String,
   @field:JsonAlias("cid")
   val comicid: String = "",
-  val year: Int? = null,
+  val year: Int,
   @field:JsonProperty("description_text")
   val descriptionText: String? = null,
   @field:JsonProperty("description_formatted")
@@ -35,7 +35,7 @@ data class MylarMetadata(
   val totalIssues: Int? = null,
   @field:JsonProperty("publication_run")
   val publicationRun: String? = null,
-  val status: Status? = null,
+  val status: Status,
   // Custom fields for extended metadata support (e.g., from manga-py)
   @field:JsonProperty("alternate_titles")
   @field:JsonDeserialize(using = AlternateTitleDeserializer::class)

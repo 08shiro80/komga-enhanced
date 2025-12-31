@@ -1,6 +1,7 @@
 package org.gotson.komga.domain.model
 
 import com.github.f4b6a3.tsid.TsidCreator
+import java.net.URI
 import java.net.URL
 import java.time.LocalDateTime
 
@@ -15,7 +16,7 @@ fun makeBook(
   Thread.sleep(5)
   return Book(
     name = name,
-    url = url ?: URL("file:/${name.replace(" ", "_")}"),
+    url = url ?: URI("file:/${name.replace(" ", "_")}").toURL(),
     fileLastModified = fileLastModified,
     libraryId = libraryId,
     seriesId = seriesId,
@@ -31,7 +32,7 @@ fun makeSeries(
   Thread.sleep(5)
   return Series(
     name = name,
-    url = url ?: URL("file:/${name.replace(" ", "_")}"),
+    url = url ?: URI("file:/${name.replace(" ", "_")}").toURL(),
     fileLastModified = LocalDateTime.now(),
     libraryId = libraryId,
   )
@@ -45,7 +46,7 @@ fun makeLibrary(
 ): Library =
   Library(
     name = name,
-    root = url ?: URL(path),
+    root = url ?: URI(path).toURL(),
     id = id,
   )
 

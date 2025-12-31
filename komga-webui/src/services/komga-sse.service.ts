@@ -7,6 +7,10 @@ import {
   COLLECTION_ADDED,
   COLLECTION_CHANGED,
   COLLECTION_DELETED,
+  DOWNLOAD_COMPLETED,
+  DOWNLOAD_FAILED,
+  DOWNLOAD_PROGRESS,
+  DOWNLOAD_STARTED,
   LIBRARY_ADDED,
   LIBRARY_CHANGED,
   LIBRARY_DELETED,
@@ -103,6 +107,12 @@ export default class KomgaSseService {
     this.eventSource.addEventListener('TaskQueueStatus', (event: any) => this.updateTaskCount(event))
 
     this.eventSource.addEventListener('SessionExpired', (event: any) => this.emit(SESSION_EXPIRED, event))
+
+    // Downloads
+    this.eventSource.addEventListener('DownloadStarted', (event: any) => this.emit(DOWNLOAD_STARTED, event))
+    this.eventSource.addEventListener('DownloadProgress', (event: any) => this.emit(DOWNLOAD_PROGRESS, event))
+    this.eventSource.addEventListener('DownloadCompleted', (event: any) => this.emit(DOWNLOAD_COMPLETED, event))
+    this.eventSource.addEventListener('DownloadFailed', (event: any) => this.emit(DOWNLOAD_FAILED, event))
   }
 
   disconnect() {

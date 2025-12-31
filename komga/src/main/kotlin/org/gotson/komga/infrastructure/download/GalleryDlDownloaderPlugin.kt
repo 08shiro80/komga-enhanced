@@ -118,11 +118,11 @@ class GalleryDlDownloaderPlugin(
   override suspend fun startDownload(request: org.gotson.komga.domain.model.DownloadRequest): DownloadQueue {
     logger.info { "Starting download via plugin: ${request.sourceUrl}" }
 
-    // This is handled by DownloadService which uses GalleryDlWrapper directly
+    // This is handled by DownloadExecutor which uses GalleryDlWrapper directly
     // This method is here to satisfy the interface but actual download logic
-    // is in DownloadService.kt
+    // is in DownloadExecutor.kt
     throw UnsupportedOperationException(
-      "Use DownloadService to start downloads. This plugin provides metadata only.",
+      "Use DownloadExecutor to start downloads. This plugin provides metadata only.",
     )
   }
 
@@ -137,13 +137,13 @@ class GalleryDlDownloaderPlugin(
   }
 
   override suspend fun cancelDownload(queueId: String): Boolean {
-    logger.warn { "Cancel download via plugin not supported - use DownloadService instead" }
+    logger.warn { "Cancel download via plugin not supported - use DownloadExecutor instead" }
     return false
   }
 
   override suspend fun getProgress(queueId: String): DownloadProgress {
-    // Progress is tracked by DownloadService, not by the plugin
-    throw UnsupportedOperationException("Progress tracking is handled by DownloadService")
+    // Progress is tracked by DownloadExecutor, not by the plugin
+    throw UnsupportedOperationException("Progress tracking is handled by DownloadExecutor")
   }
 
   override suspend fun checkForUpdates(

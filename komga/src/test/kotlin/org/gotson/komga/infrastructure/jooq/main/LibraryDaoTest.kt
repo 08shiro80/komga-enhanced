@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import java.net.URI
 import java.net.URL
 import java.time.LocalDateTime
 
@@ -26,7 +27,7 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
 
     libraryDao.insert(library)
@@ -43,7 +44,7 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
     libraryDao.insert(library)
 
@@ -53,7 +54,7 @@ class LibraryDaoTest(
       with(libraryDao.findById(library.id)) {
         copy(
           name = "LibraryUpdated",
-          root = URL("file://library2"),
+          root = URI("file://library2").toURL(),
           importEpubSeries = false,
           importEpubBook = false,
           importComicInfoCollection = false,
@@ -123,7 +124,7 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
 
     libraryDao.insert(library)
@@ -139,12 +140,12 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
     val library2 =
       Library(
         name = "Library2",
-        root = URL("file://library2"),
+        root = URI("file://library2").toURL(),
       )
 
     libraryDao.insert(library)
@@ -161,12 +162,12 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
     val library2 =
       Library(
         name = "Library2",
-        root = URL("file://library2"),
+        root = URI("file://library2").toURL(),
       )
 
     libraryDao.insert(library)
@@ -183,12 +184,12 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
     val library2 =
       Library(
         name = "Library2",
-        root = URL("file://library2"),
+        root = URI("file://library2").toURL(),
       )
 
     libraryDao.insert(library)
@@ -205,7 +206,7 @@ class LibraryDaoTest(
     val library =
       Library(
         name = "Library",
-        root = URL("file://library"),
+        root = URI("file://library").toURL(),
       )
 
     libraryDao.insert(library)

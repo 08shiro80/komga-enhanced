@@ -34,6 +34,7 @@ import komgaReleases from './plugins/komga-releases.plugin'
 import komgaSettings from './plugins/komga-settings.plugin'
 import komgaFonts from './plugins/komga-fonts.plugin'
 import komgaPlugins from './plugins/komga-plugins.plugin'
+import komgaImport from './plugins/komga-import.plugin'
 import vuetify from './plugins/vuetify'
 import logger from './plugins/logger.plugin'
 import './public-path'
@@ -84,6 +85,7 @@ Vue.use(komgaAnnouncements, {http: Vue.prototype.$http})
 Vue.use(komgaReleases, {http: Vue.prototype.$http})
 Vue.use(komgaFonts, {http: Vue.prototype.$http})
 Vue.use(komgaPlugins, {http: Vue.prototype.$http})
+Vue.use(komgaImport, {http: Vue.prototype.$http})
 
 Vue.config.productionTip = false
 

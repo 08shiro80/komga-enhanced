@@ -77,24 +77,25 @@ data class MetadataSourceInfo(
       if (map == null) return MetadataSourceInfo()
 
       val sources =
-        map.mapNotNull { (field, value) ->
-          @Suppress("UNCHECKED_CAST")
-          val valueMap = value as? Map<String, Any> ?: return@mapNotNull null
-          val source = valueMap["source"] as? String ?: return@mapNotNull null
-          val updatedAt =
-            try {
-              LocalDateTime.parse(valueMap["updatedAt"] as? String)
-            } catch (e: Exception) {
-              LocalDateTime.now()
-            }
+        map
+          .mapNotNull { (field, value) ->
+            @Suppress("UNCHECKED_CAST")
+            val valueMap = value as? Map<String, Any> ?: return@mapNotNull null
+            val source = valueMap["source"] as? String ?: return@mapNotNull null
+            val updatedAt =
+              try {
+                LocalDateTime.parse(valueMap["updatedAt"] as? String)
+              } catch (e: Exception) {
+                LocalDateTime.now()
+              }
 
-          field to
-            MetadataSource(
-              field = field,
-              source = source,
-              updatedAt = updatedAt,
-            )
-        }.toMap()
+            field to
+              MetadataSource(
+                field = field,
+                source = source,
+                updatedAt = updatedAt,
+              )
+          }.toMap()
 
       return MetadataSourceInfo(sources)
     }

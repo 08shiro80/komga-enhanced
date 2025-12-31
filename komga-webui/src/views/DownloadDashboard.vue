@@ -8,11 +8,11 @@
             Downloads
             <v-chip
               small
-              :color="wsConnected ? 'success' : 'grey'"
+              color="success"
               class="ml-2"
             >
-              <v-icon x-small left>{{ wsConnected ? 'mdi-wifi' : 'mdi-wifi-off' }}</v-icon>
-              {{ wsConnected ? 'Live' : 'Offline' }}
+              <v-icon x-small left>mdi-broadcast</v-icon>
+              Live
             </v-chip>
           </h1>
         </v-col>
@@ -121,6 +121,10 @@
                 <v-tab>
                   <v-icon left>mdi-cog</v-icon>
                   Configuration
+                </v-tab>
+                <v-tab>
+                  <v-icon left>mdi-import</v-icon>
+                  Tachiyomi Import
                 </v-tab>
               </v-tabs>
 
@@ -262,6 +266,131 @@
                     </v-col>
                   </v-row>
                 </v-tab-item>
+                <v-tab-item>
+                  <!-- Tachiyomi Import Tab -->
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-card outlined>
+                        <v-card-title>
+                          <v-icon left>mdi-import</v-icon>
+                          Import from Tachiyomi/Mihon Backup
+                        </v-card-title>
+                        <v-card-subtitle>
+                          Import MangaDex URLs from a Tachiyomi or Mihon backup file into a library's follow.txt
+                        </v-card-subtitle>
+                        <v-card-text>
+                          <v-file-input
+                            v-model="tachiyomiFile"
+                            label="Backup File"
+                            accept=".proto.gz,.tachibk,.json,.json.gz"
+                            prepend-icon="mdi-file-upload"
+                            outlined
+                            show-size
+                            hint="Supports .proto.gz, .tachibk, .json, .json.gz formats"
+                            persistent-hint
+                          ></v-file-input>
+
+                          <v-select
+                            v-model="tachiyomiLibraryId"
+                            :items="libraries"
+                            item-text="name"
+                            item-value="id"
+                            label="Target Library"
+                            outlined
+                            prepend-icon="mdi-bookshelf"
+                            hint="MangaDex URLs will be added to this library's follow.txt"
+                            persistent-hint
+                            class="mt-4"
+                          />
+                        </v-card-text>
+                        <v-card-actions>
+                          <v-spacer></v-spacer>
+                          <v-btn
+                            color="primary"
+                            @click="importTachiyomi"
+                            :loading="importingTachiyomi"
+                            :disabled="!tachiyomiFile || !tachiyomiLibraryId"
+                          >
+                            <v-icon left>mdi-import</v-icon>
+                            Import
+                          </v-btn>
+                        </v-card-actions>
+                      </v-card>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <!-- Import Result -->
+                      <v-card outlined v-if="tachiyomiResult">
+                        <v-card-title>
+                          <v-icon left :color="tachiyomiResult.success ? 'success' : 'warning'">
+                            {{ tachiyomiResult.success ? 'mdi-check-circle' : 'mdi-alert-circle' }}
+                          </v-icon>
+                          Import Result
+                        </v-card-title>
+                        <v-card-text>
+                          <v-alert :type="tachiyomiResult.success ? 'success' : 'warning'" dense>
+                            {{ tachiyomiResult.message }}
+                          </v-alert>
+                          <v-row class="mt-2">
+                            <v-col cols="6" sm="3">
+                              <div class="text-h5">{{ tachiyomiResult.totalInBackup }}</div>
+                              <div class="text-caption">Total in Backup</div>
+                            </v-col>
+                            <v-col cols="6" sm="3">
+                              <div class="text-h5">{{ tachiyomiResult.mangaDexCount }}</div>
+                              <div class="text-caption">MangaDex</div>
+                            </v-col>
+                            <v-col cols="6" sm="3">
+                              <div class="text-h5 success--text">{{ tachiyomiResult.importedCount }}</div>
+                              <div class="text-caption">Imported</div>
+                            </v-col>
+                            <v-col cols="6" sm="3">
+                              <div class="text-h5 grey--text">{{ tachiyomiResult.skippedCount }}</div>
+                              <div class="text-caption">Skipped</div>
+                            </v-col>
+                          </v-row>
+                          <v-expansion-panels class="mt-4" v-if="tachiyomiResult.imported.length > 0 || tachiyomiResult.errors.length > 0">
+                            <v-expansion-panel v-if="tachiyomiResult.imported.length > 0">
+                              <v-expansion-panel-header>
+                                <v-icon left color="success" small>mdi-check</v-icon>
+                                Imported ({{ tachiyomiResult.imported.length }})
+                              </v-expansion-panel-header>
+                              <v-expansion-panel-content>
+                                <v-list dense>
+                                  <v-list-item v-for="(title, i) in tachiyomiResult.imported" :key="'imp-'+i">
+                                    <v-list-item-content>{{ title }}</v-list-item-content>
+                                  </v-list-item>
+                                </v-list>
+                              </v-expansion-panel-content>
+                            </v-expansion-panel>
+                            <v-expansion-panel v-if="tachiyomiResult.errors.length > 0">
+                              <v-expansion-panel-header>
+                                <v-icon left color="error" small>mdi-alert</v-icon>
+                                Errors ({{ tachiyomiResult.errors.length }})
+                              </v-expansion-panel-header>
+                              <v-expansion-panel-content>
+                                <v-list dense>
+                                  <v-list-item v-for="(err, i) in tachiyomiResult.errors" :key="'err-'+i">
+                                    <v-list-item-content class="error--text">{{ err }}</v-list-item-content>
+                                  </v-list-item>
+                                </v-list>
+                              </v-expansion-panel-content>
+                            </v-expansion-panel>
+                          </v-expansion-panels>
+                        </v-card-text>
+                      </v-card>
+                      <v-card outlined v-else>
+                        <v-card-text class="text-center pa-8">
+                          <v-icon size="64" color="grey">mdi-file-upload-outline</v-icon>
+                          <p class="mt-4">Select a backup file and target library to import</p>
+                          <p class="text-caption grey--text">
+                            Only MangaDex entries will be imported from the backup.
+                            Other sources are not supported.
+                          </p>
+                        </v-card-text>
+                      </v-card>
+                    </v-col>
+                  </v-row>
+                </v-tab-item>
               </v-tabs-items>
             </v-card-text>
           </v-card>
@@ -326,6 +455,12 @@
 
 <script>
 import DownloadTable from '../components/DownloadTable.vue'
+import {
+  DOWNLOAD_STARTED,
+  DOWNLOAD_PROGRESS,
+  DOWNLOAD_COMPLETED,
+  DOWNLOAD_FAILED,
+} from '@/types/events'
 
 export default {
   name: 'DownloadDashboard',
@@ -359,12 +494,13 @@ export default {
       schedulerEnabled: false,
       schedulerInterval: 6,
       savingScheduler: false,
-      // WebSocket
-      websocket: null,
-      wsConnected: false,
-      wsReconnectAttempts: 0,
-      wsMaxReconnectAttempts: 5,
-      wsReconnectDelay: 3000,
+      // SSE connection status (using existing SSE infrastructure)
+      sseConnected: true,
+      // Tachiyomi import
+      tachiyomiFile: null,
+      tachiyomiLibraryId: null,
+      importingTachiyomi: false,
+      tachiyomiResult: null,
     }
   },
   computed: {
@@ -395,10 +531,10 @@ export default {
     this.loadDownloads()
     this.loadLibraries()
     this.loadSchedulerSettings()
-    this.connectWebSocket()
+    this.setupSseListeners()
   },
   beforeDestroy() {
-    this.disconnectWebSocket()
+    this.removeSseListeners()
   },
   methods: {
     async loadDownloads() {
@@ -576,102 +712,79 @@ export default {
       this.snackbarColor = 'error'
       this.snackbar = true
     },
-    // WebSocket methods
-    connectWebSocket() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const wsUrl = `${protocol}//${window.location.host}/api/v1/downloads/progress`
-
-      try {
-        this.websocket = new WebSocket(wsUrl)
-
-        this.websocket.onopen = () => {
-          this.wsConnected = true
-          this.wsReconnectAttempts = 0
-        }
-
-        this.websocket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            this.handleWebSocketMessage(data)
-          } catch (e) {
-            // Parse error - ignore malformed messages
-          }
-        }
-
-        this.websocket.onclose = () => {
-          this.wsConnected = false
-          this.attemptReconnect()
-        }
-
-        this.websocket.onerror = () => {
-          // WebSocket error - will trigger onclose
-        }
-      } catch (error) {
-        // Connection failed
-      }
+    // SSE event handlers (using Komga's existing SSE infrastructure)
+    setupSseListeners() {
+      this.$eventHub.$on(DOWNLOAD_STARTED, this.onDownloadStarted)
+      this.$eventHub.$on(DOWNLOAD_PROGRESS, this.onDownloadProgress)
+      this.$eventHub.$on(DOWNLOAD_COMPLETED, this.onDownloadCompleted)
+      this.$eventHub.$on(DOWNLOAD_FAILED, this.onDownloadFailed)
     },
-    disconnectWebSocket() {
-      if (this.websocket) {
-        this.websocket.close()
-        this.websocket = null
-      }
+    removeSseListeners() {
+      this.$eventHub.$off(DOWNLOAD_STARTED, this.onDownloadStarted)
+      this.$eventHub.$off(DOWNLOAD_PROGRESS, this.onDownloadProgress)
+      this.$eventHub.$off(DOWNLOAD_COMPLETED, this.onDownloadCompleted)
+      this.$eventHub.$off(DOWNLOAD_FAILED, this.onDownloadFailed)
     },
-    attemptReconnect() {
-      if (this.wsReconnectAttempts < this.wsMaxReconnectAttempts) {
-        this.wsReconnectAttempts++
-        setTimeout(() => {
-          this.connectWebSocket()
-        }, this.wsReconnectDelay)
-      }
+    onDownloadStarted(data) {
+      this.showSuccess(`Download started: ${data.title || data.sourceUrl}`)
+      this.updateDownloadFromSse(data)
     },
-    handleWebSocketMessage(data) {
-      switch (data.type) {
-        case 'connected':
-          // WebSocket connection confirmed
-          break
-
-        case 'started':
-          this.showSuccess(`Download started: ${data.mangaTitle || data.url}`)
-          this.updateDownloadFromWs(data)
-          break
-
-        case 'progress':
-          this.updateDownloadFromWs(data)
-          break
-
-        case 'completed':
-          this.showSuccess(`Download completed: ${data.mangaTitle}`)
-          this.updateDownloadFromWs(data)
-          break
-
-        case 'failed':
-        case 'error':
-          this.showError(`Download failed: ${data.mangaTitle || data.url} - ${data.error}`)
-          this.updateDownloadFromWs(data)
-          break
-
-        case 'pong':
-          // Heartbeat response
-          break
-      }
+    onDownloadProgress(data) {
+      this.updateDownloadFromSse(data)
     },
-    updateDownloadFromWs(data) {
+    onDownloadCompleted(data) {
+      this.showSuccess(`Download completed: ${data.title}`)
+      this.updateDownloadFromSse(data)
+    },
+    onDownloadFailed(data) {
+      this.showError(`Download failed: ${data.title} - ${data.errorMessage}`)
+      this.updateDownloadFromSse(data)
+    },
+    updateDownloadFromSse(data) {
       if (!data.downloadId) return
 
       const index = this.downloads.findIndex(d => d.id === data.downloadId)
       if (index !== -1) {
-        // Update existing download
+        // Update existing download reactively
         this.$set(this.downloads, index, {
           ...this.downloads[index],
           status: data.status,
-          progressPercent: data.percentage || this.downloads[index].progressPercent,
-          currentChapter: data.completedChapters || this.downloads[index].currentChapter,
-          totalChapters: data.totalChapters || this.downloads[index].totalChapters,
-          errorMessage: data.error || this.downloads[index].errorMessage,
+          progressPercent: data.progressPercent ?? this.downloads[index].progressPercent,
+          currentChapter: data.currentChapter ?? this.downloads[index].currentChapter,
+          totalChapters: data.totalChapters ?? this.downloads[index].totalChapters,
+          errorMessage: data.errorMessage ?? this.downloads[index].errorMessage,
         })
       } else {
         // New download - reload full list
         this.loadDownloads()
+      }
+    },
+    // Tachiyomi Import
+    async importTachiyomi() {
+      if (!this.tachiyomiFile || !this.tachiyomiLibraryId) {
+        this.showError('Please select a backup file and target library')
+        return
+      }
+      this.importingTachiyomi = true
+      this.tachiyomiResult = null
+      try {
+        const result = await this.$komgaImport.importTachiyomi(this.tachiyomiFile, this.tachiyomiLibraryId)
+        this.tachiyomiResult = result
+        if (result.importedCount > 0) {
+          this.showSuccess(`Imported ${result.importedCount} manga from Tachiyomi backup`)
+          // Refresh follow.txt if we're on the config tab viewing the same library
+          if (this.selectedLibrary && this.selectedLibrary.id === this.tachiyomiLibraryId) {
+            this.loadFollowTxt()
+          }
+        } else if (result.skippedCount > 0) {
+          this.showSuccess('All manga already exist in follow.txt')
+        } else {
+          this.showError('No MangaDex manga found in backup')
+        }
+      } catch (error) {
+        this.showError(error.message || 'Failed to import Tachiyomi backup')
+      } finally {
+        this.importingTachiyomi = false
       }
     },
   },

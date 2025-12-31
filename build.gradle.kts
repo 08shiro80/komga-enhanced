@@ -10,6 +10,7 @@ plugins {
     val kotlinVersion = "2.2.21"
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.spring") version kotlinVersion
+    kotlin("plugin.serialization") version kotlinVersion
     kotlin("kapt") version kotlinVersion
   }
   id("org.jlleitschuh.gradle.ktlint") version "13.1.0"

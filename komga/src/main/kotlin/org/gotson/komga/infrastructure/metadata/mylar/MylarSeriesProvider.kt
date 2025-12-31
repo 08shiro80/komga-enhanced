@@ -38,7 +38,7 @@ class MylarSeriesProvider(
         logger.debug { "Series folder does not contain any $SERIES_JSON file: $series" }
         return null
       }
-      logger.info { "Found $SERIES_JSON for series: ${series.name} at ${seriesJsonPath}" }
+      logger.info { "Found $SERIES_JSON for series: ${series.name} at $seriesJsonPath" }
       val metadata = mapper.readValue(seriesJsonPath.toFile(), MylarSeries::class.java).metadata
       logger.info { "Parsed series.json: name=${metadata.name}, alternateTitles=${metadata.alternateTitles?.size ?: 0}" }
 
@@ -68,7 +68,6 @@ class MylarSeriesProvider(
           when (metadata.status) {
             Status.Ended -> SeriesMetadata.Status.ENDED
             Status.Continuing -> SeriesMetadata.Status.ONGOING
-            null -> null
           },
         summary = metadata.descriptionFormatted ?: metadata.descriptionText,
         readingDirection = null,

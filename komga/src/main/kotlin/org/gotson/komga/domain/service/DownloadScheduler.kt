@@ -25,7 +25,7 @@ private val logger = KotlinLogging.logger {}
   matchIfMissing = true,
 )
 class DownloadScheduler(
-  private val downloadService: DownloadService,
+  private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
   private val followConfigRepository: FollowConfigRepository,
   private val taskScheduler: TaskScheduler,
@@ -84,7 +84,7 @@ class DownloadScheduler(
         Duration.ofMillis(intervalMillis),
       )
 
-    logger.info { "Scheduled follow check every ${intervalHours} hours" }
+    logger.info { "Scheduled follow check every $intervalHours hours" }
   }
 
   /**
@@ -95,7 +95,7 @@ class DownloadScheduler(
 
     config.urls.forEach { url ->
       try {
-        downloadService.createDownload(
+        downloadExecutor.createDownload(
           sourceUrl = url,
           libraryId = null,
           title = null,
@@ -149,7 +149,7 @@ class DownloadScheduler(
         return
       }
 
-      downloadService.processFollowList(followListPath, library.id)
+      downloadExecutor.processFollowList(followListPath, library.id)
       lastCheckTimes[libraryId] = LocalDateTime.now()
 
       logger.info { "Manual check completed for library: ${library.name}" }
@@ -179,7 +179,7 @@ class DownloadScheduler(
           logger.info { "Processing follow.txt for library: ${library.name}" }
 
           try {
-            downloadService.processFollowList(followListPath, library.id)
+            downloadExecutor.processFollowList(followListPath, library.id)
             lastCheckTimes[library.id] = LocalDateTime.now()
             processedCount++
           } catch (e: Exception) {

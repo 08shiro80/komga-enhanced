@@ -22,7 +22,7 @@ class PluginLogDao(
   PluginLogRepository {
   private val pl = Tables.PLUGIN_LOG
 
-  override fun findById(id: String): PluginLog = findByIdOrNull(id) ?: throw Exception("PluginLog not found: $id")
+  override fun findById(id: String): PluginLog = findByIdOrNull(id) ?: throw NoSuchElementException("PluginLog not found: $id")
 
   override fun findByIdOrNull(id: String): PluginLog? =
     dslRO
