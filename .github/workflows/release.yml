@@ -194,7 +194,7 @@ jobs:
           JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: JReleaser Publish output
         if: always() && inputs.docker_release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jreleaser-publish
           path: |
