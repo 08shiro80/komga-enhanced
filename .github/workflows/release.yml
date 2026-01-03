@@ -24,6 +24,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   version:
     runs-on: ubuntu-latest
@@ -104,7 +108,7 @@ jobs:
 
       - name: Commit version change via API (verified)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           # Get current file content and SHA
           FILE_SHA=$(gh api repos/${{ github.repository }}/contents/gradle.properties --jq '.sha')
@@ -122,16 +126,21 @@ jobs:
 
       - name: Create tag via API (verified)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
+          VERSION="${{ needs.version.outputs.version_next }}"
+
+          # Delete existing tag if present
+          gh api repos/${{ github.repository }}/git/refs/tags/${VERSION} -X DELETE 2>/dev/null || true
+
           # Get the latest commit SHA
           COMMIT_SHA=$(gh api repos/${{ github.repository }}/commits/${{ github.ref_name }} --jq '.sha')
 
           # Create the tag object
           TAG_SHA=$(gh api repos/${{ github.repository }}/git/tags \
             -X POST \
-            -f tag="${{ needs.version.outputs.version_next }}" \
-            -f message="Release ${{ needs.version.outputs.version_next }}" \
+            -f tag="${VERSION}" \
+            -f message="Release ${VERSION}" \
             -f object="$COMMIT_SHA" \
             -f type="commit" \
             --jq '.sha')
@@ -139,10 +148,12 @@ jobs:
           # Create the tag reference
           gh api repos/${{ github.repository }}/git/refs \
             -X POST \
-            -f ref="refs/tags/${{ needs.version.outputs.version_next }}" \
+            -f ref="refs/tags/${VERSION}" \
             -f sha="$TAG_SHA"
 
       - name: Pull latest changes
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           # Reset local gradle.properties to match what we just committed via API
           git checkout gradle.properties
@@ -183,16 +194,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: JReleaser Publish (Docker)
+      - name: Prepare Docker build
         if: inputs.docker_release
-        run: ./gradlew jreleaserPublish
-        env:
-          JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: JReleaser Publish output
-        if: always() && inputs.docker_release
-        uses: actions/upload-artifact@v4
+        run: |
+          JAR_PATH="${{ steps.prepare_jar.outputs.jar_path }}"
+          JAR_NAME="${{ steps.prepare_jar.outputs.jar_name }}"
+
+          # Create build context
+          mkdir -p docker-build/assembly
+          cp "${JAR_PATH}" docker-build/assembly/
+
+          # Create Dockerfile from template
+          sed "s/{{distributionArtifactFile}}/${JAR_NAME}/g" komga/docker/Dockerfile.tpl > docker-build/Dockerfile
+
+      - name: Build and push Docker images
+        if: inputs.docker_release
+        uses: docker/build-push-action@v5
         with:
-          name: jreleaser-publish
-          path: |
-            build/jreleaser/trace.log
-            build/jreleaser/output.properties
+          context: docker-build
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            08shiro80/komga:latest
+            08shiro80/komga:${{ needs.version.outputs.version_next }}
