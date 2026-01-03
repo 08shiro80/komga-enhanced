@@ -24,6 +24,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   version:
     runs-on: ubuntu-latest
