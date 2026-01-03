@@ -1,96 +1,281 @@
-[![Open Collective backers and sponsors](https://img.shields.io/opencollective/all/komga?label=OpenCollective%20Sponsors&color=success)](https://opencollective.com/komga) [![GitHub Sponsors](https://img.shields.io/github/sponsors/gotson?label=Github%20Sponsors&color=success)](https://github.com/sponsors/gotson)
-[![Discord](https://img.shields.io/discord/678794935368941569?label=Discord&color=blue)](https://discord.gg/TdRpkDu)
+# Komga with MangaDex Downloader
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/gotson/komga/tests.yml?branch=master)](https://github.com/gotson/komga/actions?query=workflow%3ATests+branch%3Amaster)
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/gotson/komga?color=blue&label=download&sort=semver)](https://github.com/gotson/komga/releases) [![GitHub all releases](https://img.shields.io/github/downloads/gotson/komga/total?color=blue&label=github%20downloads)](https://github.com/gotson/komga/releases)
-[![Docker Pulls](https://img.shields.io/docker/pulls/gotson/komga)](https://hub.docker.com/r/gotson/komga)
+**Komga Enhanced** - A powerful manga media server with integrated MangaDex downloading, automatic chapter tracking, and Tachiyomi/Mihon backup import.
 
-[![Translation status](https://hosted.weblate.org/widgets/komga/-/webui/svg-badge.svg)](https://hosted.weblate.org/engage/komga/)
+> **Built on [Komga](https://github.com/gotson/komga)** - Extends the excellent Komga media server with manga downloading and automation features.
 
-# ![app icon](./.github/readme-images/app-icon.png) Komga
+---
 
-Komga is a media server for your comics, mangas, BDs, magazines and eBooks.
+## Why This Fork?
 
-#### Chat on [Discord](https://discord.gg/TdRpkDu)
+This fork transforms Komga from a pure media server into a **complete manga management solution**:
 
-## Features
+| Problem | Solution |
+|---------|----------|
+| Manually downloading manga from MangaDex | **Automatic downloads** via gallery-dl integration |
+| Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
+| Re-downloading after crashes | **Incremental saves** - each chapter saved immediately |
+| Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
+| Long vertical webtoon pages | **Page splitting** like TachiyomiSY |
+| Missing metadata | **MangaDex & AniList plugins** for rich metadata |
 
-- Browse libraries, series and books via a responsive web UI that works on desktop, tablets and phones
-- Organize your library with collections and read lists
-- Edit metadata for your series and books
-- Import embedded metadata automatically
-- Webreader with multiple reading modes
-- Manage multiple users, with per-library access control, age restrictions, and labels restrictions
-- Offers a REST API, many community tools and scripts can interact with Komga
-- OPDS v1 and v2 support
-- Kobo Sync with your Kobo eReader
-- KOReader Sync
-- Download book files, whole series, or read lists
-- Duplicate files detection
-- Duplicate pages detection and removal
-- Import books from outside your libraries directly into your series folder
-- Import ComicRack `cbl` read lists
+---
 
-## Fork Features
+## Key Features
 
-This fork adds:
+### MangaDex Download System
 
-### MangaDex Integration & Downloads
-- **Automatic Downloads**: Download manga directly from MangaDex using gallery-dl
-- **Follow Lists**: Configure `follow.txt` per library to automatically check for new chapters
-- **Scheduled Downloads**: Cron-based automatic chapter checking
-- **Real-time Progress**: SSE-based download progress updates in the UI
-- **ComicInfo.xml Injection**: Automatic metadata injection into downloaded CBZ files
-- **Incremental Download Tracking**: Each chapter is saved immediately after download - if Komga crashes, downloads resume from where they left off
-- **Download Queue Management**: Clear completed, failed, or cancelled downloads from the queue
+Download manga directly from MangaDex with full automation:
 
-### Metadata Plugins
-- **MangaDex Metadata Plugin**: Fetch metadata from MangaDex API
-- **AniList Metadata Plugin**: Fetch metadata from AniList with configurable title language
-- **Custom series.json**: Support for alternate titles from various sources
+- **Queue-based downloads** with priority support
+- **Real-time progress** via Server-Sent Events (SSE)
+- **ComicInfo.xml injection** - metadata embedded in every CBZ
+- **Crash recovery** - downloads resume from last completed chapter
+- **Rate limiting** - respects MangaDex API limits
+- **Multi-language support** - download chapters in your preferred language
 
-### Tachiyomi/Mihon Integration
-- **Backup Import**: Import MangaDex URLs from Tachiyomi/Mihon backup files (.tachibk, .proto.gz)
+```
+POST /api/v1/downloads
+{
+  "url": "https://mangadex.org/title/...",
+  "libraryId": "your-library-id"
+}
+```
+
+### Follow List Automation
+
+Automatically check for new chapters from your favorite manga:
+
+1. Create a `follow.txt` file in your library root
+2. Add MangaDex URLs (one per line)
+3. Configure check interval (default: 24 hours)
+4. New chapters download automatically
+
+```
+# Example follow.txt
+https://mangadex.org/title/a1c7c817-4e59-43b7-9365-09c5f56e5eb1
+https://mangadex.org/title/32d76d19-8a05-4db0-9fc2-e0b0648fe9d0
+```
+
+### Tachiyomi/Mihon Migration
+
+Import your MangaDex library from Tachiyomi or Mihon:
+
+- Supports `.tachibk` (Mihon/forks) and `.proto.gz` (Tachiyomi) formats
+- Extracts all MangaDex URLs from your backup
+- Adds URLs to your library's `follow.txt`
+- Duplicate detection prevents re-adding existing URLs
+
+```
+POST /api/v1/tachiyomi/import
+Content-Type: multipart/form-data
+```
+
+### Tall Page Splitting
+
+Split long vertical webtoon pages into readable segments:
+
+- Configurable maximum height threshold
+- Batch processing for entire libraries
+- Preserves original files (creates new split versions)
+- Similar to TachiyomiSY's "split tall images" feature
+
+```
+GET  /api/v1/media-management/oversized-pages
+POST /api/v1/media-management/oversized-pages/split/{bookId}
+POST /api/v1/media-management/oversized-pages/split-all
+```
+
+### Enhanced Metadata
+
+Rich metadata from multiple sources:
+
+**MangaDex Metadata Plugin:**
+- Fetches title, description, authors, artists
+- Multi-language title support (10+ languages)
+- Genre and tag mapping
+- Cover art downloading
+
+**AniList Metadata Plugin:**
+- GraphQL-based metadata fetching
+- Configurable title preference (English/Romaji/Native)
+- Detailed series information
+
+### Chapter URL Tracking
+
+Never download the same chapter twice:
+
+- Imports from gallery-dl's `.chapter-urls.json`
+- Database persistence for crash recovery
+- Tracks chapter metadata (volume, language, scanlation group)
+- API to check/clear download history
+
+---
+
+## API Endpoints
+
+### Downloads
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/downloads` | List download queue |
+| POST | `/api/v1/downloads` | Add download to queue |
+| DELETE | `/api/v1/downloads/{id}` | Cancel/remove download |
+| DELETE | `/api/v1/downloads/clear/completed` | Clear completed |
+| DELETE | `/api/v1/downloads/clear/failed` | Clear failed |
+| DELETE | `/api/v1/downloads/clear/cancelled` | Clear cancelled |
+| GET | `/api/v1/downloads/progress` | SSE progress stream |
+
+### Follow Configuration
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/downloads/follow-config` | Get follow settings |
+| PUT | `/api/v1/downloads/follow-config` | Update follow settings |
 
 ### Media Management
-- **Oversized Pages Detection**: Scan for pages with very high resolutions
-- **Split Tall Images**: Split tall/long strip images into multiple pages (like TachiyomiSY's "split tall images" feature)
-- **Configurable Split Height**: Set custom maximum height threshold for page splitting
 
-### Additional Features
-- **Health Check API**: System health monitoring at `/api/v1/health`
-- **Chapter URL Tracking**: Prevent duplicate downloads
-- **Clear Downloaded Chapters**: Re-download chapters if ComicInfo.xml was broken
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/media-management/oversized-pages` | List oversized pages |
+| POST | `/api/v1/media-management/oversized-pages/split/{bookId}` | Split book pages |
+| POST | `/api/v1/media-management/oversized-pages/split-all` | Split all oversized |
 
-### Requirements
-- For downloads: `pip install gallery-dl` (included in Docker image)
+### System
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/health` | Health check |
+| POST | `/api/v1/tachiyomi/import` | Import Tachiyomi backup |
+
+---
 
 ## Installation
 
-Refer to the [website](https://komga.org/docs/category/installation) for instructions.
+### Requirements
+
+- Java 21+
+- [gallery-dl](https://github.com/mikf/gallery-dl) (`pip install gallery-dl`)
+
+### Docker (Recommended)
+
+```bash
+docker pull ghcr.io/YOUR_USERNAME/komga:latest
+
+docker run -d \
+  --name komga \
+  -p 25600:25600 \
+  -v /path/to/config:/config \
+  -v /path/to/manga:/manga \
+  ghcr.io/YOUR_USERNAME/komga:latest
+```
+
+### JAR
+
+```bash
+java -jar komga.jar
+```
+
+### Build from Source
+
+```bash
+# Build frontend
+cd komga-webui && npm install && npm run build && cd ..
+
+# Build backend with frontend
+./gradlew prepareThymeLeaf :komga:bootJar
+
+# Run
+java -jar komga/build/libs/komga-*.jar
+```
+
+---
+
+## Configuration
+
+### gallery-dl Setup
+
+Create `~/.config/gallery-dl/config.json`:
+
+```json
+{
+  "extractor": {
+    "mangadex": {
+      "lang": ["en"],
+      "chapter-filter": "lang == 'en'"
+    }
+  }
+}
+```
+
+### Follow List Check Interval
+
+Configure via API or application properties:
+
+```yaml
+komga:
+  download:
+    follow-check-interval: 24h
+```
+
+---
+
+## Comparison with Original Komga
+
+| Feature | Original | This Fork |
+|---------|----------|-----------|
+| Media Server | Yes | Yes |
+| MangaDex Downloads | No | Yes |
+| Automatic Chapter Tracking | No | Yes |
+| Tachiyomi Import | No | Yes |
+| Page Splitting | No | Yes |
+| AniList Metadata | No | Yes |
+| Follow List Automation | No | Yes |
+| Real-time Progress | No | Yes (SSE) |
+
+---
 
 ## Documentation
 
-Head over to our [website](https://komga.org) for more information.
+- [Download System Guide](docs/downloads.md)
+- [Follow List Setup](docs/follow-lists.md)
+- [Tachiyomi Migration](docs/tachiyomi-import.md)
+- [Page Splitting](docs/page-splitting.md)
+- [Metadata Plugins](docs/metadata-plugins.md)
+- [API Reference](docs/api-reference.md)
 
-## Develop in Komga
+---
 
-Check the [development guidelines](./DEVELOPING.md).
+## Tech Stack
 
-## Translation
+- **Backend:** Kotlin, Spring Boot, jOOQ
+- **Frontend:** Vue.js 2, Vuetify, TypeScript
+- **Database:** H2 (embedded) / SQLite
+- **Downloads:** gallery-dl integration
+- **Metadata:** MangaDex API, AniList GraphQL
 
-[![Translation status](https://hosted.weblate.org/widgets/komga/-/webui/horizontal-auto.svg)](https://hosted.weblate.org/engage/komga/)
+---
 
-## Sponsors
+## Contributing
 
-[![Jetbrains_logo](./.github/readme-images/jetbrains.svg)](https://www.jetbrains.com/?from=Komga)
+1. Fork the repository
+2. Create a feature branch
+3. Follow [Conventional Commits](https://www.conventionalcommits.org/)
+4. Submit a pull request
 
-Thanks to [JetBrains](https://www.jetbrains.com/?from=Komga) for providing the development environment that helps us develop Komga.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-[![Chromatic logo](https://user-images.githubusercontent.com/321738/84662277-e3db4f80-af1b-11ea-88f5-91d67a5e59f6.png)](https://www.chromatic.com)
-
-Thanks to [Chromatic](https://www.chromatic.com/) for providing the visual testing platform that helps us review UI changes and catch visual regressions.
+---
 
 ## Credits
 
-The Komga icon is based on an icon made by [Freepik](https://www.freepik.com/home) from www.flaticon.com
+- [Komga](https://github.com/gotson/komga) by gotson - The excellent base media server
+- [gallery-dl](https://github.com/mikf/gallery-dl) by mikf - Download engine
+- [MangaDex](https://mangadex.org) - Manga source and API
+- [AniList](https://anilist.co) - Metadata source
+
+---
+
+## License
+
+[MIT License](LICENSE)
