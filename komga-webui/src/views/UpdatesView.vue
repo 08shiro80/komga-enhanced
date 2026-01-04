@@ -66,7 +66,9 @@ export default Vue.extend({
       return this.$store.state.releases.find((x: ReleaseDto) => x.latest)
     },
     currentVersion(): string {
-      return this.$store.state.actuatorInfo?.build?.version
+      // Extract base version (before -fork suffix) for comparison with releases
+      const fullVersion = this.$store.state.actuatorInfo?.build?.version || ''
+      return fullVersion.split('-fork')[0]
     },
   },
   mounted() {

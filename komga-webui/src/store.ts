@@ -72,7 +72,10 @@ export default new Vuex.Store({
     isLatestVersion: (state) => (): number => {
       if(isEmpty(state.actuatorInfo)) return -1
       if(state.releases.length == 0) return -1
-      if(state.actuatorInfo.build.version == state.releases.find((x: ReleaseDto) => x.latest)?.version) return 1
+      // Extract base version (before -fork suffix) for comparison
+      const currentVersion = state.actuatorInfo.build.version.split('-fork')[0]
+      const latestVersion = state.releases.find((x: ReleaseDto) => x.latest)?.version
+      if(currentVersion == latestVersion) return 1
       else return 0
     },
   },

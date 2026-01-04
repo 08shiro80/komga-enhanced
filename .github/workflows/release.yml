@@ -3,14 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g., 1.2.3)'
+      komga_version:
+        description: 'Upstream Komga version (e.g., 1.23.6)'
         type: string
         required: true
-      jar_filename:
-        description: 'Custom JAR filename (without .jar), e.g., komga-1.20.2-fork-0.0.4'
+        default: '1.23.6'
+      fork_version:
+        description: 'Fork version (e.g., 0.0.5)'
         type: string
-        required: false
+        required: true
       release_notes:
         description: Release notes (use \n for newlines)
         type: string
@@ -43,10 +44,12 @@ jobs:
         run: |
           # Get latest tag as current version, or 0.0.0 if no tags exist
           CURRENT=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          # Construct full version: {komga_version}-fork-{fork_version}
+          NEXT="${{ inputs.komga_version }}-fork-${{ inputs.fork_version }}"
           echo "version_current=$CURRENT" >> $GITHUB_OUTPUT
-          echo "version_next=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          echo "version_next=$NEXT" >> $GITHUB_OUTPUT
           echo "Previous version: $CURRENT"
-          echo "New version: ${{ inputs.version }}"
+          echo "New version: $NEXT"
 
   release:
     name: Release
@@ -163,19 +166,9 @@ jobs:
         id: prepare_jar
         run: |
           VERSION="${{ needs.version.outputs.version_next }}"
-          ORIGINAL_JAR="komga/build/libs/komga-${VERSION}.jar"
-
-          if [ -n "${{ inputs.jar_filename }}" ]; then
-            # Custom filename provided
-            FINAL_JAR="komga/build/libs/${{ inputs.jar_filename }}.jar"
-            mv "$ORIGINAL_JAR" "$FINAL_JAR"
-            echo "jar_path=$FINAL_JAR" >> $GITHUB_OUTPUT
-            echo "jar_name=${{ inputs.jar_filename }}.jar" >> $GITHUB_OUTPUT
-          else
-            # Use default filename
-            echo "jar_path=$ORIGINAL_JAR" >> $GITHUB_OUTPUT
-            echo "jar_name=komga-${VERSION}.jar" >> $GITHUB_OUTPUT
-          fi
+          JAR_PATH="komga/build/libs/komga-${VERSION}.jar"
+          echo "jar_path=$JAR_PATH" >> $GITHUB_OUTPUT
+          echo "jar_name=komga-${VERSION}.jar" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         if: inputs.github_release
