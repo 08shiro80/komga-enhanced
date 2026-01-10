@@ -202,7 +202,7 @@ jobs:
 
       - name: Build and push Docker images
         if: inputs.docker_release
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: docker-build
           platforms: linux/amd64,linux/arm64,linux/arm/v7
