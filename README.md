@@ -160,7 +160,7 @@ Never download the same chapter twice:
 ### Docker (Recommended)
 
 ```bash
-docker pull ghcr.io/YOUR_USERNAME/komga:latest
+docker pull 08shiro80/komga:latest
 
 docker run -d \
   --name komga \
