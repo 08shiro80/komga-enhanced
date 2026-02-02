@@ -417,3 +417,7 @@ project.afterEvaluate {
     mustRunAfter(tasks.jar)
   }
 }
+
+tasks.bootJar {
+  archiveFileName.set("komga-${project.version}.jar")
+}
