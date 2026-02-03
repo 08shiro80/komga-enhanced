@@ -167,7 +167,7 @@ docker run -d \
   -p 25600:25600 \
   -v /path/to/config:/config \
   -v /path/to/manga:/manga \
-  ghcr.io/YOUR_USERNAME/komga:latest
+  08shiro80/komga:latest
 ```
 
 ### JAR
