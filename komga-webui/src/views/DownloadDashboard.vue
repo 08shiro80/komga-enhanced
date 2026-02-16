@@ -106,6 +106,34 @@
                 <v-icon left>mdi-plus</v-icon>
                 New Download
               </v-btn>
+              <v-menu offset-y>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-btn text v-bind="attrs" v-on="on" class="ml-2">
+                    <v-icon left>mdi-broom</v-icon>
+                    Clear
+                    <v-icon right>mdi-menu-down</v-icon>
+                  </v-btn>
+                </template>
+                <v-list dense>
+                  <v-list-item @click="clearByStatus('completed')" :disabled="completedDownloads.length === 0">
+                    <v-list-item-icon><v-icon color="success">mdi-check-circle</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Completed ({{ completedDownloads.length }})</v-list-item-content>
+                  </v-list-item>
+                  <v-list-item @click="clearByStatus('failed')" :disabled="failedDownloads.length === 0">
+                    <v-list-item-icon><v-icon color="error">mdi-alert-circle</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Failed ({{ failedDownloads.length }})</v-list-item-content>
+                  </v-list-item>
+                  <v-list-item @click="clearByStatus('cancelled')" :disabled="cancelledDownloads.length === 0">
+                    <v-list-item-icon><v-icon color="warning">mdi-cancel</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Cancelled ({{ cancelledDownloads.length }})</v-list-item-content>
+                  </v-list-item>
+                  <v-divider></v-divider>
+                  <v-list-item @click="clearByStatus('pending')" :disabled="pendingDownloads.length === 0">
+                    <v-list-item-icon><v-icon color="grey">mdi-clock-outline</v-icon></v-list-item-icon>
+                    <v-list-item-content>Clear Pending ({{ pendingDownloads.length }})</v-list-item-content>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
               <v-btn icon @click="loadDownloads" :loading="loading" class="ml-2">
                 <v-icon>mdi-refresh</v-icon>
               </v-btn>
@@ -519,6 +547,9 @@ export default {
     failedDownloads() {
       return this.downloads.filter(d => d.status === 'FAILED')
     },
+    cancelledDownloads() {
+      return this.downloads.filter(d => d.status === 'CANCELLED')
+    },
     selectedLibrary() {
       if (this.selectedLibraryIndex === null || this.selectedLibraryIndex === undefined) return null
       return this.libraries[this.selectedLibraryIndex]
@@ -700,6 +731,15 @@ export default {
         case 'delete':
           this.deleteDownload(download)
           break
+      }
+    },
+    async clearByStatus(status) {
+      try {
+        const response = await this.$http.delete(`/api/v1/downloads/clear/${status}`)
+        this.showSuccess(response.data.message || `Cleared ${status} downloads`)
+        await this.loadDownloads()
+      } catch (error) {
+        this.showError('Failed to clear downloads: ' + error.message)
       }
     },
     showSuccess(message) {

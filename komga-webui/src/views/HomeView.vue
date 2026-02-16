@@ -516,14 +516,7 @@ export default Vue.extend({
       const fullVersion = info.build.version
       const branch = info.git?.branch || 'unknown'
       // Parse version format: 1.23.6-fork-0.0.4
-      const forkMatch = fullVersion.match(/^(.+)-fork-(.+)$/)
-      if (forkMatch) {
-        const baseVersion = forkMatch[1]
-        const forkVersion = forkMatch[2]
-        return `v${baseVersion}-${branch}  ${forkVersion}`
-      }
-      // Fallback for non-fork versions
-      return `v${fullVersion}-${branch}`
+      return `v${fullVersion}`
     },
   },
   methods: {
