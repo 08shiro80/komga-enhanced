@@ -18,6 +18,11 @@ interface DownloadQueueRepository {
 
   fun findByLibraryId(libraryId: String): Collection<DownloadQueue>
 
+  fun existsBySourceUrlAndStatusIn(
+    sourceUrl: String,
+    statuses: Collection<DownloadStatus>,
+  ): Boolean
+
   fun delete(id: String)
 
   fun insert(download: DownloadQueue)

@@ -3,7 +3,7 @@
     <v-container fluid>
       <v-row>
         <v-col>
-          <h1 class="text-h4 mb-4">Database Backup & Restore</h1>
+          <h1 class="text-h4 mb-4">{{ $t('settings_backup.title') }}</h1>
         </v-col>
       </v-row>
 
@@ -11,9 +11,9 @@
       <v-row>
         <v-col cols="12" md="6">
           <v-card>
-            <v-card-title>Create New Backup</v-card-title>
+            <v-card-title>{{ $t('settings_backup.create_title') }}</v-card-title>
             <v-card-text>
-              <p>Create a backup of your Komga database. Backups are stored locally and can be downloaded or restored later.</p>
+              <p>{{ $t('settings_backup.create_description') }}</p>
             </v-card-text>
             <v-card-actions>
               <v-btn
@@ -22,7 +22,7 @@
                 @click="createBackup"
               >
                 <v-icon left>mdi-database-export</v-icon>
-                Create Backup
+                {{ $t('settings_backup.create_backup') }}
               </v-btn>
               <v-btn
                 color="secondary"
@@ -30,7 +30,7 @@
                 @click="createFullBackup"
               >
                 <v-icon left>mdi-database-export-outline</v-icon>
-                Full Backup (Main + Tasks)
+                {{ $t('settings_backup.create_full_backup') }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -38,12 +38,12 @@
 
         <v-col cols="12" md="6">
           <v-card>
-            <v-card-title>Cleanup Old Backups</v-card-title>
+            <v-card-title>{{ $t('settings_backup.cleanup_title') }}</v-card-title>
             <v-card-text>
-              <p>Remove old backups to free up disk space. Keep the most recent backups.</p>
+              <p>{{ $t('settings_backup.cleanup_description') }}</p>
               <v-text-field
                 v-model.number="keepCount"
-                label="Number of backups to keep"
+                :label="$t('settings_backup.field_keep_count')"
                 type="number"
                 min="1"
                 max="50"
@@ -58,7 +58,7 @@
                 @click="cleanBackups"
               >
                 <v-icon left>mdi-delete-sweep</v-icon>
-                Clean Old Backups
+                {{ $t('settings_backup.clean_old_backups') }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -70,7 +70,7 @@
         <v-col cols="12">
           <v-card>
             <v-card-title>
-              Available Backups
+              {{ $t('settings_backup.available_title') }}
               <v-spacer></v-spacer>
               <v-btn icon @click="loadBackups" :loading="loading">
                 <v-icon>mdi-refresh</v-icon>
@@ -79,7 +79,7 @@
 
             <v-card-text>
               <v-alert v-if="backups.length === 0 && !loading" type="info" text>
-                No backups found. Create your first backup using the button above.
+                {{ $t('settings_backup.no_backups') }}
               </v-alert>
 
               <v-data-table
@@ -117,7 +117,7 @@
                         <v-icon small>mdi-download</v-icon>
                       </v-btn>
                     </template>
-                    <span>Download</span>
+                    <span>{{ $t('settings_backup.download') }}</span>
                   </v-tooltip>
 
                   <v-tooltip bottom>
@@ -132,7 +132,7 @@
                         <v-icon small>mdi-delete</v-icon>
                       </v-btn>
                     </template>
-                    <span>Delete</span>
+                    <span>{{ $t('settings_backup.delete') }}</span>
                   </v-tooltip>
 
                   <v-tooltip bottom>
@@ -147,7 +147,7 @@
                         <v-icon small>mdi-database-import</v-icon>
                       </v-btn>
                     </template>
-                    <span>Restore (requires restart)</span>
+                    <span>{{ $t('settings_backup.restore') }}</span>
                   </v-tooltip>
                 </template>
               </v-data-table>
@@ -160,15 +160,15 @@
     <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog" max-width="500">
       <v-card>
-        <v-card-title class="headline">Delete Backup?</v-card-title>
+        <v-card-title class="headline">{{ $t('settings_backup.dialog_delete_title') }}</v-card-title>
         <v-card-text>
-          Are you sure you want to delete backup: <strong>{{ selectedBackup?.fileName }}</strong>?
-          <br>This action cannot be undone.
+          {{ $t('settings_backup.dialog_delete_confirm') }} <strong>{{ selectedBackup?.fileName }}</strong>?
+          <br>{{ $t('settings_backup.dialog_delete_info') }}
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="deleteDialog = false">Cancel</v-btn>
-          <v-btn color="error" text @click="deleteBackup" :loading="deleting">Delete</v-btn>
+          <v-btn text @click="deleteDialog = false">{{ $t('download_manager.cancel') }}</v-btn>
+          <v-btn color="error" text @click="deleteBackup" :loading="deleting">{{ $t('settings_backup.delete') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -178,26 +178,26 @@
       <v-card>
         <v-card-title class="headline error--text">
           <v-icon color="error" left>mdi-alert</v-icon>
-          Restore Backup?
+          {{ $t('settings_backup.dialog_restore_title') }}
         </v-card-title>
         <v-card-text>
           <v-alert type="warning" text>
-            <strong>Warning:</strong> Restoring a backup will:
+            <strong>{{ $t('settings_backup.dialog_restore_warning') }}</strong>
             <ul>
-              <li>Replace your current database</li>
-              <li>Require an application restart</li>
-              <li>Potentially lose recent changes</li>
+              <li>{{ $t('settings_backup.dialog_restore_item1') }}</li>
+              <li>{{ $t('settings_backup.dialog_restore_item2') }}</li>
+              <li>{{ $t('settings_backup.dialog_restore_item3') }}</li>
             </ul>
           </v-alert>
           <p class="mt-4">
-            Restore from backup: <strong>{{ selectedBackup?.fileName }}</strong>?
+            {{ $t('settings_backup.dialog_restore_confirm') }} <strong>{{ selectedBackup?.fileName }}</strong>?
           </p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="restoreDialog = false">Cancel</v-btn>
+          <v-btn text @click="restoreDialog = false">{{ $t('download_manager.cancel') }}</v-btn>
           <v-btn color="warning" text @click="restoreBackup" :loading="restoring">
-            Restore & Restart
+            {{ $t('settings_backup.restore_and_restart') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -212,7 +212,7 @@
     >
       {{ snackbarText }}
       <template v-slot:action="{ attrs }">
-        <v-btn text v-bind="attrs" @click="snackbar = false">Close</v-btn>
+        <v-btn text v-bind="attrs" @click="snackbar = false">{{ $t('download_manager.close') }}</v-btn>
       </template>
     </v-snackbar>
   </div>
@@ -240,14 +240,18 @@ export default {
       snackbar: false,
       snackbarText: '',
       snackbarColor: 'success',
-      headers: [
-        { text: 'File Name', value: 'fileName' },
-        { text: 'Created Date', value: 'createdDate' },
-        { text: 'Size', value: 'sizeMb' },
-        { text: 'Type', value: 'type' },
-        { text: 'Actions', value: 'actions', sortable: false },
-      ],
     }
+  },
+  computed: {
+    headers() {
+      return [
+        { text: this.$t('settings_backup.header_filename'), value: 'fileName' },
+        { text: this.$t('settings_backup.header_created'), value: 'createdDate' },
+        { text: this.$t('settings_backup.header_size'), value: 'sizeMb' },
+        { text: this.$t('settings_backup.header_type'), value: 'type' },
+        { text: this.$t('settings_backup.header_actions'), value: 'actions', sortable: false },
+      ]
+    },
   },
   mounted() {
     this.loadBackups()
@@ -259,7 +263,7 @@ export default {
         const response = await this.$http.get('/api/v1/backup')
         this.backups = response.data
       } catch (error) {
-        this.showError('Failed to load backups: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_load_failed') + ': ' + error.message)
       } finally {
         this.loading = false
       }
@@ -268,10 +272,10 @@ export default {
       this.creating = true
       try {
         await this.$http.post('/api/v1/backup')
-        this.showSuccess('Backup created successfully')
+        this.showSuccess(this.$t('settings_backup.snack_created'))
         await this.loadBackups()
       } catch (error) {
-        this.showError('Failed to create backup: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_create_failed') + ': ' + error.message)
       } finally {
         this.creating = false
       }
@@ -280,10 +284,10 @@ export default {
       this.creatingFull = true
       try {
         await this.$http.post('/api/v1/backup/full')
-        this.showSuccess('Full backup created successfully')
+        this.showSuccess(this.$t('settings_backup.snack_full_created'))
         await this.loadBackups()
       } catch (error) {
-        this.showError('Failed to create full backup: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_full_create_failed') + ': ' + error.message)
       } finally {
         this.creatingFull = false
       }
@@ -295,7 +299,7 @@ export default {
         this.showSuccess(response.data.message)
         await this.loadBackups()
       } catch (error) {
-        this.showError('Failed to clean backups: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_clean_failed') + ': ' + error.message)
       } finally {
         this.cleaning = false
       }
@@ -308,7 +312,6 @@ export default {
           { responseType: 'blob' },
         )
 
-        // Create download link
         const url = window.URL.createObjectURL(new Blob([response.data]))
         const link = document.createElement('a')
         link.href = url
@@ -318,9 +321,9 @@ export default {
         link.remove()
         window.URL.revokeObjectURL(url)
 
-        this.showSuccess('Backup downloaded successfully')
+        this.showSuccess(this.$t('settings_backup.snack_downloaded'))
       } catch (error) {
-        this.showError('Failed to download backup: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_download_failed') + ': ' + error.message)
       } finally {
         this.downloading = null
       }
@@ -333,11 +336,11 @@ export default {
       this.deleting = true
       try {
         await this.$http.delete(`/api/v1/backup/${this.selectedBackup.fileName}`)
-        this.showSuccess('Backup deleted successfully')
+        this.showSuccess(this.$t('settings_backup.snack_deleted'))
         this.deleteDialog = false
         await this.loadBackups()
       } catch (error) {
-        this.showError('Failed to delete backup: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_delete_failed') + ': ' + error.message)
       } finally {
         this.deleting = false
       }
@@ -355,24 +358,21 @@ export default {
         this.showSuccess(response.data.message)
         this.restoreDialog = false
 
-        // Show countdown and redirect
         let countdown = 3
         const countdownInterval = setInterval(() => {
           if (countdown > 0) {
-            this.showWarning(`Application restarting in ${countdown} seconds...`)
+            this.showWarning(this.$t('settings_backup.restarting_countdown', { seconds: countdown }))
             countdown--
           } else {
             clearInterval(countdownInterval)
-            // Redirect to home page - server will be restarting
-            this.showWarning('Server restarting... Please wait and refresh if needed.')
-            // Try to reconnect after 5 seconds
+            this.showWarning(this.$t('settings_backup.restarting_message'))
             setTimeout(() => {
               window.location.href = '/'
             }, 5000)
           }
         }, 1000)
       } catch (error) {
-        this.showError('Failed to restore backup: ' + error.message)
+        this.showError(this.$t('settings_backup.snack_restore_failed') + ': ' + error.message)
       } finally {
         this.restoring = false
       }

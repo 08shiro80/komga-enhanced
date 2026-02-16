@@ -2,6 +2,10 @@
   <v-container fluid class="pa-6">
     <v-row>
       <v-col>
+        <div v-if="forkVersion" class="mb-4">
+          <v-chip label color="primary" class="me-2">Base: {{ currentVersion }}</v-chip>
+          <v-chip label color="secondary">Fork: {{ forkVersion }}</v-chip>
+        </div>
         <div v-if="$store.getters.isLatestVersion() == 1">
           <v-alert type="success" text>
             {{ $t('updates.latest_installed')}}
@@ -23,7 +27,7 @@
                 release.version
               }}</a>
             <v-chip
-              v-if="release.version == currentVersion"
+              v-if="release.version.replace(/^v/, '') == currentVersion.replace(/^v/, '')"
               class="mx-2 mt-n3"
               small
               label
@@ -66,7 +70,13 @@ export default Vue.extend({
       return this.$store.state.releases.find((x: ReleaseDto) => x.latest)
     },
     currentVersion(): string {
-      return this.$store.state.actuatorInfo?.build?.version
+      const fullVersion = this.$store.state.actuatorInfo?.build?.version || ''
+      return fullVersion.split('-fork')[0]
+    },
+    forkVersion(): string {
+      const fullVersion = this.$store.state.actuatorInfo?.build?.version || ''
+      const parts = fullVersion.split('-fork-')
+      return parts.length > 1 ? parts[1] : ''
     },
   },
   mounted() {

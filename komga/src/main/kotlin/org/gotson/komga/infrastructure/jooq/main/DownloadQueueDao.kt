@@ -68,6 +68,17 @@ class DownloadQueueDao(
       .fetch()
       .map { it.toDomain() }
 
+  override fun existsBySourceUrlAndStatusIn(
+    sourceUrl: String,
+    statuses: Collection<DownloadStatus>,
+  ): Boolean =
+    dslRO.fetchExists(
+      dslRO
+        .selectFrom(dq)
+        .where(dq.SOURCE_URL.eq(sourceUrl))
+        .and(dq.STATUS.`in`(statuses.map { it.name })),
+    )
+
   override fun delete(id: String) {
     dslRW
       .deleteFrom(dq)

@@ -95,6 +95,10 @@ class DownloadScheduler(
 
     config.urls.forEach { url ->
       try {
+        if (downloadExecutor.isUrlAlreadyQueued(url)) {
+          logger.debug { "Skipping duplicate URL from follow config: $url" }
+          return@forEach
+        }
         downloadExecutor.createDownload(
           sourceUrl = url,
           libraryId = null,

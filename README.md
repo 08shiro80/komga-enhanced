@@ -160,14 +160,42 @@ Never download the same chapter twice:
 ### Docker (Recommended)
 
 ```bash
-docker pull ghcr.io/YOUR_USERNAME/komga:latest
+docker pull 08shiro80/komga:latest
 
 docker run -d \
   --name komga \
   -p 25600:25600 \
   -v /path/to/config:/config \
   -v /path/to/manga:/manga \
-  ghcr.io/YOUR_USERNAME/komga:latest
+  08shiro80/komga:latest
+```
+
+### Docker Compose
+
+```yaml
+version: "3.9"
+services:
+  komga:
+    image: 08shiro80/komga:latest
+    container_name: komga
+    ports:
+      - "25600:25600"
+    volumes:
+      - ./config:/config
+      - /path/to/manga:/manga
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+### Updating gallery-dl in Docker
+
+To update gallery-dl to the latest version inside your running container:
+
+```bash
+docker exec komga pip install -U gallery-dl
 ```
 
 ### JAR

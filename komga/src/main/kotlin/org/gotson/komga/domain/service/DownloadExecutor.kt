@@ -33,6 +33,7 @@ class DownloadExecutor(
 ) {
   private val processing = AtomicBoolean(false)
   private val activeDownloads = ConcurrentHashMap<String, DownloadQueue>()
+  private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
 
   /**
    * Process download queue every 30 seconds
@@ -212,6 +213,7 @@ class DownloadExecutor(
     )
 
     activeDownloads.remove(downloadId)
+    cancelledIds.add(downloadId)
     logger.info { "Cancelled download: $downloadId" }
   }
 
@@ -245,6 +247,7 @@ class DownloadExecutor(
   fun deleteDownload(downloadId: String) {
     downloadQueueRepository.delete(downloadId)
     activeDownloads.remove(downloadId)
+    cancelledIds.add(downloadId)
     logger.info { "Deleted download: $downloadId" }
   }
 
@@ -277,6 +280,8 @@ class DownloadExecutor(
    */
   fun clearCancelledDownloads(): Int = clearDownloadsByStatus(DownloadStatus.CANCELLED)
 
+  fun clearPendingDownloads(): Int = clearDownloadsByStatus(DownloadStatus.PENDING)
+
   /**
    * Process a follow.txt file to add manga URLs to download queue
    */
@@ -299,13 +304,17 @@ class DownloadExecutor(
 
       logger.info { "Processing follow list: ${urls.size} URLs" }
 
+      val activeStatuses = listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.COMPLETED)
       urls.forEach { url ->
         try {
-          // gallery-dl's --download-archive will handle duplicate chapter detection
+          if (downloadQueueRepository.existsBySourceUrlAndStatusIn(url, activeStatuses)) {
+            logger.debug { "Skipping duplicate URL already in queue: $url" }
+            return@forEach
+          }
           createDownload(
             sourceUrl = url,
             libraryId = libraryId,
-            title = null, // Will be fetched from gallery-dl
+            title = null,
             createdBy = "follow-list",
             priority = 5,
           )
@@ -319,7 +328,17 @@ class DownloadExecutor(
     }
   }
 
+  fun isUrlAlreadyQueued(url: String): Boolean =
+    downloadQueueRepository.existsBySourceUrlAndStatusIn(
+      url,
+      listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.COMPLETED),
+    )
+
   private fun processDownload(download: DownloadQueue) {
+    if (cancelledIds.remove(download.id)) {
+      logger.info { "Download ${download.id} was cancelled before processing started, skipping" }
+      return
+    }
     activeDownloads[download.id] = download
 
     try {
@@ -384,6 +403,11 @@ class DownloadExecutor(
       // Download using gallery-dl
       val result =
         galleryDlWrapper.download(download.sourceUrl, destinationPath, library?.path) { progress ->
+          if (cancelledIds.contains(download.id)) {
+            logger.info { "Download ${download.id} cancelled during processing, aborting" }
+            cancelledIds.remove(download.id)
+            throw InterruptedException("Download cancelled: ${download.id}")
+          }
           // Update progress in database
           downloadQueueRepository.update(
             download.copy(
@@ -565,5 +589,9 @@ class DownloadExecutor(
     )
   }
 
-  private fun sanitizeFileName(name: String): String = name.replace(Regex("[^a-zA-Z0-9-_ ]"), "_").trim()
+  private fun sanitizeFileName(name: String): String =
+    name
+      .replace(Regex("[\\\\/:*?\"<>|]"), "")
+      .trim()
+      .trimEnd('.')
 }

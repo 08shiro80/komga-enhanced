@@ -155,6 +155,28 @@ class GalleryDlWrapper(
           }
         }
 
+      val finalTitle =
+        if (englishTitle != null && englishTitle.length > 80) {
+          val allEnglishTitles = mutableListOf<String>()
+          if (mainEnglishTitle != null) allEnglishTitles.add(mainEnglishTitle)
+          altTitles.forEach { entry ->
+            if (entry is Map<*, *>) {
+              entry.entries.forEach { (lang, title) ->
+                if (lang == "en" && title is String) allEnglishTitles.add(title)
+              }
+            }
+          }
+          val shortest = allEnglishTitles.minByOrNull { it.length }
+          if (shortest != null && shortest.length < englishTitle.length) {
+            logger.info { "Title too long (${englishTitle.length} chars), using shortest EN title: $shortest" }
+            shortest
+          } else {
+            englishTitle
+          }
+        } else {
+          englishTitle
+        }
+
       // Extract description (prefer English)
       val descriptionMap = attributes["description"] as? Map<*, *> ?: emptyMap<String, String>()
       val description = descriptionMap["en"] as? String
@@ -215,10 +237,10 @@ class GalleryDlWrapper(
         }
       }
 
-      logger.info { "Successfully fetched MangaDex metadata for $mangaId: title='$englishTitle', author='$authorArtist', cover='$coverFilename'" }
+      logger.info { "Successfully fetched MangaDex metadata for $mangaId: title='$finalTitle', author='$authorArtist', cover='$coverFilename'" }
 
       return MangaInfo(
-        title = englishTitle ?: "Unknown",
+        title = finalTitle ?: "Unknown",
         author = authorArtist,
         totalChapters = 0, // Will be updated during download
         description = description,
@@ -1498,7 +1520,7 @@ class GalleryDlWrapper(
               "name" to mangaInfo.title,
               "alternate_titles" to alternateTitles,
             ).apply {
-              // Add all optional fields if available
+              this["publisher"] = "MangaDex"
               mangaInfo.author?.let { this["author"] = it }
               mangaInfo.description?.let { this["description"] = it }
               mangaInfo.year?.let { this["year"] = it }

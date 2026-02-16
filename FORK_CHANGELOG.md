@@ -6,7 +6,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [Unreleased]
+## [0.0.4] - 2026-02-16
 
 ### Added
 
@@ -69,6 +69,15 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **MangaDex Rate Limiter** - Respect API rate limits
 - **Download Scheduler** - Background scheduled tasks for follow list checking
 - **Chapter URL DAO** - Database persistence for chapter tracking
+
+### Fixed
+
+- **Follow List Duplicate Prevention** - Follow.txt and follow config URLs that are already completed are now skipped, not just pending/downloading ones
+- **Follow Config Duplicate Check** - `processFollowConfigNow` now checks for duplicates before adding URLs to the download queue
+
+### Improved
+
+- **Shortest Title Selection** - When the selected English title exceeds 80 characters, the system now picks the shortest available English title from both main and alternative titles
 
 ### Changed
 

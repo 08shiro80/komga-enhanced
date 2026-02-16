@@ -57,3 +57,7 @@ application-oauth2.yml
 ### Conveyor
 output/
 secret/
+
+##Ignore
+CLAUDE.md
+backup/

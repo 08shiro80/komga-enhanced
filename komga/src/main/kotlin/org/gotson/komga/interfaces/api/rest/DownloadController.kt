@@ -147,6 +147,17 @@ class DownloadController(
     )
   }
 
+  @DeleteMapping("clear/pending")
+  @Operation(summary = "Clear all pending downloads", tags = [TagNames.DOWNLOADS])
+  fun clearPendingDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearPendingDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "PENDING",
+      message = "Cleared $count pending downloads",
+    )
+  }
+
   // =====================
   // Library follow.txt Endpoints
   // =====================
