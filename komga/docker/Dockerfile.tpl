@@ -6,7 +6,7 @@ RUN java -Djarmode=tools -jar application.jar extract --layers --destination ext
 
 # Build kepubify from source with current Go
 FROM golang:1.24 as kepubify-builder
-RUN go install github.com/pgaskin/kepubify/v4@latest
+RUN go install github.com/pgaskin/kepubify/v4/cmd/kepubify@latest
 
 # amd64 builder
 FROM ubuntu:24.10 as build-amd64

@@ -1,10 +1,8 @@
 package org.gotson.komga.infrastructure.metadata.mylar.dto
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -161,7 +159,7 @@ class SeriesTest(
   }
 
   @Test
-  fun `given invalid json file missing year when deserializing then it fails`() {
+  fun `given json file missing year when deserializing then year defaults to null`() {
     // language=JSON
     val json =
       """
@@ -186,13 +184,14 @@ class SeriesTest(
         }
       }
       """.trimIndent()
-    val thrown = catchThrowable { mapper.readValue<Series>(json) }
+    val seriesJson = mapper.readValue<Series>(json)
 
-    assertThat(thrown).isInstanceOf(MismatchedInputException::class.java)
+    assertThat(seriesJson.metadata.year).isNull()
+    assertThat(seriesJson.metadata.name).isEqualTo("Usagi Yojimbo")
   }
 
   @Test
-  fun `given invalid json file missing publisher when deserializing then it fails`() {
+  fun `given json file missing publisher when deserializing then publisher defaults to empty`() {
     // language=JSON
     val json =
       """
@@ -217,13 +216,14 @@ class SeriesTest(
         }
       }
       """.trimIndent()
-    val thrown = catchThrowable { mapper.readValue<Series>(json) }
+    val seriesJson = mapper.readValue<Series>(json)
 
-    assertThat(thrown).isInstanceOf(MismatchedInputException::class.java)
+    assertThat(seriesJson.metadata.publisher).isEmpty()
+    assertThat(seriesJson.metadata.name).isEqualTo("Usagi Yojimbo")
   }
 
   @Test
-  fun `given invalid json file missing status when deserializing then it fails`() {
+  fun `given json file missing status when deserializing then status defaults to null`() {
     // language=JSON
     val json =
       """
@@ -247,10 +247,10 @@ class SeriesTest(
           "publication_run": "June 2019 - Present"
         }
       }
-
       """.trimIndent()
-    val thrown = catchThrowable { mapper.readValue<Series>(json) }
+    val seriesJson = mapper.readValue<Series>(json)
 
-    assertThat(thrown).isInstanceOf(MismatchedInputException::class.java)
+    assertThat(seriesJson.metadata.status).isNull()
+    assertThat(seriesJson.metadata.name).isEqualTo("Usagi Yojimbo")
   }
 }
