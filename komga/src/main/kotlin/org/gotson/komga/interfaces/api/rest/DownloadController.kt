@@ -6,10 +6,13 @@ import org.gotson.komga.domain.model.FollowConfig
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.domain.service.ChapterChecker
 import org.gotson.komga.domain.service.DownloadExecutor
 import org.gotson.komga.domain.service.DownloadScheduler
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
+import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckResultDto
+import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckSummaryDto
 import org.gotson.komga.interfaces.api.rest.dto.ClearResultDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadActionDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadCreateDto
@@ -44,6 +47,7 @@ class DownloadController(
   private val followConfigRepository: FollowConfigRepository,
   private val downloadScheduler: DownloadScheduler,
   private val libraryRepository: LibraryRepository,
+  private val chapterChecker: ChapterChecker,
 ) {
   @GetMapping
   @Operation(summary = "List all downloads", tags = [TagNames.DOWNLOADS])
@@ -158,9 +162,61 @@ class DownloadController(
     )
   }
 
-  // =====================
-  // Library follow.txt Endpoints
-  // =====================
+  @PostMapping("check-new")
+  @Operation(summary = "Check for new chapters across all followed manga", tags = [TagNames.DOWNLOADS])
+  fun checkForNewChapters(): ChapterCheckSummaryDto {
+    val summary = chapterChecker.checkAndQueueNewChapters()
+    return ChapterCheckSummaryDto(
+      totalManga = summary.totalManga,
+      checkedCount = summary.checkedCount,
+      needsDownloadCount = summary.needsDownloadCount,
+      upToDateCount = summary.upToDateCount,
+      errorCount = summary.errorCount,
+      results =
+        summary.results.map { r ->
+          ChapterCheckResultDto(
+            url = r.url,
+            mangaId = r.mangaId,
+            title = r.title,
+            apiChapterCount = r.apiChapterCount,
+            downloadedChapterCount = r.downloadedChapterCount,
+            filesystemChapterCount = r.filesystemChapterCount,
+            newChaptersEstimate = r.newChaptersEstimate,
+            needsDownload = r.needsDownload,
+            error = r.error,
+          )
+        },
+      durationMs = summary.durationMs,
+    )
+  }
+
+  @PostMapping("check-only")
+  @Operation(summary = "Check for new chapters without queuing downloads", tags = [TagNames.DOWNLOADS])
+  fun checkOnly(): ChapterCheckSummaryDto {
+    val summary = chapterChecker.checkAll()
+    return ChapterCheckSummaryDto(
+      totalManga = summary.totalManga,
+      checkedCount = summary.checkedCount,
+      needsDownloadCount = summary.needsDownloadCount,
+      upToDateCount = summary.upToDateCount,
+      errorCount = summary.errorCount,
+      results =
+        summary.results.map { r ->
+          ChapterCheckResultDto(
+            url = r.url,
+            mangaId = r.mangaId,
+            title = r.title,
+            apiChapterCount = r.apiChapterCount,
+            downloadedChapterCount = r.downloadedChapterCount,
+            filesystemChapterCount = r.filesystemChapterCount,
+            newChaptersEstimate = r.newChaptersEstimate,
+            needsDownload = r.needsDownload,
+            error = r.error,
+          )
+        },
+      durationMs = summary.durationMs,
+    )
+  }
 
   @GetMapping("follow-txt/{libraryId}")
   @Operation(summary = "Get follow.txt content for a library", tags = [TagNames.DOWNLOADS])
@@ -210,10 +266,6 @@ class DownloadController(
     downloadScheduler.checkFollowListNow(libraryId)
   }
 
-  // =====================
-  // Scheduler Endpoints
-  // =====================
-
   @GetMapping("scheduler")
   @Operation(summary = "Get scheduler settings", tags = [TagNames.DOWNLOADS])
   fun getSchedulerSettings(): SchedulerSettingsDto {
@@ -245,10 +297,6 @@ class DownloadController(
       intervalHours = saved.checkIntervalHours,
     )
   }
-
-  // =====================
-  // Legacy Follow Config Endpoints (kept for compatibility)
-  // =====================
 
   @GetMapping("follow-config")
   @Operation(summary = "Get follow configuration", tags = [TagNames.DOWNLOADS])
@@ -288,7 +336,6 @@ class DownloadController(
   }
 }
 
-// Extension function to convert FollowConfig to DTO
 fun FollowConfig.toDto() =
   FollowConfigDto(
     urls = urls,

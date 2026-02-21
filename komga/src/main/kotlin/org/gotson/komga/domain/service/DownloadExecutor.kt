@@ -21,6 +21,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private val logger = KotlinLogging.logger {}
 
+private data class ActiveDownload(
+  val download: DownloadQueue,
+  var process: Process? = null,
+)
+
 @Service
 class DownloadExecutor(
   private val downloadQueueRepository: DownloadQueueRepository,
@@ -32,12 +37,9 @@ class DownloadExecutor(
   private val eventPublisher: ApplicationEventPublisher,
 ) {
   private val processing = AtomicBoolean(false)
-  private val activeDownloads = ConcurrentHashMap<String, DownloadQueue>()
+  private val activeDownloads = ConcurrentHashMap<String, ActiveDownload>()
   private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
 
-  /**
-   * Process download queue every 30 seconds
-   */
   @Scheduled(fixedDelay = 30000, initialDelay = 10000)
   fun processQueue() {
     if (!processing.compareAndSet(false, true)) {
@@ -46,13 +48,11 @@ class DownloadExecutor(
     }
 
     try {
-      // Check if gallery-dl is available
       if (!galleryDlWrapper.isInstalled()) {
-        logger.warn { "gallery-dl is not installed, skipping download processing. Please install with: pip install gallery-dl" }
+        logger.warn { "gallery-dl is not installed, skipping download processing" }
         return
       }
 
-      // Get pending downloads ordered by priority
       val pending = downloadQueueRepository.findPendingOrdered()
 
       if (pending.isEmpty()) {
@@ -60,7 +60,6 @@ class DownloadExecutor(
         return
       }
 
-      // Process one download at a time for now
       val download = pending.first()
 
       if (activeDownloads.containsKey(download.id)) {
@@ -77,11 +76,7 @@ class DownloadExecutor(
     }
   }
 
-  /**
-   * Auto-retry failed downloads every 5 minutes
-   * Only retries downloads that haven't exceeded maxRetries
-   */
-  @Scheduled(fixedDelay = 300000, initialDelay = 60000) // 5 minutes
+  @Scheduled(fixedDelay = 300000, initialDelay = 60000)
   fun autoRetryFailedDownloads() {
     try {
       val failed = downloadQueueRepository.findByStatus(DownloadStatus.FAILED)
@@ -92,11 +87,10 @@ class DownloadExecutor(
         return
       }
 
-      // Only retry downloads that failed more than 5 minutes ago (exponential backoff)
       val now = LocalDateTime.now()
       val toRetry =
         retriable.filter { download ->
-          val waitMinutes = (download.retryCount + 1) * 5L // 5, 10, 15 minutes for retries 1, 2, 3
+          val waitMinutes = (download.retryCount + 1) * 5L
           val lastModified = download.lastModifiedDate
           java.time.Duration
             .between(lastModified, now)
@@ -115,7 +109,6 @@ class DownloadExecutor(
           retryDownload(download.id)
           logger.info { "Auto-retry queued: ${download.id} - ${download.title} (attempt ${download.retryCount + 1})" }
 
-          // Broadcast retry event via WebSocket
           downloadProgressHandler.broadcastProgress(
             DownloadProgressDto(
               type = "retry",
@@ -140,9 +133,6 @@ class DownloadExecutor(
     }
   }
 
-  /**
-   * Create a new download request
-   */
   fun createDownload(
     sourceUrl: String,
     libraryId: String?,
@@ -150,13 +140,11 @@ class DownloadExecutor(
     createdBy: String,
     priority: Int = 5,
   ): DownloadQueue {
-    // Validate library exists
     if (libraryId != null) {
       libraryRepository.findByIdOrNull(libraryId)
         ?: throw IllegalArgumentException("Library not found: $libraryId")
     }
 
-    // Try to get manga info
     val mangaInfo =
       try {
         galleryDlWrapper.getChapterInfo(sourceUrl)
@@ -197,9 +185,6 @@ class DownloadExecutor(
     return download
   }
 
-  /**
-   * Cancel a download
-   */
   fun cancelDownload(downloadId: String) {
     val download =
       downloadQueueRepository.findByIdOrNull(downloadId)
@@ -212,14 +197,16 @@ class DownloadExecutor(
       ),
     )
 
-    activeDownloads.remove(downloadId)
     cancelledIds.add(downloadId)
+    activeDownloads.remove(downloadId)?.let { active ->
+      active.process?.let { proc ->
+        logger.info { "Killing gallery-dl subprocess for download $downloadId (pid=${proc.pid()})" }
+        proc.destroyForcibly()
+      }
+    }
     logger.info { "Cancelled download: $downloadId" }
   }
 
-  /**
-   * Retry a failed download
-   */
   fun retryDownload(downloadId: String) {
     val download =
       downloadQueueRepository.findByIdOrNull(downloadId)
@@ -241,50 +228,32 @@ class DownloadExecutor(
     logger.info { "Retrying download: $downloadId (attempt ${download.retryCount + 1})" }
   }
 
-  /**
-   * Delete a download from queue
-   */
   fun deleteDownload(downloadId: String) {
     downloadQueueRepository.delete(downloadId)
-    activeDownloads.remove(downloadId)
     cancelledIds.add(downloadId)
+    activeDownloads.remove(downloadId)?.let { active ->
+      active.process?.let { proc ->
+        logger.info { "Killing gallery-dl subprocess for deleted download $downloadId (pid=${proc.pid()})" }
+        proc.destroyForcibly()
+      }
+    }
     logger.info { "Deleted download: $downloadId" }
   }
 
-  /**
-   * Clear all downloads with a specific status
-   * @param status The status of downloads to clear (COMPLETED, FAILED, CANCELLED)
-   * @return Number of downloads deleted
-   */
   fun clearDownloadsByStatus(status: DownloadStatus): Int {
     val count = downloadQueueRepository.deleteByStatus(status)
     logger.info { "Cleared $count downloads with status: $status" }
     return count
   }
 
-  /**
-   * Clear all completed downloads from queue
-   * @return Number of downloads deleted
-   */
   fun clearCompletedDownloads(): Int = clearDownloadsByStatus(DownloadStatus.COMPLETED)
 
-  /**
-   * Clear all failed downloads from queue
-   * @return Number of downloads deleted
-   */
   fun clearFailedDownloads(): Int = clearDownloadsByStatus(DownloadStatus.FAILED)
 
-  /**
-   * Clear all cancelled downloads from queue
-   * @return Number of downloads deleted
-   */
   fun clearCancelledDownloads(): Int = clearDownloadsByStatus(DownloadStatus.CANCELLED)
 
   fun clearPendingDownloads(): Int = clearDownloadsByStatus(DownloadStatus.PENDING)
 
-  /**
-   * Process a follow.txt file to add manga URLs to download queue
-   */
   fun processFollowList(
     followListPath: java.nio.file.Path,
     libraryId: String?,
@@ -334,18 +303,23 @@ class DownloadExecutor(
       listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.COMPLETED),
     )
 
+  fun setActiveProcess(
+    downloadId: String,
+    process: Process,
+  ) {
+    activeDownloads[downloadId]?.process = process
+  }
+
   private fun processDownload(download: DownloadQueue) {
     if (cancelledIds.remove(download.id)) {
       logger.info { "Download ${download.id} was cancelled before processing started, skipping" }
       return
     }
-    activeDownloads[download.id] = download
+    activeDownloads[download.id] = ActiveDownload(download)
 
     try {
-      // Mark as downloading
       updateDownloadStatus(download, DownloadStatus.DOWNLOADING, startedDate = LocalDateTime.now())
 
-      // Broadcast download started via WebSocket + SSE
       downloadProgressHandler.broadcastProgress(
         DownloadProgressDto(
           type = "started",
@@ -371,7 +345,6 @@ class DownloadExecutor(
         ),
       )
 
-      // Determine destination path
       val library =
         if (download.libraryId != null) {
           libraryRepository.findByIdOrNull(download.libraryId)
@@ -379,8 +352,6 @@ class DownloadExecutor(
           null
         }
 
-      // Create manga folder with English title from our metadata (NOT from gallery-dl)
-      // This ensures we use the English title, not Japanese/romanized
       val mangaFolderName = sanitizeFileName(download.title ?: "Unknown")
       val libraryPath =
         if (library != null) {
@@ -389,10 +360,8 @@ class DownloadExecutor(
           Paths.get(System.getProperty("user.home"), "Downloads", "komga")
         }
 
-      // destinationPath is Library/MangaTitle - gallery-dl creates chapter folders inside
       val destinationPath = libraryPath.resolve(mangaFolderName)
 
-      // Create the manga folder if it doesn't exist
       if (!destinationPath.toFile().exists()) {
         destinationPath.toFile().mkdirs()
         logger.info { "Created manga folder: $destinationPath" }
@@ -400,15 +369,21 @@ class DownloadExecutor(
 
       logger.info { "Starting download to: $destinationPath" }
 
-      // Download using gallery-dl
+      val isCancelled = { cancelledIds.contains(download.id) }
+
       val result =
-        galleryDlWrapper.download(download.sourceUrl, destinationPath, library?.path) { progress ->
-          if (cancelledIds.contains(download.id)) {
+        galleryDlWrapper.download(
+          url = download.sourceUrl,
+          destinationPath = destinationPath,
+          libraryPath = library?.path,
+          isCancelled = isCancelled,
+          onProcessStarted = { process -> setActiveProcess(download.id, process) },
+        ) { progress ->
+          if (isCancelled()) {
             logger.info { "Download ${download.id} cancelled during processing, aborting" }
             cancelledIds.remove(download.id)
             throw InterruptedException("Download cancelled: ${download.id}")
           }
-          // Update progress in database
           downloadQueueRepository.update(
             download.copy(
               progressPercent = progress.percent,
@@ -418,7 +393,6 @@ class DownloadExecutor(
             ),
           )
 
-          // Broadcast progress via WebSocket + SSE
           downloadProgressHandler.broadcastProgress(
             DownloadProgressDto(
               type = "progress",
@@ -448,14 +422,11 @@ class DownloadExecutor(
         }
 
       if (result.success) {
-        // gallery-dl creates the manga folder automatically via {manga} pattern
-        // No folder renaming needed - the manga title comes directly from MangaDex
-        val finalPath = destinationPath // Library path - manga folder created by gallery-dl
+        val finalPath = destinationPath
         val finalTitle = result.mangaTitle ?: download.title
 
         logger.info { "Download completed to: $finalPath (manga folder: ${result.mangaTitle})" }
 
-        // Mark as completed
         updateDownloadStatus(
           download,
           DownloadStatus.COMPLETED,
@@ -464,7 +435,6 @@ class DownloadExecutor(
           destinationPath = finalPath.toString(),
         )
 
-        // Broadcast completion via WebSocket + SSE
         downloadProgressHandler.broadcastProgress(
           DownloadProgressDto(
             type = "completed",
@@ -489,22 +459,18 @@ class DownloadExecutor(
           ),
         )
 
-        // TODO: Trigger library scan if download was for a library
-        // For now, user needs to manually trigger library scan after download completes
         if (library != null) {
           logger.info { "Download completed for library ${library.name}. Please manually trigger library scan." }
         }
 
         logger.info { "Download completed: ${download.id} - ${result.filesDownloaded} files" }
       } else {
-        // Mark as failed
         updateDownloadStatus(
           download,
           DownloadStatus.FAILED,
           errorMessage = result.errorMessage ?: "Download failed",
         )
 
-        // Broadcast failure via WebSocket + SSE
         downloadProgressHandler.broadcastProgress(
           DownloadProgressDto(
             type = "failed",
@@ -539,7 +505,6 @@ class DownloadExecutor(
         errorMessage = e.message ?: "Unknown error",
       )
 
-      // Broadcast error via WebSocket + SSE
       downloadProgressHandler.broadcastProgress(
         DownloadProgressDto(
           type = "error",

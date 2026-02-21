@@ -6,138 +6,133 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.0.5] - 2026-02-20
+
+### Bug Fixes
+- **Fix cancelled downloads continuing to process** — `cancelDownload()` and `deleteDownload()` now immediately kill the gallery-dl subprocess via `Process.destroyForcibly()`. Previously, cancellation was only checked inside the progress callback, allowing the subprocess to keep running between chapters.
+- **Fix duplicate downloads every follow check** — Follow check now uses the new `ChapterChecker` service which compares MangaDex aggregate chapter counts against downloaded chapters (DB + filesystem). Downloads are only created when new chapters are actually detected, eliminating duplicate entries.
+- **Remove `.chapter-urls.json` system** — The `.chapter-urls.json` file could contain entries for chapters that weren't fully downloaded (saved before CBZ was finalized). Duplicate detection now relies solely on the `chapter_url` database table and filesystem CBZ checks, which are both reliable. Existing `.chapter-urls.json` files are cleaned up during library scans.
+
+### New Features
+- **Fast parallel chapter checking** — New `ChapterChecker` service checks all followed manga for new chapters using the MangaDex aggregate endpoint (`/manga/{id}/aggregate`). Runs 5 concurrent checks, reducing check time for 200 manga from 6+ hours to under a minute.
+- **Chapter naming with title** — Downloaded chapters are now named `Ch. 001 - Chapter Title.cbz` instead of `c001.cbz`. Falls back to `Ch. 001.cbz` when no title is available.
+- **Multi-group scanlation support** — Same chapter from different scanlation groups is now downloaded separately. Group name is included in the gallery-dl directory pattern (`c{chapter} [{group}]`) to prevent file collisions. When multiple groups exist for the same chapter number, the CBZ filename includes the group name: `Ch. 001 - Title [GroupName].cbz`.
+- **Check-new API endpoints** — `POST /api/v1/downloads/check-new` triggers a chapter check and queues downloads for manga with new chapters. `POST /api/v1/downloads/check-only` runs the check without queuing.
+- **Cancellation check between chapters** — Download cancellation is now checked between each chapter download in addition to the progress callback, ensuring faster response to cancel requests.
+- **Process tracking** — Active download processes are tracked via `ActiveDownload` data class, enabling immediate subprocess termination on cancel/delete.
+
+### Performance
+- **MangaDex aggregate endpoint** — Uses `/manga/{id}/aggregate` for quick chapter count comparison instead of the full `/manga/{id}/feed` endpoint. Much faster for checking if new chapters exist.
+- **5-concurrent chapter checking** — Parallel checking with semaphore-based concurrency control, staying within MangaDex rate limits (~5 req/s).
+- **Skip up-to-date manga** — Manga where the aggregate chapter count matches the downloaded count are skipped entirely, no download entry created.
+
+### Technical Details
+
+#### New Service
+- `ChapterChecker` — Fast parallel chapter checking using MangaDex aggregate endpoint, replaces sequential `processFollowList()`
+
+#### New API Endpoints
+- `POST /api/v1/downloads/check-new` — Check for new chapters and queue downloads
+- `POST /api/v1/downloads/check-only` — Check for new chapters without queuing
+
+#### Modified Files
+| File | Changes |
+|------|---------|
+| `DownloadExecutor.kt` | `ActiveDownload` data class, process tracking, subprocess killing on cancel/delete |
+| `GalleryDlWrapper.kt` | Removed `.chapter-urls.json` system, added `isCancelled`/`onProcessStarted` params, new chapter naming, multi-group directory pattern, `extractMangaDexId` moved to companion object |
+| `ChapterUrlImporter.kt` | Gutted — now only cleans up legacy `.chapter-urls.json` files |
+| `DownloadScheduler.kt` | Uses `ChapterChecker` instead of `processFollowList()` |
+| `DownloadController.kt` | Added `check-new` and `check-only` endpoints |
+| `DownloadDto.kt` | Added `ChapterCheckResultDto` and `ChapterCheckSummaryDto` |
+| `gradle.properties` | Version bumped to 0.0.5 |
+
+---
+
 ## [0.0.4] - 2026-02-16
+
+### Added
+- `DELETE /api/v1/downloads/clear/pending` endpoint to clear pending downloads
+- `isUrlAlreadyQueued()` public method on DownloadExecutor
+- `existsBySourceUrlAndStatusIn()` on DownloadQueueRepository for status-aware duplicate checking
+- 44+ new locale/translation files (ar, bg, ca, cs, da, el, eo, fa, fi, gl, he, hr, hu, id, ja, ko, nb, sl, th, ta, ti, tr, uk, vi, zh-Hans, zh-Hant, and more)
+- Docker image reference and Docker Compose example in README
+- `publisher` field in generated series.json for better metadata compatibility
+
+### Fixed
+- **Follow list duplicate prevention** — now includes COMPLETED status in addition to PENDING/DOWNLOADING, preventing re-queuing of already downloaded manga
+- **Follow config duplicate check** — `processFollowConfigNow` checks for existing queue entries before adding URLs
+- **Null safety in Mylar metadata** — status field mapping now handles null values correctly
+
+### Improved
+- **Shortest title selection** — when the English title exceeds 80 characters, automatically uses the shortest available English title from both main and alternative titles
+- **Better cancellation handling** — dedicated `cancelledIds` tracking set, cancellation checked before processing starts and during progress callbacks
+- **Improved filename sanitization** — enhanced regex removes all invalid Windows filename characters, trims trailing dots
+
+### Changed
+- Kotlin 2.2.0 → 2.2.21
+- ktlint plugin 13.0.0 → 13.1.0
+- ben-manes versions plugin 0.52.0 → 0.53.0
+- JReleaser 1.19.0 → 1.21.0
+
+---
+
+## [0.0.3] - Initial Fork Release
 
 ### Added
 
 #### MangaDex Download System
-- **Download Queue** - Queue-based download management with priority support
-- **gallery-dl Integration** - Download manga directly from MangaDex using gallery-dl
-- **Real-time Progress** - SSE-based download progress updates in the UI
-- **ComicInfo.xml Injection** - Automatic metadata injection into downloaded CBZ files
-- **Crash Recovery** - Incremental chapter tracking, downloads resume from last completed chapter
-- **Rate Limiting** - Respect MangaDex API limits with configurable throttling
-- **Multi-language Support** - Download chapters in preferred language
+- **Download Queue** — Queue-based download management with priority support
+- **gallery-dl Integration** — Download manga directly from MangaDex using gallery-dl
+- **Real-time Progress** — SSE-based download progress updates in the UI
+- **ComicInfo.xml Injection** — Automatic metadata injection into downloaded CBZ files
+- **Crash Recovery** — Incremental chapter tracking, downloads resume from last completed chapter
+- **Rate Limiting** — Respect MangaDex API limits with configurable throttling
+- **Multi-language Support** — Download chapters in preferred language
 
 #### Follow List Automation
-- **follow.txt Support** - Per-library follow lists for automatic chapter checking
-- **Scheduled Downloads** - Cron-based automatic new chapter detection
-- **Configurable Intervals** - Set check frequency per library (default: 24 hours)
-- **Duplicate Prevention** - Skip already-downloaded chapters automatically
+- **follow.txt Support** — Per-library follow lists for automatic chapter checking
+- **Scheduled Downloads** — Cron-based automatic new chapter detection
+- **Configurable Intervals** — Set check frequency per library (default: 24 hours)
+- **Duplicate Prevention** — Skip already-downloaded chapters automatically
 
 #### Tachiyomi/Mihon Integration
-- **Backup Import** - Import MangaDex URLs from Tachiyomi/Mihon backup files
-- **Format Support** - `.tachibk` (Mihon/forks) and `.proto.gz` (Tachiyomi legacy)
-- **Bulk Import** - Extract all MangaDex URLs in one operation
-- **Duplicate Detection** - Skip URLs already in follow.txt
+- **Backup Import** — Import MangaDex URLs from Tachiyomi/Mihon backup files
+- **Format Support** — `.tachibk` (Mihon/forks) and `.proto.gz` (Tachiyomi legacy)
+- **Bulk Import** — Extract all MangaDex URLs in one operation
+- **Duplicate Detection** — Skip URLs already in follow.txt
 
 #### Page Splitting
-- **Oversized Page Detection** - Scan for pages with configurable height threshold
-- **Tall Image Splitting** - Split vertical webtoon pages into readable segments
-- **Batch Processing** - Split all oversized pages in library at once
-- **TachiyomiSY-like Feature** - Similar to TachiyomiSY's "split tall images"
+- **Oversized Page Detection** — Scan for pages with configurable height threshold
+- **Tall Image Splitting** — Split vertical webtoon pages into readable segments
+- **Batch Processing** — Split all oversized pages in library at once
 
 #### Metadata Plugins
-- **MangaDex Metadata Plugin** - Fetch metadata from MangaDex API
-  - Multi-language title support (10+ languages)
-  - Author/artist information
-  - Genre and tag mapping
-  - Cover art downloading
-- **AniList Metadata Plugin** - Fetch metadata from AniList GraphQL API
-  - Configurable title type (English/Romaji/Native)
-  - Detailed descriptions and staff info
-  - Genre mapping
+- **MangaDex Metadata Plugin** — Multi-language titles, author/artist, genres, cover art
+- **AniList Metadata Plugin** — GraphQL-based metadata with configurable title type
 
 #### Chapter URL Tracking
-- **Download History** - Track all downloaded chapter URLs in database
-- **Import from gallery-dl** - Automatic import of `.chapter-urls.json` files
-- **Duplicate Prevention** - Never re-download the same chapter
-- **Metadata Tracking** - Store volume, language, scanlation group info
+- **Download History** — Track all downloaded chapter URLs in database
+- **Import from gallery-dl** — Automatic import of `.chapter-urls.json` files
+- **Metadata Tracking** — Store volume, language, scanlation group info
 
 #### API Endpoints
-- `GET/POST/DELETE /api/v1/downloads` - Download queue management
-- `DELETE /api/v1/downloads/clear/*` - Clear completed/failed/cancelled
-- `GET /api/v1/downloads/progress` - SSE progress stream
-- `GET/PUT /api/v1/downloads/follow-config` - Follow list configuration
-- `GET /api/v1/media-management/oversized-pages` - List oversized pages
-- `POST /api/v1/media-management/oversized-pages/split/*` - Split pages
-- `POST /api/v1/tachiyomi/import` - Import Tachiyomi backup
-- `GET /api/v1/health` - System health check
+- `GET/POST/DELETE /api/v1/downloads` — Download queue management
+- `DELETE /api/v1/downloads/clear/*` — Clear completed/failed/cancelled
+- `GET /api/v1/downloads/progress` — SSE progress stream
+- `GET/PUT /api/v1/downloads/follow-config` — Follow list configuration
+- `GET /api/v1/media-management/oversized-pages` — List oversized pages
+- `POST /api/v1/media-management/oversized-pages/split/*` — Split pages
+- `POST /api/v1/tachiyomi/import` — Import Tachiyomi backup
+- `GET /api/v1/health` — System health check
 
 #### Infrastructure
-- **WebSocket Progress Handler** - Real-time download updates via WebSocket
-- **MangaDex Rate Limiter** - Respect API rate limits
-- **Download Scheduler** - Background scheduled tasks for follow list checking
-- **Chapter URL DAO** - Database persistence for chapter tracking
-
-### Fixed
-
-- **Follow List Duplicate Prevention** - Follow.txt and follow config URLs that are already completed are now skipped, not just pending/downloading ones
-- **Follow Config Duplicate Check** - `processFollowConfigNow` now checks for duplicates before adding URLs to the download queue
-
-### Improved
-
-- **Shortest Title Selection** - When the selected English title exceeds 80 characters, the system now picks the shortest available English title from both main and alternative titles
-
-### Changed
-
-- Updated Kotlin version to 2.2.21 (from 2.2.0)
-- Updated ktlint plugin to 13.1.0 (from 13.0.0)
-- Updated ben-manes versions plugin to 0.53.0 (from 0.52.0)
-- Updated JReleaser to 1.21.0 (from 1.19.0)
-
-### Technical Details
-
-#### New Domain Models
-- `DownloadQueue` - Download queue entity with status tracking
-- `DownloadItem` - Individual chapter download tracking
-- `ChapterUrl` - Downloaded chapter URL entity
-- `FollowConfig` - Per-library follow configuration
-- `UpdateCheck` - Series update checking configuration
-- `DownloadProgress` - Progress tracking DTO
-
-#### New Services
-- `DownloadExecutor` - Download queue processing
-- `DownloadScheduler` - Scheduled follow list checking
-- `ChapterUrlImporter` - Import URLs from gallery-dl JSON
-- `TachiyomiImporter` - Import from Tachiyomi backups
-- `PageSplitter` - Split oversized pages
-
-#### New Infrastructure
-- `GalleryDlWrapper` - gallery-dl process management
-- `MangaDexRateLimiter` - API rate limiting
-- `ImageSplitter` - Core image splitting logic
-- `MangaDexMetadataProvider` - MangaDex API integration
-- `AniListMetadataProvider` - AniList GraphQL integration
-
----
-
-## Differences from Upstream
-
-| Feature | Upstream Komga | This Fork |
-|---------|----------------|-----------|
-| Media Server | Yes | Yes |
-| MangaDex Downloads | No | Yes |
-| gallery-dl Integration | No | Yes |
-| Follow List Automation | No | Yes |
-| Tachiyomi Import | No | Yes |
-| Page Splitting | No | Yes |
-| AniList Metadata | No | Yes |
-| MangaDex Metadata | No | Yes |
-| Real-time Progress (SSE) | No | Yes |
-| Chapter URL Tracking | No | Yes |
-
----
-
-## Requirements
-
-### Additional Dependencies
-
-- **gallery-dl** - Required for downloads (`pip install gallery-dl`)
-- Included in Docker image
-
-### System Requirements
-
-- Java 21+ (same as upstream)
-- 2GB+ RAM recommended for download operations
-- Sufficient disk space for downloaded manga
+- `GalleryDlWrapper` — gallery-dl process management
+- `DownloadExecutor` — Download queue processing
+- `DownloadScheduler` — Background scheduled tasks
+- `ChapterUrlImporter` — Import URLs from gallery-dl JSON
+- `TachiyomiImporter` — Import from Tachiyomi backups
+- `PageSplitter` / `ImageSplitter` — Page splitting
+- `MangaDexRateLimiter` — API rate limiting
+- `MangaDexMetadataProvider` / `AniListMetadataProvider` — Metadata fetching
+- WebSocket + SSE progress handlers
+- Chapter URL DAO for database persistence
