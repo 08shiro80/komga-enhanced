@@ -353,15 +353,34 @@ class ChapterUrlDao(
       id = get(idField)!!,
       seriesId = get(seriesIdField)!!,
       url = get(urlField)!!,
-      chapter = get(chapterField) ?: 0.0,
+      chapter = (get(chapterField) as? Number)?.toDouble() ?: 0.0,
       volume = get(volumeField),
       title = get(titleField),
       lang = get(langField) ?: "en",
-      downloadedAt = get(downloadedAtField)?.toCurrentTimeZone() ?: LocalDateTime.now(),
+      downloadedAt = getTimestamp(downloadedAtField) ?: LocalDateTime.now(),
       source = get(sourceField) ?: "gallery-dl",
       chapterId = get(chapterIdField),
       scanlationGroup = get(scanlationGroupField),
-      createdDate = get(createdDateField)?.toCurrentTimeZone() ?: LocalDateTime.now(),
-      lastModifiedDate = get(lastModifiedDateField)?.toCurrentTimeZone() ?: LocalDateTime.now(),
+      createdDate = getTimestamp(createdDateField) ?: LocalDateTime.now(),
+      lastModifiedDate = getTimestamp(lastModifiedDateField) ?: LocalDateTime.now(),
     )
+
+  private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
+    val raw = get(field) ?: return null
+    return try {
+      raw.toCurrentTimeZone()
+    } catch (_: ClassCastException) {
+      val value = get(field.name)
+      when (value) {
+        is java.sql.Timestamp -> value.toLocalDateTime()
+        is String ->
+          try {
+            LocalDateTime.parse(value.replace(" ", "T").substringBefore("+"))
+          } catch (_: Exception) {
+            LocalDateTime.now()
+          }
+        else -> LocalDateTime.now()
+      }
+    }
+  }
 }

@@ -29,6 +29,7 @@ class DownloadScheduler(
   private val libraryRepository: LibraryRepository,
   private val followConfigRepository: FollowConfigRepository,
   private val taskScheduler: TaskScheduler,
+  private val chapterChecker: ChapterChecker,
 ) {
   private val lastCheckTimes = ConcurrentHashMap<String, LocalDateTime>()
   private var scheduledTask: ScheduledFuture<*>? = null
@@ -36,7 +37,6 @@ class DownloadScheduler(
   private var currentIntervalHours = 24
 
   init {
-    // Load config on startup and schedule if enabled
     try {
       val config = followConfigRepository.findDefault()
       if (config != null) {
@@ -52,9 +52,6 @@ class DownloadScheduler(
     }
   }
 
-  /**
-   * Update the schedule based on new config
-   */
   fun updateSchedule(
     enabled: Boolean,
     intervalHours: Int,
@@ -62,7 +59,6 @@ class DownloadScheduler(
     isEnabled.set(enabled)
     currentIntervalHours = intervalHours
 
-    // Cancel existing schedule
     scheduledTask?.cancel(false)
     scheduledTask = null
 
@@ -80,39 +76,23 @@ class DownloadScheduler(
     scheduledTask =
       taskScheduler.scheduleAtFixedRate(
         { checkFollowConfig() },
-        Instant.now().plusMillis(intervalMillis), // First run after interval
+        Instant.now().plusMillis(intervalMillis),
         Duration.ofMillis(intervalMillis),
       )
 
     logger.info { "Scheduled follow check every $intervalHours hours" }
   }
 
-  /**
-   * Process the stored FollowConfig URLs
-   */
   fun processFollowConfigNow(config: FollowConfig) {
-    logger.info { "Processing follow config URLs: ${config.urls.size} URLs" }
+    logger.info { "Processing follow config via ChapterChecker: ${config.urls.size} URLs" }
 
-    config.urls.forEach { url ->
-      try {
-        if (downloadExecutor.isUrlAlreadyQueued(url)) {
-          logger.debug { "Skipping duplicate URL from follow config: $url" }
-          return@forEach
-        }
-        downloadExecutor.createDownload(
-          sourceUrl = url,
-          libraryId = null,
-          title = null,
-          createdBy = "follow-config",
-          priority = 5,
-        )
-        logger.info { "Added to queue from follow config: $url" }
-      } catch (e: Exception) {
-        logger.warn(e) { "Failed to add URL from follow config: $url" }
-      }
+    val summary = chapterChecker.checkAndQueueNewChapters()
+
+    logger.info {
+      "Follow config check complete: ${summary.needsDownloadCount} manga need downloads, " +
+        "${summary.upToDateCount} up to date, ${summary.errorCount} errors (${summary.durationMs}ms)"
     }
 
-    // Update last check time
     followConfigRepository.save(config.copy(lastCheckTime = LocalDateTime.now()))
   }
 
@@ -125,7 +105,7 @@ class DownloadScheduler(
     try {
       val config = followConfigRepository.findDefault()
       if (config != null && config.enabled && config.urls.isNotEmpty()) {
-        logger.info { "Running scheduled follow check" }
+        logger.info { "Running scheduled follow check via ChapterChecker" }
         processFollowConfigNow(config)
       }
     } catch (e: Exception) {
@@ -153,48 +133,65 @@ class DownloadScheduler(
         return
       }
 
-      downloadExecutor.processFollowList(followListPath, library.id)
-      lastCheckTimes[libraryId] = LocalDateTime.now()
+      val urls =
+        followListPath
+          .toFile()
+          .readLines()
+          .map { it.trim() }
+          .filter { it.isNotEmpty() && !it.startsWith("#") }
 
+      if (urls.isEmpty()) {
+        logger.info { "No URLs in follow.txt for library: ${library.name}" }
+        return
+      }
+
+      logger.info { "Checking ${urls.size} URLs from follow.txt via ChapterChecker" }
+      val summary = chapterChecker.checkUrls(urls)
+
+      summary.results
+        .filter { it.needsDownload }
+        .forEach { result ->
+          if (!downloadExecutor.isUrlAlreadyQueued(result.url)) {
+            try {
+              downloadExecutor.createDownload(
+                sourceUrl = result.url,
+                libraryId = library.id,
+                title = result.title,
+                createdBy = "follow-list",
+                priority = 5,
+              )
+              logger.info { "Queued from follow.txt: ${result.title ?: result.url}" }
+            } catch (e: Exception) {
+              logger.warn(e) { "Failed to queue URL from follow.txt: ${result.url}" }
+            }
+          }
+        }
+
+      lastCheckTimes[libraryId] = LocalDateTime.now()
       logger.info { "Manual check completed for library: ${library.name}" }
     } catch (e: Exception) {
       logger.error(e) { "Error during manual check for library: $libraryId" }
     }
   }
 
-  /**
-   * Check for new chapters by processing follow.txt files in all libraries
-   * Default: runs every 6 hours (configurable via komga.download.cron property)
-   */
   @Scheduled(cron = "\${komga.download.cron:0 0 */6 * * *}")
   fun checkForNewChapters() {
-    logger.info { "Starting scheduled check for new chapters" }
+    logger.info { "Starting scheduled check for new chapters via ChapterChecker" }
 
     try {
-      val libraries = libraryRepository.findAll()
-      logger.info { "Checking ${libraries.size} libraries for follow.txt files" }
-
-      var processedCount = 0
-
-      libraries.forEach { library ->
-        val followListPath = library.path.resolve("follow.txt")
-
-        if (followListPath.toFile().exists()) {
-          logger.info { "Processing follow.txt for library: ${library.name}" }
-
-          try {
-            downloadExecutor.processFollowList(followListPath, library.id)
-            lastCheckTimes[library.id] = LocalDateTime.now()
-            processedCount++
-          } catch (e: Exception) {
-            logger.error(e) { "Error processing follow.txt for library ${library.name}" }
-          }
-        } else {
-          logger.debug { "No follow.txt found for library: ${library.name}" }
-        }
+      val summary = chapterChecker.checkAndQueueNewChapters()
+      logger.info {
+        "Scheduled check completed: ${summary.needsDownloadCount} need download, " +
+          "${summary.upToDateCount} up to date (${summary.durationMs}ms)"
       }
 
-      logger.info { "Scheduled check completed. Processed $processedCount follow lists." }
+      val libraries = libraryRepository.findAll()
+      libraries.forEach { library ->
+        val followListPath = library.path.resolve("follow.txt")
+        if (followListPath.toFile().exists()) {
+          checkFollowListNow(library.id)
+        }
+      }
     } catch (e: Exception) {
       logger.error(e) { "Error during scheduled chapter check" }
     }

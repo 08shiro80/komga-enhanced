@@ -67,3 +67,25 @@ data class ClearResultDto(
   val status: String,
   val message: String,
 )
+
+data class ChapterCheckResultDto(
+  val url: String,
+  val mangaId: String?,
+  val title: String?,
+  val apiChapterCount: Int,
+  val downloadedChapterCount: Int,
+  val filesystemChapterCount: Int,
+  val newChaptersEstimate: Int,
+  val needsDownload: Boolean,
+  val error: String?,
+)
+
+data class ChapterCheckSummaryDto(
+  val totalManga: Int,
+  val checkedCount: Int,
+  val needsDownloadCount: Int,
+  val upToDateCount: Int,
+  val errorCount: Int,
+  val results: List<ChapterCheckResultDto>,
+  val durationMs: Long,
+)
