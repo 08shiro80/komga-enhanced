@@ -14,7 +14,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 |---------|----------|
 | Manually downloading manga from MangaDex | **Automatic downloads** via gallery-dl integration |
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
-| Re-downloading after crashes | **Incremental saves** - each chapter saved immediately |
+| Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
 | Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
 | Long vertical webtoon pages | **Page splitting** like TachiyomiSY |
 | Missing metadata | **MangaDex & AniList plugins** for rich metadata |
@@ -30,7 +30,7 @@ Download manga directly from MangaDex with full automation:
 - **Queue-based downloads** with priority support
 - **Real-time progress** via Server-Sent Events (SSE)
 - **ComicInfo.xml injection** - metadata embedded in every CBZ
-- **Crash recovery** - downloads resume from last completed chapter
+- **Crash recovery** - skips already-downloaded chapters via DB + filesystem checks
 - **Rate limiting** - respects MangaDex API limits
 - **Multi-language support** - download chapters in your preferred language
 
@@ -49,7 +49,8 @@ Automatically check for new chapters from your favorite manga:
 1. Create a `follow.txt` file in your library root
 2. Add MangaDex URLs (one per line)
 3. Configure check interval (default: 24 hours)
-4. New chapters download automatically
+4. Fast parallel checking via MangaDex aggregate API (200 manga in under a minute)
+5. New chapters download automatically
 
 ```
 # Example follow.txt
@@ -105,10 +106,10 @@ Rich metadata from multiple sources:
 
 Never download the same chapter twice:
 
-- Imports from gallery-dl's `.chapter-urls.json`
-- Database persistence for crash recovery
+- Database tracking of all downloaded chapter URLs
+- Filesystem duplicate detection via existing CBZ files
 - Tracks chapter metadata (volume, language, scanlation group)
-- API to check/clear download history
+- Multi-group support — same chapter from different scanlation groups downloaded separately
 
 ---
 
@@ -124,7 +125,10 @@ Never download the same chapter twice:
 | DELETE | `/api/v1/downloads/clear/completed` | Clear completed |
 | DELETE | `/api/v1/downloads/clear/failed` | Clear failed |
 | DELETE | `/api/v1/downloads/clear/cancelled` | Clear cancelled |
+| DELETE | `/api/v1/downloads/clear/pending` | Clear pending |
 | GET | `/api/v1/downloads/progress` | SSE progress stream |
+| POST | `/api/v1/downloads/check-new` | Check for new chapters and queue |
+| POST | `/api/v1/downloads/check-only` | Check for new chapters only |
 
 ### Follow Configuration
 

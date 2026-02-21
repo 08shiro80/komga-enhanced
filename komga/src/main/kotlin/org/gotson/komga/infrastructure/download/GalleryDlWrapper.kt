@@ -700,13 +700,7 @@ class GalleryDlWrapper(
               chapterNumStr
             }
 
-          val isMultiGroup = chapter.chapterNumber in multiGroupChapterNumbers
-          val groupTag =
-            if (isMultiGroup && !chapter.scanlationGroup.isNullOrBlank()) {
-              chapter.scanlationGroup.lowercase()
-            } else {
-              null
-            }
+          val groupTag = chapter.scanlationGroup?.lowercase()
 
           val alreadyExists =
             existingCbzFiles.any { name ->
@@ -906,18 +900,24 @@ class GalleryDlWrapper(
                   ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
                   ?: emptyList()
 
+              val recentCbzFiles =
+                cbzFiles
+                  .filter { System.currentTimeMillis() - it.lastModified() < 120_000 }
+                  .sortedByDescending { it.lastModified() }
+
               val targetCbz =
-                cbzFiles.find { file ->
+                recentCbzFiles.find { file ->
                   val name = file.nameWithoutExtension.lowercase()
                   name.startsWith("c$paddedChapter") ||
                     name.startsWith("c$chapterStr") ||
-                    name == "ch. $paddedChapter" ||
-                    name.startsWith("ch. $paddedChapter -") ||
-                    name.startsWith("ch. $paddedChapter ")
-                } ?: cbzFiles
-                  .filter { System.currentTimeMillis() - it.lastModified() < 60_000 }
-                  .sortedByDescending { it.lastModified() }
-                  .firstOrNull()
+                    name.startsWith("ch. $paddedChapter")
+                } ?: recentCbzFiles.firstOrNull()
+                  ?: cbzFiles.find { file ->
+                    val name = file.nameWithoutExtension.lowercase()
+                    name.startsWith("c$paddedChapter") ||
+                      name.startsWith("c$chapterStr") ||
+                      name.startsWith("ch. $paddedChapter")
+                  }
 
               if (targetCbz != null) {
                 try {
@@ -933,8 +933,7 @@ class GalleryDlWrapper(
                     )
                   addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo)
 
-                  val isMultiGroup = chapter.chapterNumber in multiGroupChapterNumbers
-                  val desiredName = buildDesiredCbzName(chapter, isMultiGroup)
+                  val desiredName = buildDesiredCbzName(chapter)
                   val desiredFile = File(destDir, desiredName)
 
                   if (targetCbz.name != desiredName && !desiredFile.exists()) {
@@ -1060,6 +1059,7 @@ class GalleryDlWrapper(
         mapOf(
           "lang" to defaultLanguage,
           "api" to "api",
+          "data-saver" to false,
           "directory" to listOf("c{chapter:>03}{chapter_minor} [{group}]"),
           "filename" to "{page:>03}.{extension}",
         ),
@@ -1449,36 +1449,57 @@ class GalleryDlWrapper(
           .createTempFile("cbz_temp_", ".cbz")
 
       try {
-        ZipInputStream(
-          Files
-            .newInputStream(cbzPath),
-        ).use { zipIn ->
-          ZipOutputStream(
-            Files
-              .newOutputStream(tempFile),
-          ).use { zipOut ->
-            val comicInfoEntry = ZipEntry("ComicInfo.xml")
-            zipOut.putNextEntry(comicInfoEntry)
-            zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
-            zipOut.closeEntry()
+        val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "avif")
+        val allEntries = mutableListOf<Pair<ZipEntry, ByteArray>>()
 
-            var entry = zipIn.nextEntry
-            while (entry != null) {
-              if (entry.name != "ComicInfo.xml") {
-                zipOut.putNextEntry(ZipEntry(entry.name))
-                zipIn.copyTo(zipOut)
-                zipOut.closeEntry()
-              }
-              entry = zipIn.nextEntry
+        ZipInputStream(Files.newInputStream(cbzPath)).use { zipIn ->
+          var entry = zipIn.nextEntry
+          while (entry != null) {
+            if (entry.name != "ComicInfo.xml") {
+              allEntries.add(entry to zipIn.readBytes())
+            }
+            entry = zipIn.nextEntry
+          }
+        }
+
+        val duplicatePages = mutableSetOf<String>()
+        val imagesByPage =
+          allEntries
+            .filter { (e, _) ->
+              val ext = e.name.substringAfterLast('.', "").lowercase()
+              ext in imageExtensions
+            }.groupBy { (e, _) ->
+              e.name.substringBeforeLast('.').substringAfterLast('/')
+            }
+
+        for ((_, variants) in imagesByPage) {
+          if (variants.size > 1) {
+            val keep = variants.maxByOrNull { (_, data) -> data.size }
+            variants.filter { it != keep }.forEach { (e, _) -> duplicatePages.add(e.name) }
+          }
+        }
+
+        if (duplicatePages.isNotEmpty()) {
+          logger.info { "Removing ${duplicatePages.size} duplicate images from ${cbzPath.fileName}" }
+        }
+
+        ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
+          zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
+          zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
+          zipOut.closeEntry()
+
+          for ((entry, data) in allEntries) {
+            if (entry.name !in duplicatePages) {
+              zipOut.putNextEntry(ZipEntry(entry.name))
+              zipOut.write(data)
+              zipOut.closeEntry()
             }
           }
         }
 
-        Files
-          .move(tempFile, cbzPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        Files.move(tempFile, cbzPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
       } finally {
-        Files
-          .deleteIfExists(tempFile)
+        Files.deleteIfExists(tempFile)
       }
 
       logToDatabase(
@@ -1513,31 +1534,54 @@ class GalleryDlWrapper(
         val tempFile = cbzPath.resolveSibling("${cbzPath.fileName}.tmp")
 
         try {
-          ZipInputStream(
-            Files
-              .newInputStream(cbzPath),
-          ).use { zipIn ->
-            ZipOutputStream(
-              Files
-                .newOutputStream(tempFile),
-            ).use { zipOut ->
-              val writtenEntries = mutableSetOf<String>()
+          val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "avif")
+          val allEntries = mutableListOf<Pair<ZipEntry, ByteArray>>()
 
-              val comicInfoEntry = ZipEntry("ComicInfo.xml")
-              zipOut.putNextEntry(comicInfoEntry)
-              zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
-              zipOut.closeEntry()
-              writtenEntries.add("ComicInfo.xml")
+          ZipInputStream(Files.newInputStream(cbzPath)).use { zipIn ->
+            var entry = zipIn.nextEntry
+            while (entry != null) {
+              if (entry.name != "ComicInfo.xml") {
+                allEntries.add(entry to zipIn.readBytes())
+              }
+              entry = zipIn.nextEntry
+            }
+          }
 
-              var entry = zipIn.nextEntry
-              while (entry != null) {
-                if (entry.name !in writtenEntries) {
-                  writtenEntries.add(entry.name)
-                  zipOut.putNextEntry(ZipEntry(entry.name))
-                  zipIn.copyTo(zipOut)
-                  zipOut.closeEntry()
-                }
-                entry = zipIn.nextEntry
+          val duplicatePages = mutableSetOf<String>()
+          val imagesByPage =
+            allEntries
+              .filter { (e, _) ->
+                val ext = e.name.substringAfterLast('.', "").lowercase()
+                ext in imageExtensions
+              }.groupBy { (e, _) ->
+                e.name.substringBeforeLast('.').substringAfterLast('/')
+              }
+
+          for ((_, variants) in imagesByPage) {
+            if (variants.size > 1) {
+              val keep = variants.maxByOrNull { (_, data) -> data.size }
+              variants.filter { it != keep }.forEach { (e, _) -> duplicatePages.add(e.name) }
+            }
+          }
+
+          if (duplicatePages.isNotEmpty()) {
+            logger.info { "Removing ${duplicatePages.size} duplicate images from ${cbzPath.fileName}" }
+          }
+
+          ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
+            val writtenEntries = mutableSetOf<String>()
+
+            zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
+            zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
+            zipOut.closeEntry()
+            writtenEntries.add("ComicInfo.xml")
+
+            for ((entry, data) in allEntries) {
+              if (entry.name !in writtenEntries && entry.name !in duplicatePages) {
+                writtenEntries.add(entry.name)
+                zipOut.putNextEntry(ZipEntry(entry.name))
+                zipOut.write(data)
+                zipOut.closeEntry()
               }
             }
           }
@@ -1707,10 +1751,7 @@ class GalleryDlWrapper(
     )
   }
 
-  private fun buildDesiredCbzName(
-    chapter: ChapterDownloadInfo,
-    isMultiGroup: Boolean,
-  ): String {
+  private fun buildDesiredCbzName(chapter: ChapterDownloadInfo): String {
     val chapterNumStr = chapter.chapterNumber ?: "000"
     val paddedNum =
       try {
@@ -1734,7 +1775,7 @@ class GalleryDlWrapper(
       }
 
     val groupPart =
-      if (isMultiGroup && !chapter.scanlationGroup.isNullOrBlank()) {
+      if (!chapter.scanlationGroup.isNullOrBlank()) {
         " [${sanitizeFsName(chapter.scanlationGroup)}]"
       } else {
         ""

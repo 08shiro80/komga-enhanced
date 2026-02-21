@@ -366,21 +366,17 @@ class ChapterUrlDao(
     )
 
   private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
-    val raw = get(field) ?: return null
-    return try {
-      raw.toCurrentTimeZone()
-    } catch (_: ClassCastException) {
-      val value = get(field.name)
-      when (value) {
-        is java.sql.Timestamp -> value.toLocalDateTime()
-        is String ->
-          try {
-            LocalDateTime.parse(value.replace(" ", "T").substringBefore("+"))
-          } catch (_: Exception) {
-            LocalDateTime.now()
-          }
-        else -> LocalDateTime.now()
-      }
+    val raw = get(field.name) ?: return null
+    return when (raw) {
+      is LocalDateTime -> raw.toCurrentTimeZone()
+      is java.sql.Timestamp -> raw.toLocalDateTime()
+      is String ->
+        try {
+          LocalDateTime.parse(raw.replace(" ", "T").substringBefore("+"))
+        } catch (_: Exception) {
+          LocalDateTime.now()
+        }
+      else -> LocalDateTime.now()
     }
   }
 }

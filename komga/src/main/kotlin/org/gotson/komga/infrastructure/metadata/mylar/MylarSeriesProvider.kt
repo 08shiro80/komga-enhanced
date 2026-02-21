@@ -68,6 +68,8 @@ class MylarSeriesProvider(
           when (metadata.status) {
             Status.Ended -> SeriesMetadata.Status.ENDED
             Status.Continuing -> SeriesMetadata.Status.ONGOING
+            Status.Hiatus -> SeriesMetadata.Status.HIATUS
+            Status.Cancelled -> SeriesMetadata.Status.ABANDONED
             null -> null
           },
         summary = metadata.descriptionFormatted ?: metadata.descriptionText,

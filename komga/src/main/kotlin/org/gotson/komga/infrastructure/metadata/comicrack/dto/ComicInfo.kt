@@ -19,7 +19,7 @@ class ComicInfo {
   var count: Int? = null
 
   @JsonProperty(value = "Volume")
-  var volume: Int? = null
+  var volume: Float? = null
 
   @JsonProperty(value = "AlternateSeries")
   var alternateSeries: String? = null

@@ -195,8 +195,8 @@ class ComicInfoProvider(
 
 fun computeSeriesFromSeriesAndVolume(
   series: String?,
-  volume: Int?,
+  volume: Number?,
 ): String? =
   series?.ifBlank { null }?.let { s ->
-    s + (volume?.let { if (it != 1) " ($it)" else "" } ?: "")
+    s + (volume?.let { v -> if (v.toFloat() != 1f) " (${if (v.toFloat() % 1f == 0f) v.toInt() else v})" else "" } ?: "")
   }

@@ -11,4 +11,12 @@ enum class Status {
   @JsonProperty("Continuing")
   @JsonAlias("continuing", "ongoing", "Ongoing", "releasing", "Releasing")
   Continuing,
+
+  @JsonProperty("Hiatus")
+  @JsonAlias("hiatus")
+  Hiatus,
+
+  @JsonProperty("Cancelled")
+  @JsonAlias("cancelled", "canceled", "Canceled")
+  Cancelled,
 }
