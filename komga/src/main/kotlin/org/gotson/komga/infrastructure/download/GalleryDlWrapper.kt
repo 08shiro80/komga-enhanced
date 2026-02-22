@@ -27,7 +27,6 @@ private val logger = KotlinLogging.logger {}
 class GalleryDlWrapper(
   private val pluginConfigRepository: org.gotson.komga.domain.persistence.PluginConfigRepository,
   private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
-  private val chapterUrlRepository: org.gotson.komga.domain.persistence.ChapterUrlRepository,
 ) {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
@@ -644,10 +643,8 @@ class GalleryDlWrapper(
           emptyList()
         }
 
-      val chapterUrls = allChapters.mapNotNull { it.chapterUrl }
-      val existingUrlsInDb = chapterUrlRepository.existsByUrls(chapterUrls)
-      val urlsAlreadyDownloaded = existingUrlsInDb.filterValues { it }.keys.toMutableSet()
-      logger.info { "Database check: ${urlsAlreadyDownloaded.size}/${chapterUrls.size} chapters already in DB" }
+      val urlsFromCbz = extractChapterUrlsFromCbzFiles(destDir)
+      logger.info { "CBZ ComicInfo check: Found ${urlsFromCbz.size} chapter URLs in existing CBZ files" }
 
       val existingCbzFiles =
         destDir
@@ -670,8 +667,8 @@ class GalleryDlWrapper(
 
       val chapters =
         allChapters.filter { chapter ->
-          if (chapter.chapterUrl in urlsAlreadyDownloaded) {
-            logger.debug { "Skipping chapter ${chapter.chapterNumber} - URL already in database" }
+          if (chapter.chapterUrl in urlsFromCbz) {
+            logger.debug { "Skipping chapter ${chapter.chapterNumber} - URL found in existing CBZ" }
             return@filter false
           }
 
@@ -732,6 +729,8 @@ class GalleryDlWrapper(
       if (skippedCount > 0) {
         logger.info { "Skipping $skippedCount already downloaded chapters, ${chapters.size} remaining to download" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Skipping $skippedCount already downloaded chapters")
+
+        updateExistingCbzChapterUrls(destDir, allChapters, urlsFromCbz, mangaInfo)
       } else {
         logger.info { "No existing chapters found, downloading all ${allChapters.size} chapters" }
       }
@@ -931,7 +930,7 @@ class GalleryDlWrapper(
                       publishDate = chapter.publishDate,
                       language = chapter.language,
                     )
-                  addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo)
+                  addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
 
                   val desiredName = buildDesiredCbzName(chapter)
                   val desiredFile = File(destDir, desiredName)
@@ -1365,6 +1364,7 @@ class GalleryDlWrapper(
   private fun generateComicInfoXml(
     mangaInfo: MangaInfo,
     chapterInfo: ChapterInfo?,
+    chapterUrl: String? = null,
   ): String {
     val seriesTitle = mangaInfo.title.escapeXml()
     val author = mangaInfo.author?.escapeXml() ?: ""
@@ -1403,7 +1403,7 @@ class GalleryDlWrapper(
   <Translator>$scanlationGroup</Translator>
   <Publisher>MangaDex</Publisher>
   ${if (genres.isNotBlank()) "<Genre>$genres</Genre>" else ""}
-  <Web>https://mangadex.org/</Web>
+  <Web>${(chapterUrl ?: "https://mangadex.org/").escapeXml()}</Web>
   ${if (pageCount > 0) "<PageCount>$pageCount</PageCount>" else ""}
   <LanguageISO>$language</LanguageISO>
   <Manga>$mangaType</Manga>
@@ -1443,7 +1443,8 @@ class GalleryDlWrapper(
           null
         }
 
-      val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo)
+      val chapterUrl = if (chapterId != null) "https://mangadex.org/chapter/$chapterId" else null
+      val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
       val tempFile =
         Files
           .createTempFile("cbz_temp_", ".cbz")
@@ -1524,13 +1525,14 @@ class GalleryDlWrapper(
     cbzPath: Path,
     mangaInfo: MangaInfo,
     chapterInfo: ChapterInfo?,
+    chapterUrl: String? = null,
   ) {
     val maxRetries = 5
     val retryDelayMs = 1000L
 
     for (attempt in 1..maxRetries) {
       try {
-        val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo)
+        val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
         val tempFile = cbzPath.resolveSibling("${cbzPath.fileName}.tmp")
 
         try {
@@ -1622,6 +1624,124 @@ class GalleryDlWrapper(
         logger.warn(e) { "Failed to add ComicInfo.xml to ${cbzPath.fileName}" }
         return
       }
+    }
+  }
+
+  private fun extractChapterUrlsFromCbzFiles(destDir: File): Set<String> {
+    val urls = mutableSetOf<String>()
+    val cbzFiles =
+      destDir
+        .listFiles()
+        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+        ?: return urls
+
+    for (cbzFile in cbzFiles) {
+      try {
+        ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
+          var entry = zipIn.nextEntry
+          while (entry != null) {
+            if (entry.name == "ComicInfo.xml") {
+              val xml = zipIn.readBytes().toString(Charsets.UTF_8)
+              val match = Regex("<Web>(.+?)</Web>").find(xml)
+              if (match != null) {
+                val url =
+                  match.groupValues[1]
+                    .replace("&amp;", "&")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&quot;", "\"")
+                    .replace("&apos;", "'")
+                if (url.contains("mangadex.org/chapter/")) {
+                  urls.add(url)
+                }
+              }
+              break
+            }
+            entry = zipIn.nextEntry
+          }
+        }
+      } catch (e: Exception) {
+        logger.debug { "Failed to read ComicInfo.xml from ${cbzFile.name}: ${e.message}" }
+      }
+    }
+    return urls
+  }
+
+  private fun updateExistingCbzChapterUrls(
+    destDir: File,
+    allChapters: List<ChapterDownloadInfo>,
+    existingUrls: Set<String>,
+    mangaInfo: MangaInfo,
+  ) {
+    val cbzFiles =
+      destDir
+        .listFiles()
+        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+        ?: return
+
+    val chaptersNeedingUpdate =
+      allChapters.filter { it.chapterUrl !in existingUrls }
+
+    if (chaptersNeedingUpdate.isEmpty()) return
+
+    var updated = 0
+    for (chapter in chaptersNeedingUpdate) {
+      val chapterNumStr = chapter.chapterNumber ?: continue
+      val paddedNum =
+        try {
+          val num = chapterNumStr.toDouble()
+          if (num == num.toLong().toDouble()) {
+            String.format("%03d", num.toLong())
+          } else {
+            chapterNumStr
+          }
+        } catch (_: NumberFormatException) {
+          chapterNumStr
+        }
+
+      val chapterStr =
+        try {
+          val num = chapterNumStr.toDouble()
+          if (num == num.toLong().toDouble()) {
+            num.toLong().toString()
+          } else {
+            chapterNumStr
+          }
+        } catch (_: NumberFormatException) {
+          chapterNumStr
+        }
+
+      val matchingCbz =
+        cbzFiles.find { file ->
+          val name = file.nameWithoutExtension.lowercase()
+          name == "c$chapterStr" ||
+            name.startsWith("c$chapterStr ") ||
+            name == "ch. $paddedNum" ||
+            name.startsWith("ch. $paddedNum -") ||
+            name.startsWith("ch. $paddedNum ")
+        } ?: continue
+
+      try {
+        val chapterInfo =
+          ChapterInfo(
+            chapterNumber = chapter.chapterNumber,
+            chapterTitle = chapter.chapterTitle,
+            volume = chapter.volume,
+            pages = chapter.pages,
+            scanlationGroup = chapter.scanlationGroup,
+            publishDate = chapter.publishDate,
+            language = chapter.language,
+          )
+        addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+        updated++
+        logger.info { "Updated ComicInfo.xml with chapter URL in ${matchingCbz.name}" }
+      } catch (e: Exception) {
+        logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
+      }
+    }
+
+    if (updated > 0) {
+      logger.info { "Updated $updated existing CBZ files with chapter URLs" }
     }
   }
 

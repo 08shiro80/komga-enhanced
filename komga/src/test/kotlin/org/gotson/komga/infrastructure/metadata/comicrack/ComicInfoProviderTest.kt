@@ -407,7 +407,7 @@ class ComicInfoProviderTest {
       val comicInfo =
         ComicInfo().apply {
           series = "series"
-          volume = 2020
+          volume = 2020f
         }
 
       every { mockMapper.readValue(any<ByteArray>(), ComicInfo::class.java) } returns comicInfo
@@ -430,7 +430,7 @@ class ComicInfoProviderTest {
       val comicInfo =
         ComicInfo().apply {
           series = "series"
-          volume = 1
+          volume = 1f
         }
 
       every { mockMapper.readValue(any<ByteArray>(), ComicInfo::class.java) } returns comicInfo

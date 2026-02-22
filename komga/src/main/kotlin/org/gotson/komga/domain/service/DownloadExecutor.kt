@@ -17,6 +17,7 @@ import java.nio.file.Paths
 import java.time.LocalDateTime
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 private val logger = KotlinLogging.logger {}
@@ -39,8 +40,12 @@ class DownloadExecutor(
   private val processing = AtomicBoolean(false)
   private val activeDownloads = ConcurrentHashMap<String, ActiveDownload>()
   private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
+  private val downloadThread =
+    Executors.newSingleThreadExecutor { r ->
+      Thread(r, "download-worker").apply { isDaemon = true }
+    }
 
-  @Scheduled(fixedDelay = 30000, initialDelay = 10000)
+  @Scheduled(fixedDelay = 10000, initialDelay = 10000)
   fun processQueue() {
     if (!processing.compareAndSet(false, true)) {
       logger.debug { "Download processing already in progress, skipping" }
@@ -50,6 +55,7 @@ class DownloadExecutor(
     try {
       if (!galleryDlWrapper.isInstalled()) {
         logger.warn { "gallery-dl is not installed, skipping download processing" }
+        processing.set(false)
         return
       }
 
@@ -57,6 +63,7 @@ class DownloadExecutor(
 
       if (pending.isEmpty()) {
         logger.debug { "No pending downloads" }
+        processing.set(false)
         return
       }
 
@@ -64,14 +71,22 @@ class DownloadExecutor(
 
       if (activeDownloads.containsKey(download.id)) {
         logger.debug { "Download ${download.id} already being processed" }
+        processing.set(false)
         return
       }
 
       logger.info { "Processing download: ${download.id} - ${download.sourceUrl}" }
-      processDownload(download)
+      downloadThread.submit {
+        try {
+          processDownload(download)
+        } catch (e: Exception) {
+          logger.error(e) { "Error processing download queue" }
+        } finally {
+          processing.set(false)
+        }
+      }
     } catch (e: Exception) {
       logger.error(e) { "Error processing download queue" }
-    } finally {
       processing.set(false)
     }
   }
@@ -226,6 +241,28 @@ class DownloadExecutor(
     )
 
     logger.info { "Retrying download: $downloadId (attempt ${download.retryCount + 1})" }
+  }
+
+  fun resumeDownload(downloadId: String) {
+    val download =
+      downloadQueueRepository.findByIdOrNull(downloadId)
+        ?: throw IllegalArgumentException("Download not found: $downloadId")
+
+    if (download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PENDING) {
+      throw IllegalStateException("Download is already ${download.status.name.lowercase()}")
+    }
+
+    cancelledIds.remove(downloadId)
+
+    downloadQueueRepository.update(
+      download.copy(
+        status = DownloadStatus.PENDING,
+        errorMessage = null,
+        lastModifiedDate = LocalDateTime.now(),
+      ),
+    )
+
+    logger.info { "Resumed download: $downloadId - ${download.title}" }
   }
 
   fun deleteDownload(downloadId: String) {

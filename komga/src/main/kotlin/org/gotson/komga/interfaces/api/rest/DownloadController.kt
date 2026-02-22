@@ -96,6 +96,7 @@ class DownloadController(
       when (action.action.lowercase()) {
         "cancel" -> downloadExecutor.cancelDownload(id)
         "retry" -> downloadExecutor.retryDownload(id)
+        "resume" -> downloadExecutor.resumeDownload(id)
         else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown action: ${action.action}")
       }
     } catch (e: IllegalArgumentException) {
