@@ -9,7 +9,7 @@ import kotlin.io.path.inputStream
 
 private val logger = KotlinLogging.logger {}
 
-private const val DEFAULT_BUFFER_SIZE = 8192
+private const val DEFAULT_BUFFER_SIZE = 65536
 private const val SEED = 0
 
 @Component
@@ -38,9 +38,15 @@ class Hasher {
     return hash.digest().toHexString()
   }
 
-  @OptIn(ExperimentalUnsignedTypes::class)
-  fun ByteArray.toHexString(): String =
-    asUByteArray().joinToString("") {
-      it.toString(16).padStart(2, '0')
+  private val hexChars = "0123456789abcdef".toCharArray()
+
+  fun ByteArray.toHexString(): String {
+    val sb = StringBuilder(size * 2)
+    for (b in this) {
+      val v = b.toInt() and 0xFF
+      sb.append(hexChars[v ushr 4])
+      sb.append(hexChars[v and 0x0F])
     }
+    return sb.toString()
+  }
 }

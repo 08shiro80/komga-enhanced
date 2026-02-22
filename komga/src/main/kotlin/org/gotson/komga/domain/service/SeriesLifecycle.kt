@@ -72,6 +72,8 @@ class SeriesLifecycle(
     logger.debug { "Existing books: $books" }
     logger.debug { "Existing metadata: $metadatas" }
 
+    val metadataMap = metadatas.associateBy { it.bookId }
+
     val sorted =
       books
         .sortedWith(
@@ -81,7 +83,7 @@ class SeriesLifecycle(
               .stripAccents()
               .replace(whitespacePattern, " ")
           },
-        ).map { book -> book to metadatas.first { it.bookId == book.id } }
+        ).map { book -> book to metadataMap.getValue(book.id) }
     logger.debug { "Sorted books: $sorted" }
 
     bookRepository.update(

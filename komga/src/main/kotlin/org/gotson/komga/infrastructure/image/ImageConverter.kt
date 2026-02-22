@@ -118,16 +118,17 @@ class ImageConverter(
     format: ImageType,
     size: Int,
   ): Thumbnails.Builder<out InputStream>? {
+    val dimension = imageAnalyzer.getDimension(imageBytes.inputStream())
     val longestEdge =
-      imageAnalyzer.getDimension(imageBytes.inputStream())?.let {
-        val mediaType = contentDetector.detectMediaType(imageBytes.inputStream())
+      dimension?.let {
         val longestEdge = max(it.height, it.width)
-        // don't resize if source and target format is the same, and source is smaller than desired
-        if (mediaType == format.mediaType && longestEdge <= size) return null
+        if (longestEdge <= size) {
+          val mediaType = contentDetector.detectMediaType(imageBytes.inputStream())
+          if (mediaType == format.mediaType) return null
+        }
         longestEdge
       }
 
-    // prevent upscaling
     val resizeTo = if (longestEdge != null) min(longestEdge, size) else size
 
     return Thumbnails
@@ -140,10 +141,12 @@ class ImageConverter(
   private fun containsAlphaChannel(image: BufferedImage): Boolean = image.colorModel.hasAlpha()
 
   private fun containsTransparency(image: BufferedImage): Boolean {
-    for (x in 0 until image.width) {
-      for (y in 0 until image.height) {
-        val pixel = image.getRGB(x, y)
-        if (pixel shr 24 == 0x00) return true
+    val alphaRaster = image.alphaRaster ?: return false
+    val pixel = IntArray(1)
+    for (y in 0 until image.height) {
+      for (x in 0 until image.width) {
+        alphaRaster.getPixel(x, y, pixel)
+        if (pixel[0] == 0) return true
       }
     }
     return false

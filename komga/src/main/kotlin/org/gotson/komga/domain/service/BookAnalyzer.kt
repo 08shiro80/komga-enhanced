@@ -31,7 +31,6 @@ import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
 import java.nio.file.AccessDeniedException
 import java.nio.file.NoSuchFileException
-import javax.imageio.ImageIO
 import kotlin.io.path.extension
 
 private val logger = KotlinLogging.logger {}
@@ -398,16 +397,61 @@ class BookAnalyzer(
   ): String {
     val bytes =
       if (page.mediaType == ImageType.JPEG.mediaType) {
-        // JPEG could contain different EXIF data, reading and writing back the image will get rid of it
-        ByteArrayOutputStream().use { buffer ->
-          ImageIO.write(ImageIO.read(content.inputStream()), ImageType.JPEG.imageIOFormat, buffer)
-          buffer.toByteArray()
-        }
+        stripJpegMetadata(content)
       } else {
         content
       }
 
     return hasher.computeHash(bytes.inputStream())
+  }
+
+  private fun stripJpegMetadata(data: ByteArray): ByteArray {
+    if (data.size < 4 || data[0] != 0xFF.toByte() || data[1] != 0xD8.toByte()) {
+      return data
+    }
+
+    val output = ByteArrayOutputStream(data.size)
+    output.write(0xFF)
+    output.write(0xD8)
+
+    var i = 2
+    while (i < data.size - 1) {
+      if (data[i] != 0xFF.toByte()) break
+
+      val marker = data[i + 1].toInt() and 0xFF
+
+      if (marker == 0xDA) {
+        output.write(data, i, data.size - i)
+        break
+      }
+
+      if (marker == 0xFF) {
+        i++
+        continue
+      }
+
+      if (marker == 0x00 || marker == 0xD9 || marker in 0xD0..0xD7) {
+        output.write(data, i, 2)
+        i += 2
+        continue
+      }
+
+      if (i + 3 >= data.size) break
+      val segLen = ((data[i + 2].toInt() and 0xFF) shl 8) or (data[i + 3].toInt() and 0xFF)
+      val totalLen = segLen + 2
+
+      if (marker in 0xE0..0xEF || marker == 0xFE) {
+        i += totalLen
+        continue
+      }
+
+      if (i + totalLen <= data.size) {
+        output.write(data, i, totalLen)
+      }
+      i += totalLen
+    }
+
+    return output.toByteArray()
   }
 
   fun getPdfPagesDynamic(media: Media): List<BookPage> {

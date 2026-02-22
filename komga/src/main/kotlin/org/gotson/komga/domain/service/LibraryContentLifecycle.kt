@@ -139,7 +139,7 @@ class LibraryContentLifecycle(
         }
       // we store the url of all the series that had deleted books
       // this can be used to detect changed series even if their file modified date did not change, for example because of NFS/SMB cache
-      val seriesUrlWithDeletedBooks = seriesToSortAndRefresh.map { it.url }
+      val seriesUrlWithDeletedBooks = seriesToSortAndRefresh.map { it.url }.toSet()
 
       scannedSeries.forEach { (newSeries, newBooks) ->
         val existingSeries = seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, newSeries.url)
@@ -206,7 +206,7 @@ class LibraryContentLifecycle(
             }
 
             // add new books
-            val existingBooksUrls = existingBooks.filterNot { it.deletedDate != null }.map { it.url }
+            val existingBooksUrls = existingBooks.filterNot { it.deletedDate != null }.map { it.url }.toSet()
             val booksToAdd = newBooks.filterNot { newBook -> existingBooksUrls.contains(newBook.url) }
             logger.info { "Adding new books: $booksToAdd" }
             seriesLifecycle.addBooks(existingSeries, booksToAdd)
@@ -250,7 +250,7 @@ class LibraryContentLifecycle(
       }
 
       // cleanup sidecars that don't exist anymore
-      scanResult.sidecars.map { it.url }.let { newSidecarsUrls ->
+      scanResult.sidecars.map { it.url }.toSet().let { newSidecarsUrls ->
         existingSidecars
           .filterNot { existing -> newSidecarsUrls.contains(existing.url) }
           .let { sidecars ->
@@ -318,7 +318,7 @@ class LibraryContentLifecycle(
 
       val match =
         deletedCandidates.find { (_, books) ->
-          books.map { it.fileHash }.containsAll(newBooksWithHash.map { it.fileHash }) && newBooksWithHash.map { it.fileHash }.containsAll(books.map { it.fileHash })
+          books.map { it.fileHash }.toSet() == newBooksWithHash.map { it.fileHash }.toSet()
         }
 
       if (match != null) {

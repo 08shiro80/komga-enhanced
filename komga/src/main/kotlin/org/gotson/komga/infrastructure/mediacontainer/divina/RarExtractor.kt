@@ -35,12 +35,16 @@ class RarExtractor(
         .map { entry ->
           try {
             val buffer = rar.getInputStream(entry).use { it.readBytes() }
-            val mediaType = buffer.inputStream().use { contentDetector.detectMediaType(it) }
+            val stream = buffer.inputStream().buffered()
+            stream.mark(buffer.size)
+            val mediaType = contentDetector.detectMediaType(stream)
             val dimension =
-              if (analyzeDimensions && contentDetector.isImage(mediaType))
-                buffer.inputStream().use { imageAnalyzer.getDimension(it) }
-              else
+              if (analyzeDimensions && contentDetector.isImage(mediaType)) {
+                stream.reset()
+                imageAnalyzer.getDimension(stream)
+              } else {
                 null
+              }
             val fileSize = entry.fullUnpackSize
             MediaContainerEntry(name = entry.fileName, mediaType = mediaType, dimension = dimension, fileSize = fileSize)
           } catch (e: Exception) {
