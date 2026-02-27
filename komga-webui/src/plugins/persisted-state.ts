@@ -45,6 +45,7 @@ export const persistedModule: Module<any, any> = {
     importPath: '',
     duplicatesNewPageSize: 10,
     rememberMe: false,
+    themePreset: 'default',
   },
   getters: {
     getLocaleFirstDay: (state) => () => {
@@ -174,6 +175,9 @@ export const persistedModule: Module<any, any> = {
     },
     setRememberMe(state, val) {
       state.rememberMe = val
+    },
+    setThemePreset(state, val) {
+      state.themePreset = val
     },
   },
 }

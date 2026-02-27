@@ -4,6 +4,7 @@ import jakarta.servlet.Filter
 import org.gotson.komga.domain.model.UserRoles
 import org.gotson.komga.infrastructure.configuration.KomgaSettingsProvider
 import org.gotson.komga.infrastructure.hash.Hasher
+import org.gotson.komga.infrastructure.jooq.main.ClientSettingsDtoDao
 import org.gotson.komga.infrastructure.security.apikey.ApiKeyAuthenticationFilter
 import org.gotson.komga.infrastructure.security.apikey.ApiKeyAuthenticationProvider
 import org.gotson.komga.infrastructure.security.apikey.HeaderApiKeyAuthenticationConverter
@@ -33,6 +34,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
@@ -54,6 +56,7 @@ class SecurityConfiguration(
   private val authenticationEventPublisher: AuthenticationEventPublisher,
   private val tokenEncoder: TokenEncoder,
   private val hasher: Hasher,
+  private val clientSettingsDtoDao: ClientSettingsDtoDao,
   clientRegistrationRepository: InMemoryClientRegistrationRepository?,
 ) {
   private val oauth2Enabled = clientRegistrationRepository != null
@@ -162,6 +165,7 @@ class SecurityConfiguration(
       }
 
     http.addFilterAfter(restAuthenticationFilter(), BasicAuthenticationFilter::class.java)
+    http.addFilterBefore(GuestAccessFilter(clientSettingsDtoDao), UsernamePasswordAuthenticationFilter::class.java)
 
     return http.build()
   }

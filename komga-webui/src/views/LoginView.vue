@@ -79,6 +79,19 @@
 
         </div>
 
+        <v-row justify="center" v-if="guestAccessEnabled">
+          <v-col cols="auto">
+            <v-btn
+              color="secondary"
+              @click="guestBrowse"
+              min-width="250"
+            >
+              <v-icon left>mdi-eye</v-icon>
+              Als Gast durchsuchen
+            </v-btn>
+          </v-col>
+        </v-row>
+
         <v-row justify="center">
           <v-col
             v-for="provider in oauth2Providers"
@@ -170,6 +183,10 @@ export default Vue.extend({
     },
   },
   computed: {
+    guestAccessEnabled(): boolean {
+      return !this.unclaimed
+        && (this.clientSettings[CLIENT_SETTING.WEBUI_GUEST_ACCESS]?.value === 'true')
+    },
     hideLogin(): boolean {
       return !this.unclaimed
         && this.oauth2Providers.length > 0
@@ -256,6 +273,23 @@ export default Vue.extend({
     if (this.hideLogin && this.autoOauth2Login) this.oauth2Login(this.oauth2Providers[0])
   },
   methods: {
+    async guestBrowse() {
+      this.$store.commit('setGuestMode', true)
+      this.$store.commit('setMe', {
+        id: 'guest',
+        email: 'guest@komga.local',
+        roles: ['PAGE_STREAMING'],
+      })
+      try {
+        await this.$store.dispatch('getLibraries')
+      } catch (e) {
+        this.$store.commit('setGuestMode', false)
+        this.$store.commit('setMe', {})
+        this.showSnack('Guest access unavailable')
+        return
+      }
+      await this.$router.push({name: 'home'})
+    },
     oauth2Login(provider: OAuth2ClientDto) {
       const url = `${urls.originNoSlash}/oauth2/authorization/${provider.registrationId}`
       const height = 600
@@ -291,6 +325,7 @@ export default Vue.extend({
     async performLogin() {
       if (this.isUserValid()) {
         try {
+          this.$store.commit('setGuestMode', false)
           await this.$store.dispatch(
             'getMeWithAuth',
             {

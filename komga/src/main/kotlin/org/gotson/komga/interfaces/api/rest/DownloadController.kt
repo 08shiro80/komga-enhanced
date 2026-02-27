@@ -274,6 +274,8 @@ class DownloadController(
     return SchedulerSettingsDto(
       enabled = config.enabled,
       intervalHours = config.checkIntervalHours,
+      scheduleMode = config.scheduleMode,
+      checkTime = config.checkTime,
     )
   }
 
@@ -288,14 +290,18 @@ class DownloadController(
       existingConfig.copy(
         enabled = update.enabled,
         checkIntervalHours = update.intervalHours,
+        scheduleMode = update.scheduleMode,
+        checkTime = update.checkTime,
       )
 
     val saved = followConfigRepository.save(updatedConfig)
-    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours)
+    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours, saved.scheduleMode, saved.checkTime)
 
     return SchedulerSettingsDto(
       enabled = saved.enabled,
       intervalHours = saved.checkIntervalHours,
+      scheduleMode = saved.scheduleMode,
+      checkTime = saved.checkTime,
     )
   }
 
@@ -321,7 +327,7 @@ class DownloadController(
       )
 
     val saved = followConfigRepository.save(updatedConfig)
-    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours)
+    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours, saved.scheduleMode, saved.checkTime)
 
     return saved.toDto()
   }

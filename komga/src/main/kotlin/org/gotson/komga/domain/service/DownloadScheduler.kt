@@ -6,7 +6,7 @@ import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.TaskScheduler
-import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.scheduling.support.CronTrigger
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.time.Instant
@@ -35,6 +35,8 @@ class DownloadScheduler(
   private var scheduledTask: ScheduledFuture<*>? = null
   private val isEnabled = AtomicBoolean(false)
   private var currentIntervalHours = 24
+  private var currentScheduleMode = "interval"
+  private var currentCheckTime: String? = null
 
   init {
     try {
@@ -42,9 +44,11 @@ class DownloadScheduler(
       if (config != null) {
         isEnabled.set(config.enabled)
         currentIntervalHours = config.checkIntervalHours
+        currentScheduleMode = config.scheduleMode
+        currentCheckTime = config.checkTime
         if (config.enabled) {
-          scheduleFollowCheck(config.checkIntervalHours)
-          logger.info { "Follow config scheduler initialized: enabled=${config.enabled}, interval=${config.checkIntervalHours}h" }
+          scheduleFollowCheck(config.checkIntervalHours, config.scheduleMode, config.checkTime)
+          logger.info { "Follow config scheduler initialized: enabled=${config.enabled}, mode=${config.scheduleMode}, interval=${config.checkIntervalHours}h, checkTime=${config.checkTime}" }
         }
       }
     } catch (e: Exception) {
@@ -55,31 +59,59 @@ class DownloadScheduler(
   fun updateSchedule(
     enabled: Boolean,
     intervalHours: Int,
+    scheduleMode: String = "interval",
+    checkTime: String? = null,
   ) {
     isEnabled.set(enabled)
     currentIntervalHours = intervalHours
+    currentScheduleMode = scheduleMode
+    currentCheckTime = checkTime
 
     scheduledTask?.cancel(false)
     scheduledTask = null
 
     if (enabled) {
-      scheduleFollowCheck(intervalHours)
-      logger.info { "Follow check schedule updated: interval=${intervalHours}h" }
+      scheduleFollowCheck(intervalHours, scheduleMode, checkTime)
+      logger.info { "Follow check schedule updated: mode=$scheduleMode, interval=${intervalHours}h, checkTime=$checkTime" }
     } else {
       logger.info { "Follow check schedule disabled" }
     }
   }
 
-  private fun scheduleFollowCheck(intervalHours: Int) {
-    val intervalMillis = intervalHours * 60 * 60 * 1000L
+  private fun scheduleFollowCheck(
+    intervalHours: Int,
+    scheduleMode: String = "interval",
+    checkTime: String? = null,
+  ) {
+    if (scheduleMode == "fixed_time" && !checkTime.isNullOrBlank()) {
+      val parts = checkTime.split(":")
+      if (parts.size == 2) {
+        val hour = parts[0].padStart(2, '0')
+        val minute = parts[1].padStart(2, '0')
+        val cronExpression = "0 $minute $hour * * *"
+        scheduledTask =
+          taskScheduler.schedule(
+            { checkFollowConfig() },
+            CronTrigger(cronExpression),
+          )
+        logger.info { "Scheduled follow check at $hour:$minute daily (cron: $cronExpression)" }
+      } else {
+        logger.warn { "Invalid checkTime format: $checkTime, falling back to interval mode" }
+        scheduleAtInterval(intervalHours)
+      }
+    } else {
+      scheduleAtInterval(intervalHours)
+    }
+  }
 
+  private fun scheduleAtInterval(intervalHours: Int) {
+    val intervalMillis = intervalHours * 60 * 60 * 1000L
     scheduledTask =
       taskScheduler.scheduleAtFixedRate(
         { checkFollowConfig() },
         Instant.now().plusMillis(intervalMillis),
         Duration.ofMillis(intervalMillis),
       )
-
     logger.info { "Scheduled follow check every $intervalHours hours" }
   }
 
@@ -103,10 +135,11 @@ class DownloadScheduler(
     }
 
     try {
+      checkForNewChapters()
+
       val config = followConfigRepository.findDefault()
-      if (config != null && config.enabled && config.urls.isNotEmpty()) {
-        logger.info { "Running scheduled follow check via ChapterChecker" }
-        processFollowConfigNow(config)
+      if (config != null) {
+        followConfigRepository.save(config.copy(lastCheckTime = LocalDateTime.now()))
       }
     } catch (e: Exception) {
       logger.error(e) { "Error in scheduled follow check" }
@@ -174,7 +207,6 @@ class DownloadScheduler(
     }
   }
 
-  @Scheduled(cron = "\${komga.download.cron:0 0 */6 * * *}")
   fun checkForNewChapters() {
     logger.info { "Starting scheduled check for new chapters via ChapterChecker" }
 

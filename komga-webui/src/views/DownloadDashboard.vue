@@ -258,6 +258,28 @@
                         <v-card-text>
                           <v-row>
                             <v-col cols="12" sm="6">
+                              <v-switch
+                                v-model="schedulerEnabled"
+                                label="Enable Auto-Check"
+                                hint="Automatically check and download new chapters"
+                                persistent-hint
+                              ></v-switch>
+                            </v-col>
+                          </v-row>
+                          <v-row>
+                            <v-col cols="12">
+                              <v-radio-group
+                                v-model="scheduleMode"
+                                row
+                                label="Schedule Mode"
+                              >
+                                <v-radio label="Interval" value="interval"></v-radio>
+                                <v-radio label="Fixed Time" value="fixed_time"></v-radio>
+                              </v-radio-group>
+                            </v-col>
+                          </v-row>
+                          <v-row>
+                            <v-col cols="12" sm="6" v-if="scheduleMode === 'interval'">
                               <v-text-field
                                 v-model.number="schedulerInterval"
                                 label="Check Interval (hours)"
@@ -269,13 +291,16 @@
                                 persistent-hint
                               ></v-text-field>
                             </v-col>
-                            <v-col cols="12" sm="6">
-                              <v-switch
-                                v-model="schedulerEnabled"
-                                label="Enable Auto-Check"
-                                hint="Automatically check and download new chapters"
+                            <v-col cols="12" sm="6" v-if="scheduleMode === 'fixed_time'">
+                              <v-text-field
+                                v-model="checkTime"
+                                label="Check Time (HH:mm)"
+                                placeholder="03:00"
+                                outlined
+                                dense
+                                hint="Daily time to check for new chapters (24h format)"
                                 persistent-hint
-                              ></v-switch>
+                              ></v-text-field>
                             </v-col>
                           </v-row>
                         </v-card-text>
@@ -521,6 +546,8 @@ export default {
       // Scheduler settings
       schedulerEnabled: false,
       schedulerInterval: 6,
+      scheduleMode: 'interval',
+      checkTime: '03:00',
       savingScheduler: false,
       // SSE connection status (using existing SSE infrastructure)
       sseConnected: true,
@@ -642,6 +669,8 @@ export default {
         const response = await this.$http.get('/api/v1/downloads/scheduler')
         this.schedulerEnabled = response.data.enabled
         this.schedulerInterval = response.data.intervalHours || 6
+        this.scheduleMode = response.data.scheduleMode || 'interval'
+        this.checkTime = response.data.checkTime || '03:00'
       } catch (error) {
         // Default values are fine
       }
@@ -652,6 +681,8 @@ export default {
         await this.$http.post('/api/v1/downloads/scheduler', {
           enabled: this.schedulerEnabled,
           intervalHours: this.schedulerInterval,
+          scheduleMode: this.scheduleMode,
+          checkTime: this.scheduleMode === 'fixed_time' ? this.checkTime : null,
         })
         this.showSuccess('Scheduler settings saved')
       } catch (error) {

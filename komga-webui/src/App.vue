@@ -8,6 +8,7 @@ import Vue from 'vue'
 import {Theme} from '@/types/themes'
 import {LIBRARY_ADDED, LIBRARY_CHANGED, LIBRARY_DELETED, SESSION_EXPIRED} from '@/types/events'
 import {LibrarySseDto, SessionExpiredDto} from '@/types/komga-sse'
+import {applyThemePreset} from '@/plugins/vuetify'
 
 export default Vue.extend({
   name: 'App',
@@ -44,6 +45,12 @@ export default Vue.extend({
         if (Object.values(Theme).includes(val)) {
           this.changeTheme(val)
         }
+      },
+      immediate: true,
+    },
+    '$store.state.persistedState.themePreset': {
+      handler(val) {
+        applyThemePreset(this.$vuetify, val || 'default')
       },
       immediate: true,
     },

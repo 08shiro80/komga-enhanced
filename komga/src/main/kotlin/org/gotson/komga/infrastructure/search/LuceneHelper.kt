@@ -60,11 +60,18 @@ class LuceneHelper(
   ): List<String>? =
     if (!searchTerm.isNullOrBlank()) {
       try {
+        val terms = searchTerm.trim().split("\\s+".toRegex())
+        val query =
+          if (terms.size > 1 && terms.last().length < 3 && terms.last().matches(Regex("\\w+"))) {
+            terms.dropLast(1).joinToString(" ") + " " + terms.last() + "*"
+          } else {
+            searchTerm
+          }
         val fieldsQuery =
           MultiFieldQueryParser(entity.defaultFields, searchAnalyzer)
             .apply {
               defaultOperator = QueryParser.Operator.AND
-            }.parse("$searchTerm *:*")
+            }.parse("$query *:*")
 
         val typeQuery = TermQuery(Term(LuceneEntity.TYPE, entity.type))
 

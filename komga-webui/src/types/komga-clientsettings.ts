@@ -20,6 +20,8 @@ export enum CLIENT_SETTING {
   WEBUI_LIBRARIES = 'webui.libraries',
   WEBUI_SERIES_GROUPS = 'webui.series_groups',
   WEBUI_RECOMMENDED = 'webui.recommended',
+  WEBUI_GUEST_ACCESS = 'webui.guest_access',
+  WEBUI_GUEST_LIBRARIES = 'webui.guest_libraries',
 }
 
 export interface ClientSettingLibrary {

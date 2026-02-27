@@ -958,7 +958,7 @@ export default Vue.extend({
       this.notification.enabled = true
     },
     markProgress: debounce(function (this: any, location: Locator) {
-      if (!this.incognito) {
+      if (!this.incognito && !this.$store.state.guestMode) {
         this.$komgaBooks.updateProgression(this.bookId, createR2Progression(location))
       }
     }, 500),

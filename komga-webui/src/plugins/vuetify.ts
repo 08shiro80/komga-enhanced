@@ -7,12 +7,25 @@ import colors from 'vuetify/lib/util/colors'
 import {Touch} from 'vuetify/lib/directives'
 import i18n from '@/i18n'
 import IconFormatLineSpacingDown from '@/components/icons/IconFormatLineSpacingDown.vue'
+import {THEME_PRESETS} from '@/types/theme-presets'
 
 Vue.use(Vuetify, {
   directives: {
     Touch,
   },
 })
+
+export function applyThemePreset(vuetify: any, presetName: string) {
+  const preset = THEME_PRESETS.find(p => p.name === presetName) || THEME_PRESETS[0]
+  const themes = vuetify.theme?.themes || vuetify.framework?.theme?.themes
+  if (!themes) return
+  Object.entries(preset.light).forEach(([key, value]) => {
+    themes.light[key] = value
+  })
+  Object.entries(preset.dark).forEach(([key, value]) => {
+    themes.dark[key] = value
+  })
+}
 
 export default new Vuetify({
   icons: {

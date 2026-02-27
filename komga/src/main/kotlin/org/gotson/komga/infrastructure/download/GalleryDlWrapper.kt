@@ -293,6 +293,20 @@ class GalleryDlWrapper(
     return regex.find(filename)?.groupValues?.get(1)
   }
 
+  private fun extractChapterNumberFromFilename(filename: String): String? {
+    val name = filename.substringBeforeLast('.').lowercase()
+    val match =
+      Regex("""^c(\d+(?:\.\d+)?)""").find(name)
+        ?: Regex("""^ch\.?\s*(\d+(?:\.\d+)?)""").find(name)
+    val raw = match?.groupValues?.get(1) ?: return null
+    return try {
+      val num = raw.toDouble()
+      if (num == num.toLong().toDouble()) num.toLong().toString() else raw
+    } catch (_: NumberFormatException) {
+      raw
+    }
+  }
+
   private fun fetchChapterMetadata(chapterId: String): ChapterInfo? {
     try {
       val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
@@ -799,9 +813,40 @@ class GalleryDlWrapper(
             ?: emptyList()
 
         logger.info { "Found ${downloadedCbzFiles.size} CBZ files, injecting ComicInfo.xml" }
+
+        val retryChapters =
+          if (mangaDexId != null) {
+            try {
+              fetchAllChaptersFromMangaDex(mangaDexId).also {
+                if (it.isNotEmpty()) logger.info { "Fetched ${it.size} chapters from MangaDex API (retry after download)" }
+              }
+            } catch (_: Exception) {
+              emptyList()
+            }
+          } else {
+            emptyList()
+          }
+        val chapterMap = retryChapters.associateBy { it.chapterNumber }
+
         downloadedCbzFiles.forEach { cbzFile ->
           try {
-            addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
+            val chapterNum = extractChapterNumberFromFilename(cbzFile.name)
+            val matched = chapterMap[chapterNum]
+            if (matched != null) {
+              val chapterInfo =
+                ChapterInfo(
+                  chapterNumber = matched.chapterNumber,
+                  chapterTitle = matched.chapterTitle,
+                  volume = matched.volume,
+                  pages = matched.pages,
+                  scanlationGroup = matched.scanlationGroup,
+                  publishDate = matched.publishDate,
+                  language = matched.language,
+                )
+              addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, matched.chapterUrl)
+            } else {
+              addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
+            }
           } catch (e: Exception) {
             logger.warn(e) { "Failed to inject ComicInfo.xml into ${cbzFile.name}" }
           }
@@ -1389,10 +1434,10 @@ class GalleryDlWrapper(
   ${if (volume != null) "<Volume>$volume</Volume>" else ""}
   ${if (description.isNotBlank()) "<Summary>$description</Summary>" else ""}
   ${
-      if (mangaInfo.year != null) {
-        "<Year>${mangaInfo.year}</Year>"
-      } else if (publishDate != null) {
+      if (publishDate != null) {
         "<Year>${publishDate.substring(0, 4)}</Year>"
+      } else if (mangaInfo.year != null) {
+        "<Year>${mangaInfo.year}</Year>"
       } else {
         ""
       }
@@ -1679,13 +1724,8 @@ class GalleryDlWrapper(
         ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
         ?: return
 
-    val chaptersNeedingUpdate =
-      allChapters.filter { it.chapterUrl !in existingUrls }
-
-    if (chaptersNeedingUpdate.isEmpty()) return
-
     var updated = 0
-    for (chapter in chaptersNeedingUpdate) {
+    for (chapter in allChapters) {
       val chapterNumStr = chapter.chapterNumber ?: continue
       val paddedNum =
         try {
@@ -1721,6 +1761,11 @@ class GalleryDlWrapper(
             name.startsWith("ch. $paddedNum ")
         } ?: continue
 
+      val needsUrlUpdate = chapter.chapterUrl !in existingUrls
+      val needsDateFix = hasMismatchedDates(matchingCbz, chapter.publishDate)
+
+      if (!needsUrlUpdate && !needsDateFix) continue
+
       try {
         val chapterInfo =
           ChapterInfo(
@@ -1734,15 +1779,47 @@ class GalleryDlWrapper(
           )
         addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
         updated++
-        logger.info { "Updated ComicInfo.xml with chapter URL in ${matchingCbz.name}" }
+        val reason =
+          if (needsDateFix && needsUrlUpdate) {
+            "dates and chapter URL"
+          } else if (needsDateFix) {
+            "dates"
+          } else {
+            "chapter URL"
+          }
+        logger.info { "Updated ComicInfo.xml ($reason) in ${matchingCbz.name}" }
       } catch (e: Exception) {
         logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
       }
     }
 
     if (updated > 0) {
-      logger.info { "Updated $updated existing CBZ files with chapter URLs" }
+      logger.info { "Updated $updated existing CBZ files" }
     }
+  }
+
+  private fun hasMismatchedDates(
+    cbzFile: File,
+    publishDate: String?,
+  ): Boolean {
+    if (publishDate == null || publishDate.length < 10) return false
+    val expectedYear = publishDate.substring(0, 4)
+    try {
+      ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
+        var entry = zipIn.nextEntry
+        while (entry != null) {
+          if (entry.name == "ComicInfo.xml") {
+            val xml = zipIn.readBytes().toString(Charsets.UTF_8)
+            val yearMatch = Regex("<Year>(\\d+)</Year>").find(xml)
+            return yearMatch != null && yearMatch.groupValues[1] != expectedYear
+          }
+          entry = zipIn.nextEntry
+        }
+      }
+    } catch (_: Exception) {
+      return false
+    }
+    return false
   }
 
   private fun readSeriesJson(destinationPath: Path): Map<String, Any?>? {

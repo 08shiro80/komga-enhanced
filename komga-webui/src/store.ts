@@ -12,7 +12,7 @@ import {isEmpty} from 'lodash'
 Vue.use(Vuex)
 
 const persistedState = createPersistedState({
-  paths: ['persistedState'],
+  paths: ['persistedState', 'guestMode'],
 })
 
 export default new Vuex.Store({
@@ -62,6 +62,9 @@ export default new Vuex.Store({
     actuatorInfo: {} as ActuatorInfo,
 
     releases: [] as ReleaseDto[],
+    forkReleases: [] as ReleaseDto[],
+
+    guestMode: false,
   },
   getters: {
     getUnreadAnnouncementsCount: (state) => (): number => {
@@ -75,6 +78,17 @@ export default new Vuex.Store({
       const currentBase = state.actuatorInfo.build.version.split('-fork')[0].replace(/^v/, '')
       const latestVersion = state.releases.find((x: ReleaseDto) => x.latest)?.version?.replace(/^v/, '')
       if(currentBase == latestVersion) return 1
+      else return 0
+    },
+    isForkLatestVersion: (state) => (): number => {
+      if(isEmpty(state.actuatorInfo)) return -1
+      if(state.forkReleases.length == 0) return -1
+      const fullVersion = state.actuatorInfo.build.version || ''
+      const latestForkTag = state.forkReleases.find((x: ReleaseDto) => x.latest)?.version?.replace(/^v/, '') || ''
+      const currentFork = fullVersion.split('-fork-')[1] || ''
+      const latestFork = latestForkTag.split('-fork-')[1] || latestForkTag
+      if(!currentFork || !latestFork) return -1
+      if(currentFork == latestFork) return 1
       else return 0
     },
   },
@@ -181,6 +195,12 @@ export default new Vuex.Store({
     },
     setReleases(state, releases) {
       state.releases = releases
+    },
+    setForkReleases(state, releases) {
+      state.forkReleases = releases
+    },
+    setGuestMode(state, val) {
+      state.guestMode = val
     },
   },
   actions: {

@@ -81,6 +81,7 @@ const router = new Router({
         {
           path: '/downloads',
           name: 'downloads',
+          beforeEnter: adminGuard,
           component: () => import(/* webpackChunkName: "downloads" */ './views/DownloadDashboard.vue'),
         },
         // /follow-lists route removed - functionality integrated into /downloads configuration tab
@@ -126,6 +127,12 @@ const router = new Router({
           name: 'metrics',
           beforeEnter: adminGuard,
           component: () => import(/* webpackChunkName: "metrics" */ './views/MetricsView.vue'),
+        },
+        {
+          path: '/settings/logs',
+          name: 'settings-logs',
+          beforeEnter: adminGuard,
+          component: () => import(/* webpackChunkName: "settings-logs" */ './views/LogsView.vue'),
         },
         {
           path: '/settings/announcements',
@@ -332,7 +339,7 @@ const router = new Router({
   },
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   // avoid document.title flickering when changing route
   if (!['read-book', 'read-epub', 'browse-book', 'browse-oneshot', 'browse-series', 'browse-libraries', 'browse-books',
     'recommended-libraries', 'browse-collection', 'browse-collections', 'browse-readlist', 'browse-readlists'].includes(<string>to.name)
@@ -355,7 +362,40 @@ router.beforeEach((to, from, next) => {
     window.close()
   }
 
-  if (to.name !== 'startup' && to.name !== 'login' && !lStore.getters.authenticated) {
+  const guestBlockedRoutes = [
+    'settings-users', 'settings-users-add', 'settings-server', 'settings-ui',
+    'settings-backup', 'settings-plugins', 'metrics', 'announcements', 'updates',
+    'settings-logs', 'history', 'account-me', 'account-api-keys',
+    'account-settings-ui', 'account-activity', 'import-books', 'import-readlist',
+    'downloads', 'media-analysis', 'missing-posters', 'duplicate-files',
+    'settings-duplicate-pages-known', 'settings-duplicate-pages-unknown',
+    'settings-oversized-pages',
+  ]
+
+  // Guest mode: restore guest user and load libraries on page refresh
+  if (lStore.state.guestMode) {
+    if (!lStore.getters.authenticated) {
+      lStore.commit('setMe', {
+        id: 'guest',
+        email: 'guest@komga.local',
+        roles: ['PAGE_STREAMING'],
+      })
+    }
+    if (lStore.state.komgaLibraries.libraries.length === 0) {
+      try {
+        await lStore.dispatch('getLibraries')
+      } catch (e) {
+        lStore.commit('setGuestMode', false)
+        lStore.commit('setMe', {})
+        next({name: 'login'})
+        return
+      }
+    }
+  }
+
+  if (lStore.state.guestMode && guestBlockedRoutes.includes(to.name as string)) {
+    next({name: 'home'})
+  } else if (to.name !== 'startup' && to.name !== 'login' && !lStore.getters.authenticated && !lStore.state.guestMode) {
     const query = Object.assign({}, to.query, {redirect: to.fullPath})
     next({name: 'startup', query: query})
   } else next()

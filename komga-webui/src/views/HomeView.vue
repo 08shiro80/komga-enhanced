@@ -67,7 +67,7 @@
             </v-list-item-content>
           </v-list-item>
 
-          <v-list-item :to="{name: 'downloads'}">
+          <v-list-item v-if="isAdmin" :to="{name: 'downloads'}">
             <v-list-item-icon>
               <v-icon>mdi-download</v-icon>
             </v-list-item-icon>
@@ -273,6 +273,10 @@
               <v-list-item-title>{{ $t('metrics.title') }}</v-list-item-title>
             </v-list-item>
 
+            <v-list-item :to="{name: 'settings-logs'}">
+              <v-list-item-title>Logs</v-list-item-title>
+            </v-list-item>
+
             <v-list-item :to="{name: 'announcements'}">
               <v-badge
                 dot
@@ -288,7 +292,7 @@
               <v-badge
                 dot
                 inline
-                :value="$store.getters.isLatestVersion() == 0"
+                :value="$store.getters.isLatestVersion() == 0 || $store.getters.isForkLatestVersion() == 0"
                 color="warning"
               >
                 <v-list-item-title>{{ $t('server.updates') }}</v-list-item-title>
@@ -297,7 +301,7 @@
           </v-list-group>
 
           <!--   ACCOUNT     -->
-          <v-list-group prepend-icon="mdi-account"
+          <v-list-group v-if="!isGuest" prepend-icon="mdi-account"
                         no-action
                         v-model="expandAccount"
           >
@@ -322,12 +326,21 @@
             </v-list-item>
           </v-list-group>
 
-          <v-list-item @click="logout">
+          <v-list-item v-if="!isGuest" @click="logout">
             <v-list-item-icon>
               <v-icon>mdi-power</v-icon>
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title>{{ $t('navigation.logout') }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-list-item v-if="isGuest" @click="goToLogin">
+            <v-list-item-icon>
+              <v-icon>mdi-login</v-icon>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title>Login</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
         </v-list>
@@ -372,7 +385,7 @@
         >
           <v-badge
             dot
-            :value="$store.getters.isLatestVersion() == 0"
+            :value="$store.getters.isLatestVersion() == 0 || $store.getters.isForkLatestVersion() == 0"
             color="warning"
           >
             <router-link :to="{name: 'updates'}" class="link-none">
@@ -444,6 +457,9 @@ export default Vue.extend({
         .then(x => this.$store.commit('setAnnouncements', x))
       this.$komgaReleases.getReleases()
         .then(x => this.$store.commit('setReleases', x))
+      this.$komgaReleases.getForkReleases()
+        .then(x => this.$store.commit('setForkReleases', x))
+        .catch(() => {})
     }
     this.checkRoute(this.$route)
   },
@@ -470,6 +486,9 @@ export default Vue.extend({
     },
     isAdmin(): boolean {
       return this.$store.getters.meAdmin
+    },
+    isGuest(): boolean {
+      return this.$store.state.guestMode
     },
     themes(): object[] {
       return [
@@ -538,6 +557,10 @@ export default Vue.extend({
     },
     addLibrary() {
       this.$store.dispatch('dialogAddLibrary')
+    },
+    goToLogin() {
+      this.$store.commit('setGuestMode', false)
+      this.$router.push({name: 'login'})
     },
   },
 })

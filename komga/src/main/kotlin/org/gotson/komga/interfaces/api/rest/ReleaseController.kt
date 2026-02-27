@@ -19,7 +19,8 @@ import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.server.ResponseStatusException
 import java.util.concurrent.TimeUnit
 
-private const val GITHUB_API = "https://api.github.com/repos/gotson/komga/releases"
+private const val GITHUB_API_UPSTREAM = "https://api.github.com/repos/gotson/komga/releases"
+private const val GITHUB_API_FORK = "https://api.github.com/repos/08shiro80/komga-enhanced/releases"
 
 @RestController
 @PreAuthorize("hasRole('ADMIN')")
@@ -28,7 +29,7 @@ private const val GITHUB_API = "https://api.github.com/repos/gotson/komga/releas
 class ReleaseController(
   webClientBuilder: WebClient.Builder,
 ) {
-  private val webClient = webClientBuilder.baseUrl(GITHUB_API).build()
+  private val webClient = webClientBuilder.build()
 
   private val cache =
     Caffeine
@@ -38,12 +39,12 @@ class ReleaseController(
 
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
-  @Operation(summary = "List releases")
+  @Operation(summary = "List upstream releases")
   fun getReleases(
     @AuthenticationPrincipal principal: KomgaPrincipal,
   ): List<ReleaseDto> =
     cache
-      .get("releases") { fetchGitHubReleases() }
+      .get("releases") { fetchGitHubReleases(GITHUB_API_UPSTREAM) }
       ?.let { releases ->
         releases.mapIndexed { index, ghRel ->
           ReleaseDto(
@@ -58,11 +59,33 @@ class ReleaseController(
       }
       ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
-  fun fetchGitHubReleases(): List<GithubReleaseDto> {
+  @GetMapping("fork")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(summary = "List fork releases")
+  fun getForkReleases(
+    @AuthenticationPrincipal principal: KomgaPrincipal,
+  ): List<ReleaseDto> =
+    cache
+      .get("forkReleases") { fetchGitHubReleases(GITHUB_API_FORK) }
+      ?.let { releases ->
+        releases.mapIndexed { index, ghRel ->
+          ReleaseDto(
+            ghRel.tagName,
+            ghRel.publishedAt,
+            ghRel.htmlUrl,
+            index == 0,
+            ghRel.prerelease,
+            ghRel.body,
+          )
+        }
+      }
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+  fun fetchGitHubReleases(apiUrl: String): List<GithubReleaseDto> {
     val response =
       webClient
         .get()
-        .uri {
+        .uri(apiUrl) {
           it.queryParam("per_page", 20).build()
         }.retrieve()
         .toEntity(object : ParameterizedTypeReference<List<GithubReleaseDto>>() {})

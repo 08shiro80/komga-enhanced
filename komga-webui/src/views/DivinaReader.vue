@@ -900,7 +900,7 @@ export default Vue.extend({
       this.notification.enabled = true
     },
     markProgress: debounce(function (this: any, page: number) {
-      if (!this.incognito) {
+      if (!this.incognito && !this.$store.state.guestMode) {
         this.$komgaBooks.updateReadProgress(this.bookId, {page: page})
       }
     }, 50),

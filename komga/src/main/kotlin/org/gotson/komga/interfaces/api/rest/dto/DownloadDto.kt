@@ -55,11 +55,15 @@ data class FollowTxtUpdateDto(
 data class SchedulerSettingsDto(
   val enabled: Boolean,
   val intervalHours: Int,
+  val scheduleMode: String,
+  val checkTime: String?,
 )
 
 data class SchedulerSettingsUpdateDto(
   val enabled: Boolean,
   val intervalHours: Int,
+  val scheduleMode: String = "interval",
+  val checkTime: String? = null,
 )
 
 data class ClearResultDto(
