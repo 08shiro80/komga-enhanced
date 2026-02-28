@@ -121,6 +121,13 @@ class GalleryDlWrapper(
         }
       }
 
+      titleMap.forEach { (lang, title) ->
+        if (lang is String && title is String && title !in alternativeTitlesList) {
+          alternativeTitlesWithLang[title] = lang
+          alternativeTitlesList.add(title)
+        }
+      }
+
       // Priority: altTitles English > main title English > any title
       val englishTitle =
         when {
@@ -657,6 +664,8 @@ class GalleryDlWrapper(
           emptyList()
         }
 
+      normalizeDoubleBracketFilenames(destDir)
+
       val urlsFromCbz = extractChapterUrlsFromCbzFiles(destDir)
       logger.info { "CBZ ComicInfo check: Found ${urlsFromCbz.size} chapter URLs in existing CBZ files" }
 
@@ -952,18 +961,20 @@ class GalleryDlWrapper(
               val targetCbz =
                 recentCbzFiles.find { file ->
                   val name = file.nameWithoutExtension.lowercase()
-                  name.startsWith("c$paddedChapter") ||
-                    name.startsWith("c$chapterStr") ||
-                    name.startsWith("ch. $paddedChapter")
-                } ?: recentCbzFiles.firstOrNull()
+                  name.startsWith("c$paddedChapter ") || name == "c$paddedChapter" ||
+                    name.startsWith("c$chapterStr ") || name == "c$chapterStr" ||
+                    name.startsWith("ch. $paddedChapter ") || name.startsWith("ch. $paddedChapter-") || name == "ch. $paddedChapter"
+                }
                   ?: cbzFiles.find { file ->
                     val name = file.nameWithoutExtension.lowercase()
-                    name.startsWith("c$paddedChapter") ||
-                      name.startsWith("c$chapterStr") ||
-                      name.startsWith("ch. $paddedChapter")
+                    name.startsWith("c$paddedChapter ") || name == "c$paddedChapter" ||
+                      name.startsWith("c$chapterStr ") || name == "c$chapterStr" ||
+                      name.startsWith("ch. $paddedChapter ") || name.startsWith("ch. $paddedChapter-") || name == "ch. $paddedChapter"
                   }
 
-              if (targetCbz != null) {
+              if (targetCbz == null) {
+                logger.warn { "Could not find CBZ file for chapter $chapterNum (expected c$paddedChapter or c$chapterStr)" }
+              } else {
                 try {
                   val chapterInfo =
                     ChapterInfo(
@@ -1725,6 +1736,7 @@ class GalleryDlWrapper(
         ?: return
 
     var updated = 0
+    val alreadyUpdated = mutableSetOf<String>()
     for (chapter in allChapters) {
       val chapterNumStr = chapter.chapterNumber ?: continue
       val paddedNum =
@@ -1761,10 +1773,11 @@ class GalleryDlWrapper(
             name.startsWith("ch. $paddedNum ")
         } ?: continue
 
-      val needsUrlUpdate = chapter.chapterUrl !in existingUrls
+      if (matchingCbz.absolutePath in alreadyUpdated) continue
+
       val needsDateFix = hasMismatchedDates(matchingCbz, chapter.publishDate)
 
-      if (!needsUrlUpdate && !needsDateFix) continue
+      if (!needsDateFix) continue
 
       try {
         val chapterInfo =
@@ -1778,16 +1791,9 @@ class GalleryDlWrapper(
             language = chapter.language,
           )
         addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+        alreadyUpdated.add(matchingCbz.absolutePath)
         updated++
-        val reason =
-          if (needsDateFix && needsUrlUpdate) {
-            "dates and chapter URL"
-          } else if (needsDateFix) {
-            "dates"
-          } else {
-            "chapter URL"
-          }
-        logger.info { "Updated ComicInfo.xml ($reason) in ${matchingCbz.name}" }
+        logger.info { "Updated ComicInfo.xml (dates) in ${matchingCbz.name}" }
       } catch (e: Exception) {
         logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
       }
@@ -1804,6 +1810,8 @@ class GalleryDlWrapper(
   ): Boolean {
     if (publishDate == null || publishDate.length < 10) return false
     val expectedYear = publishDate.substring(0, 4)
+    val expectedMonth = publishDate.substring(5, 7)
+    val expectedDay = publishDate.substring(8, 10)
     try {
       ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
         var entry = zipIn.nextEntry
@@ -1811,7 +1819,15 @@ class GalleryDlWrapper(
           if (entry.name == "ComicInfo.xml") {
             val xml = zipIn.readBytes().toString(Charsets.UTF_8)
             val yearMatch = Regex("<Year>(\\d+)</Year>").find(xml)
-            return yearMatch != null && yearMatch.groupValues[1] != expectedYear
+            val monthMatch = Regex("<Month>(\\d+)</Month>").find(xml)
+            val dayMatch = Regex("<Day>(\\d+)</Day>").find(xml)
+            if (yearMatch == null) return true
+            if (yearMatch.groupValues[1] != expectedYear) return true
+            val existingMonth = monthMatch?.groupValues?.get(1)?.padStart(2, '0')
+            val existingDay = dayMatch?.groupValues?.get(1)?.padStart(2, '0')
+            if (existingMonth != expectedMonth) return true
+            if (existingDay != expectedDay) return true
+            return false
           }
           entry = zipIn.nextEntry
         }
@@ -1819,7 +1835,7 @@ class GalleryDlWrapper(
     } catch (_: Exception) {
       return false
     }
-    return false
+    return true
   }
 
   private fun readSeriesJson(destinationPath: Path): Map<String, Any?>? {
@@ -1946,6 +1962,29 @@ class GalleryDlWrapper(
       percent = percent,
       message = line,
     )
+  }
+
+  private fun normalizeDoubleBracketFilenames(dir: File) {
+    val cbzFiles =
+      dir
+        .listFiles()
+        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+        ?: return
+
+    for (file in cbzFiles) {
+      val name = file.nameWithoutExtension
+      if (name.contains("[[") || name.contains("]]")) {
+        val normalized =
+          name
+            .replace(Regex("""\[\['?"""), "[")
+            .replace(Regex("""'?\]\]"""), "]")
+        val newFile = File(dir, "$normalized.cbz")
+        if (!newFile.exists() && normalized != name) {
+          file.renameTo(newFile)
+          logger.info { "Normalized filename: ${file.name} -> $normalized.cbz" }
+        }
+      }
+    }
   }
 
   private fun buildDesiredCbzName(chapter: ChapterDownloadInfo): String {
