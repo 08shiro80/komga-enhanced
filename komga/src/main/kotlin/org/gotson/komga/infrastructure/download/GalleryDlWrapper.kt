@@ -708,17 +708,7 @@ class GalleryDlWrapper(
               chapterNumStr
             }
 
-          val paddedNum =
-            try {
-              val num = chapterNumStr.toDouble()
-              if (num == num.toLong().toDouble()) {
-                String.format("%03d", num.toLong())
-              } else {
-                chapterNumStr
-              }
-            } catch (_: NumberFormatException) {
-              chapterNumStr
-            }
+          val paddedNum = padChapterNumber(chapterNumStr)
 
           val groupTag = chapter.scanlationGroup?.lowercase()
 
@@ -853,6 +843,13 @@ class GalleryDlWrapper(
                   language = matched.language,
                 )
               addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, matched.chapterUrl)
+
+              val desiredName = buildDesiredCbzName(matched)
+              val desiredFile = File(destDir, desiredName)
+              if (cbzFile.name != desiredName && !desiredFile.exists()) {
+                cbzFile.renameTo(desiredFile)
+                logger.info { "Renamed ${cbzFile.name} -> $desiredName" }
+              }
             } else {
               addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
             }
@@ -860,6 +857,8 @@ class GalleryDlWrapper(
             logger.warn(e) { "Failed to inject ComicInfo.xml into ${cbzFile.name}" }
           }
         }
+
+        normalizeDoubleBracketFilenames(destDir)
       } else if (chapters.isEmpty()) {
         // All chapters already downloaded - skip
         logger.info { "All ${allChapters.size} chapters already downloaded, nothing to do" }
@@ -936,17 +935,7 @@ class GalleryDlWrapper(
               filesDownloaded++
 
               val chapterStr = chapter.chapterNumber ?: "${index + 1}"
-              val paddedChapter =
-                try {
-                  val num = chapterStr.toDouble()
-                  if (num == num.toLong().toDouble()) {
-                    String.format("%03d", num.toLong())
-                  } else {
-                    chapterStr
-                  }
-                } catch (_: NumberFormatException) {
-                  chapterStr
-                }
+              val paddedChapter = padChapterNumber(chapterStr)
               val cbzFiles =
                 destDir
                   .listFiles()
@@ -1012,6 +1001,7 @@ class GalleryDlWrapper(
           }
         }
 
+        normalizeDoubleBracketFilenames(destDir)
         configFile.delete()
       }
 
@@ -1115,12 +1105,12 @@ class GalleryDlWrapper(
           "lang" to defaultLanguage,
           "api" to "api",
           "data-saver" to false,
-          "directory" to listOf("c{chapter:>03}{chapter_minor} [{group}]"),
+          "directory" to listOf("c{chapter:>03}{chapter_minor} [{group:J, }]"),
           "filename" to "{page:>03}.{extension}",
         ),
       "mangahere" to
         mapOf(
-          "directory" to listOf("c{chapter:>03}{chapter_minor} [{group}]"),
+          "directory" to listOf("c{chapter:>03}{chapter_minor} [{group:J, }]"),
           "filename" to "{page:>03}.{extension}",
         ),
       "comick" to
@@ -1739,17 +1729,7 @@ class GalleryDlWrapper(
     val alreadyUpdated = mutableSetOf<String>()
     for (chapter in allChapters) {
       val chapterNumStr = chapter.chapterNumber ?: continue
-      val paddedNum =
-        try {
-          val num = chapterNumStr.toDouble()
-          if (num == num.toLong().toDouble()) {
-            String.format("%03d", num.toLong())
-          } else {
-            chapterNumStr
-          }
-        } catch (_: NumberFormatException) {
-          chapterNumStr
-        }
+      val paddedNum = padChapterNumber(chapterNumStr)
 
       val chapterStr =
         try {
@@ -1766,7 +1746,9 @@ class GalleryDlWrapper(
       val matchingCbz =
         cbzFiles.find { file ->
           val name = file.nameWithoutExtension.lowercase()
-          name == "c$chapterStr" ||
+          name == "c$paddedNum" ||
+            name.startsWith("c$paddedNum ") ||
+            name == "c$chapterStr" ||
             name.startsWith("c$chapterStr ") ||
             name == "ch. $paddedNum" ||
             name.startsWith("ch. $paddedNum -") ||
@@ -1964,6 +1946,20 @@ class GalleryDlWrapper(
     )
   }
 
+  private fun padChapterNumber(chapterNumStr: String): String =
+    try {
+      val num = chapterNumStr.toDouble()
+      if (num == num.toLong().toDouble()) {
+        String.format("%03d", num.toLong())
+      } else {
+        val intPart = num.toLong()
+        val decimalPart = chapterNumStr.substringAfter(".", "")
+        String.format("%03d.%s", intPart, decimalPart)
+      }
+    } catch (_: NumberFormatException) {
+      chapterNumStr
+    }
+
   private fun normalizeDoubleBracketFilenames(dir: File) {
     val cbzFiles =
       dir
@@ -1989,19 +1985,7 @@ class GalleryDlWrapper(
 
   private fun buildDesiredCbzName(chapter: ChapterDownloadInfo): String {
     val chapterNumStr = chapter.chapterNumber ?: "000"
-    val paddedNum =
-      try {
-        val num = chapterNumStr.toDouble()
-        if (num == num.toLong().toDouble()) {
-          String.format("%03d", num.toLong())
-        } else {
-          val intPart = num.toLong()
-          val decimalPart = chapterNumStr.substringAfter(".", "")
-          String.format("%03d.%s", intPart, decimalPart)
-        }
-      } catch (_: NumberFormatException) {
-        chapterNumStr
-      }
+    val paddedNum = padChapterNumber(chapterNumStr)
 
     val titlePart =
       if (!chapter.chapterTitle.isNullOrBlank()) {

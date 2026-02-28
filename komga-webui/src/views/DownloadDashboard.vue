@@ -657,7 +657,7 @@ export default {
       this.checkingNow = true
       try {
         await this.$http.post(`/api/v1/downloads/follow-txt/${this.selectedLibrary.id}/check-now`)
-        this.showSuccess('Check triggered. Downloads will start shortly.')
+        this.showSuccess('Scan gestartet — neue Kapitel erscheinen automatisch.')
       } catch (error) {
         this.showError('Failed to trigger check: ' + error.message)
       } finally {

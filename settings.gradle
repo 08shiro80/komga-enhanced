@@ -1,2 +1,8 @@
+buildCache {
+  local {
+    enabled = true
+  }
+}
+
 include 'komga'
 include 'komga-tray'

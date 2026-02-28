@@ -1,5 +1,6 @@
 package org.gotson.komga.interfaces.api.rest
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import jakarta.validation.Valid
 import org.gotson.komga.domain.model.FollowConfig
@@ -25,6 +26,7 @@ import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsDto
 import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsUpdateDto
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -37,6 +39,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+
+private val logger = KotlinLogging.logger {}
 
 @RestController
 @RequestMapping("api/v1/downloads", produces = [MediaType.APPLICATION_JSON_VALUE])
@@ -165,30 +169,17 @@ class DownloadController(
 
   @PostMapping("check-new")
   @Operation(summary = "Check for new chapters across all followed manga", tags = [TagNames.DOWNLOADS])
-  fun checkForNewChapters(): ChapterCheckSummaryDto {
-    val summary = chapterChecker.checkAndQueueNewChapters()
-    return ChapterCheckSummaryDto(
-      totalManga = summary.totalManga,
-      checkedCount = summary.checkedCount,
-      needsDownloadCount = summary.needsDownloadCount,
-      upToDateCount = summary.upToDateCount,
-      errorCount = summary.errorCount,
-      results =
-        summary.results.map { r ->
-          ChapterCheckResultDto(
-            url = r.url,
-            mangaId = r.mangaId,
-            title = r.title,
-            apiChapterCount = r.apiChapterCount,
-            downloadedChapterCount = r.downloadedChapterCount,
-            filesystemChapterCount = r.filesystemChapterCount,
-            newChaptersEstimate = r.newChaptersEstimate,
-            needsDownload = r.needsDownload,
-            error = r.error,
-          )
-        },
-      durationMs = summary.durationMs,
-    )
+  fun checkForNewChapters(): ResponseEntity<Map<String, String>> {
+    java.util.concurrent.CompletableFuture.runAsync {
+      try {
+        chapterChecker.checkAndQueueNewChapters()
+      } catch (e: Exception) {
+        logger.error(e) { "Background chapter check failed" }
+      }
+    }
+    return ResponseEntity
+      .status(HttpStatus.ACCEPTED)
+      .body(mapOf("message" to "Chapter check started in background"))
   }
 
   @PostMapping("check-only")
@@ -259,12 +250,20 @@ class DownloadController(
   }
 
   @PostMapping("follow-txt/{libraryId}/check-now")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Trigger immediate check for a library's follow.txt", tags = [TagNames.DOWNLOADS])
   fun checkFollowTxtNow(
     @PathVariable libraryId: String,
-  ) {
-    downloadScheduler.checkFollowListNow(libraryId)
+  ): ResponseEntity<Map<String, String>> {
+    java.util.concurrent.CompletableFuture.runAsync {
+      try {
+        downloadScheduler.checkFollowListNow(libraryId)
+      } catch (e: Exception) {
+        logger.error(e) { "Background follow list check failed for library $libraryId" }
+      }
+    }
+    return ResponseEntity
+      .status(HttpStatus.ACCEPTED)
+      .body(mapOf("message" to "Follow list check started in background"))
   }
 
   @GetMapping("scheduler")
