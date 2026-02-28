@@ -234,6 +234,7 @@ class GalleryDlWrapper(
         publicationDemographic = publicationDemographic,
         genres = genres,
         coverFilename = coverFilename,
+        mangaDexId = mangaId,
       )
     } catch (e: Exception) {
       logger.warn(e) { "Failed to fetch MangaDex API metadata for $mangaId" }
@@ -642,11 +643,25 @@ class GalleryDlWrapper(
           add("lang=en")
         }
 
-      logger.info { "Downloading cover image" }
       try {
         val mangaDexId = extractMangaDexId(url)
         if (mangaDexId != null && mangaInfo.coverFilename != null) {
-          downloadMangaCover(mangaDexId, mangaInfo.coverFilename!!, destinationPath)
+          val existingCoverFile =
+            destDir.listFiles()?.find {
+              it.name.startsWith("cover.") && it.isFile
+            }
+
+          @Suppress("UNCHECKED_CAST")
+          val storedCoverFilename =
+            (seriesJson?.get("metadata") as? Map<String, Any?>)?.get("cover_filename") as? String
+          val coverChanged = storedCoverFilename != mangaInfo.coverFilename
+
+          if (existingCoverFile != null && !coverChanged) {
+            logger.debug { "Cover already exists and unchanged, skipping download" }
+          } else {
+            logger.info { "Downloading cover image" }
+            downloadMangaCover(mangaDexId, mangaInfo.coverFilename!!, destinationPath)
+          }
         } else {
           logger.warn { "Cannot download cover: mangaDexId=$mangaDexId, coverFilename=${mangaInfo.coverFilename}" }
         }
@@ -1356,6 +1371,8 @@ class GalleryDlWrapper(
               "alternate_titles" to alternateTitles,
             ).apply {
               this["publisher"] = "MangaDex"
+              mangaInfo.mangaDexId?.let { this["comicid"] = it }
+              mangaInfo.coverFilename?.let { this["cover_filename"] = it }
               mangaInfo.author?.let { this["author"] = it }
               mangaInfo.description?.let { this["description"] = it }
               mangaInfo.year?.let { this["year"] = it }
@@ -1368,10 +1385,18 @@ class GalleryDlWrapper(
         )
 
       val seriesJsonFile = destinationPath.resolve("series.json").toFile()
+      val newContent = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(metadata)
+
+      if (seriesJsonFile.exists()) {
+        val existingContent = seriesJsonFile.readText()
+        if (existingContent == newContent) {
+          logger.debug { "series.json unchanged, skipping rewrite" }
+          return
+        }
+      }
 
       logger.info { "Writing series.json to: ${seriesJsonFile.absolutePath}" }
-
-      seriesJsonFile.writeText(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(metadata))
+      seriesJsonFile.writeText(newContent)
 
       if (!seriesJsonFile.exists()) {
         throw java.io.IOException("series.json file was not created")
@@ -2025,6 +2050,7 @@ data class MangaInfo(
   val publicationDemographic: String? = null,
   val genres: List<String> = emptyList(),
   val coverFilename: String? = null,
+  val mangaDexId: String? = null,
 )
 
 data class ChapterInfo(
