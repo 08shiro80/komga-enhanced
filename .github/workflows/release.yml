@@ -34,31 +34,9 @@ permissions:
   packages: write
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      version_current: ${{ steps.versions.outputs.version_current }}
-      version_next: ${{ steps.versions.outputs.version_next }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Get previous version
-        id: versions
-        run: |
-          # Get latest tag as current version, or 0.0.0 if no tags exist
-          CURRENT=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
-          # Construct full version: {komga_version}-fork-{fork_version}
-          NEXT="${{ inputs.komga_version }}-fork-${{ inputs.fork_version }}"
-          echo "version_current=$CURRENT" >> $GITHUB_OUTPUT
-          echo "version_next=$NEXT" >> $GITHUB_OUTPUT
-          echo "Previous version: $CURRENT"
-          echo "New version: $NEXT"
-
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: version
     steps:
       - name: Remove unnecessary files
         run: |
@@ -66,16 +44,21 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Display versions
+      - name: Compute versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Previous version: ${{ needs.version.outputs.version_current }}"
-          echo "New version: ${{ needs.version.outputs.version_next }}"
+          CURRENT=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "0.0.0")
+          NEXT="${{ inputs.komga_version }}-fork-${{ inputs.fork_version }}"
+          echo "version_current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "version_next=$NEXT" >> $GITHUB_OUTPUT
+          echo "Previous version: $CURRENT"
+          echo "New version: $NEXT"
 
       - name: Update version in gradle.properties
-        run: sed -i -e "s/version=.*/version=${{ needs.version.outputs.version_next }}/" gradle.properties
+        run: sed -i -e "s/version=.*/version=${{ steps.versions.outputs.version_next }}/" gradle.properties
 
       - uses: actions/setup-node@v4
         with:
@@ -122,7 +105,7 @@ jobs:
           NEW_CONTENT=$(base64 -w 0 gradle.properties)
           gh api repos/${{ github.repository }}/contents/gradle.properties \
             -X PUT \
-            -f message="chore(release): ${{ needs.version.outputs.version_next }}" \
+            -f message="chore(release): ${{ steps.versions.outputs.version_next }}" \
             -f content="$NEW_CONTENT" \
             -f sha="$FILE_SHA" \
             -f branch="${{ github.ref_name }}"
@@ -132,7 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          VERSION="${{ needs.version.outputs.version_next }}"
+          VERSION="${{ steps.versions.outputs.version_next }}"
 
           # Delete existing tag if present
           gh api repos/${{ github.repository }}/git/refs/tags/${VERSION} -X DELETE 2>/dev/null || true
@@ -155,18 +138,10 @@ jobs:
             -f ref="refs/tags/${VERSION}" \
             -f sha="$TAG_SHA"
 
-      - name: Pull latest changes
-        if: ${{ !inputs.docker_private }}
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          git checkout gradle.properties
-          git pull origin ${{ github.ref_name }}
-
       - name: Prepare release JAR
         id: prepare_jar
         run: |
-          VERSION="${{ needs.version.outputs.version_next }}"
+          VERSION="${{ steps.versions.outputs.version_next }}"
           JAR_PATH="komga/build/libs/komga-${VERSION}.jar"
           echo "jar_path=$JAR_PATH" >> $GITHUB_OUTPUT
           echo "jar_name=komga-${VERSION}.jar" >> $GITHUB_OUTPUT
@@ -175,12 +150,12 @@ jobs:
         if: inputs.github_release && !inputs.docker_private
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.version.outputs.version_next }}
-          name: Release ${{ needs.version.outputs.version_next }}
+          tag_name: ${{ steps.versions.outputs.version_next }}
+          name: Release ${{ steps.versions.outputs.version_next }}
           body: |
             ${{ inputs.release_notes }}
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ needs.version.outputs.version_current }}...${{ needs.version.outputs.version_next }}
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.versions.outputs.version_current }}...${{ steps.versions.outputs.version_next }}
           files: |
             ${{ steps.prepare_jar.outputs.jar_path }}
           draft: false
@@ -210,4 +185,4 @@ jobs:
           push: true
           tags: |
             ${{ inputs.docker_private && '08shiro80/komga-private' || '08shiro80/komga' }}:latest
-            ${{ inputs.docker_private && '08shiro80/komga-private' || '08shiro80/komga' }}:${{ needs.version.outputs.version_next }}
+            ${{ inputs.docker_private && '08shiro80/komga-private' || '08shiro80/komga' }}:${{ steps.versions.outputs.version_next }}

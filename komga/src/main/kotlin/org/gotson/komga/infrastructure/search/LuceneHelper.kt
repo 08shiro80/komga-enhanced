@@ -129,14 +129,30 @@ class LuceneHelper(
         "translator",
         "inker",
       )
-    return input
+
+    val fieldAlternation = knownFields.joinToString("|")
+    val rangeRegex = Regex("""(?i)(?:$fieldAlternation):[{\[]\S+\s+TO\s+\S+[}\]]""")
+
+    val protectedRanges = mutableMapOf<String, String>()
+    var processed = input
+    rangeRegex.findAll(input).toList().reversed().forEach { match ->
+      val placeholder = "__RANGE${protectedRanges.size}__"
+      protectedRanges[placeholder] = match.value
+      processed = processed.replaceRange(match.range, placeholder)
+    }
+
+    return processed
       .split("\\s+".toRegex())
       .joinToString(" ") { term ->
-        val colonIdx = term.indexOf(':')
-        if (colonIdx > 0 && term.substring(0, colonIdx).lowercase() in knownFields) {
-          term
+        if (term in protectedRanges) {
+          protectedRanges[term]!!
         } else {
-          QueryParser.escape(term)
+          val colonIdx = term.indexOf(':')
+          if (colonIdx > 0 && term.substring(0, colonIdx).lowercase() in knownFields) {
+            term
+          } else {
+            QueryParser.escape(term)
+          }
         }
       }
   }
