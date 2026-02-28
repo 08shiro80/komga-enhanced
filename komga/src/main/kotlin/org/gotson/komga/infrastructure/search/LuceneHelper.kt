@@ -60,12 +60,13 @@ class LuceneHelper(
   ): List<String>? =
     if (!searchTerm.isNullOrBlank()) {
       try {
-        val terms = searchTerm.trim().split("\\s+".toRegex())
+        val escaped = escapeUserSearch(searchTerm.trim())
+        val terms = escaped.split("\\s+".toRegex())
         val query =
           if (terms.size > 1 && terms.last().length < 3 && terms.last().matches(Regex("\\w+"))) {
             terms.dropLast(1).joinToString(" ") + " " + terms.last() + "*"
           } else {
-            searchTerm
+            escaped
           }
         val fieldsQuery =
           MultiFieldQueryParser(entity.defaultFields, searchAnalyzer)
@@ -94,6 +95,51 @@ class LuceneHelper(
     } else {
       null
     }
+
+  private fun escapeUserSearch(input: String): String {
+    val knownFields =
+      setOf(
+        "title",
+        "isbn",
+        "tag",
+        "author",
+        "role",
+        "release_date",
+        "status",
+        "deleted",
+        "oneshot",
+        "publisher",
+        "reading_direction",
+        "age_rating",
+        "language",
+        "genre",
+        "sharing_label",
+        "total_book_count",
+        "book_count",
+        "complete",
+        "series_tag",
+        "book_tag",
+        "name",
+        "writer",
+        "penciller",
+        "colorist",
+        "letterer",
+        "cover",
+        "editor",
+        "translator",
+        "inker",
+      )
+    return input
+      .split("\\s+".toRegex())
+      .joinToString(" ") { term ->
+        val colonIdx = term.indexOf(':')
+        if (colonIdx > 0 && term.substring(0, colonIdx).lowercase() in knownFields) {
+          term
+        } else {
+          QueryParser.escape(term)
+        }
+      }
+  }
 
   fun upgradeIndex() {
     IndexUpgrader(directory, IndexWriterConfig(indexAnalyzer), true).upgrade()
