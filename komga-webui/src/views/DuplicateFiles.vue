@@ -58,12 +58,17 @@ export default Vue.extend({
       books: [] as BookDto[],
       totalBooks: 0,
       loading: true,
-      options: {} as any,
+      options: {
+        itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
+      } as any,
     }
   },
   watch: {
     options: {
       handler() {
+        if (this.options.itemsPerPage) {
+          this.$store.commit('setDataTablePageSize', this.options.itemsPerPage)
+        }
         this.loadBooks()
       },
       deep: true,

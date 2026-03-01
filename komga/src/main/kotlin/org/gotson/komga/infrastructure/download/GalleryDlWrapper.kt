@@ -27,6 +27,7 @@ private val logger = KotlinLogging.logger {}
 class GalleryDlWrapper(
   private val pluginConfigRepository: org.gotson.komga.domain.persistence.PluginConfigRepository,
   private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
+  private val blacklistedChapterRepository: org.gotson.komga.domain.persistence.BlacklistedChapterRepository,
 ) {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
@@ -703,8 +704,15 @@ class GalleryDlWrapper(
         logger.info { "Multi-group chapters detected: ${multiGroupChapterNumbers.size} chapter numbers with multiple groups" }
       }
 
+      val blacklistedUrls = blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
+
       val chapters =
         allChapters.filter { chapter ->
+          if (chapter.chapterUrl in blacklistedUrls) {
+            logger.debug { "Skipping blacklisted chapter ${chapter.chapterNumber}" }
+            return@filter false
+          }
+
           if (chapter.chapterUrl in urlsFromCbz) {
             logger.debug { "Skipping chapter ${chapter.chapterNumber} - URL found in existing CBZ" }
             return@filter false

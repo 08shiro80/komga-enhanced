@@ -61,8 +61,12 @@
                 :headers="headers"
                 :items="downloads"
                 :loading="loading"
-                :items-per-page="20"
+                :items-per-page="itemsPerPage"
+                @update:items-per-page="onItemsPerPageChange"
                 class="elevation-1"
+                :footer-props="{
+                  itemsPerPageOptions: [10, 20, 50, 100],
+                }"
               >
                 <template v-slot:item.title="{ item }">
                   <div>
@@ -286,6 +290,7 @@ export default {
       snackbar: false,
       snackbarText: '',
       snackbarColor: 'success',
+      itemsPerPage: 20,
       refreshInterval: null,
     }
   },
@@ -302,6 +307,8 @@ export default {
     },
   },
   mounted() {
+    const savedPageSize = this.$store?.state?.persistedState?.dataTablePageSize
+    if (savedPageSize) this.itemsPerPage = savedPageSize
     this.loadDownloads()
     this.loadLibraries()
     this.refreshInterval = setInterval(() => {
@@ -314,6 +321,10 @@ export default {
     }
   },
   methods: {
+    onItemsPerPageChange(val) {
+      this.itemsPerPage = val
+      this.$store.commit('setDataTablePageSize', val)
+    },
     async loadDownloads(silent = false) {
       if (!silent) this.loading = true
       try {

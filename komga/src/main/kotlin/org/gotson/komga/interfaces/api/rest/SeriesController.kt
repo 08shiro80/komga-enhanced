@@ -18,6 +18,7 @@ import org.gotson.komga.application.tasks.HIGH_PRIORITY
 import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.AlternateTitle
 import org.gotson.komga.domain.model.Author
+import org.gotson.komga.domain.model.BlacklistedChapter
 import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.Dimension
 import org.gotson.komga.domain.model.DomainEvent
@@ -34,6 +35,7 @@ import org.gotson.komga.domain.model.SeriesMetadata
 import org.gotson.komga.domain.model.SeriesSearch
 import org.gotson.komga.domain.model.ThumbnailSeries
 import org.gotson.komga.domain.model.WebLink
+import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.SeriesCollectionRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
@@ -119,6 +121,7 @@ class SeriesController(
   private val imageAnalyzer: ImageAnalyzer,
   private val thumbnailsSeriesRepository: ThumbnailSeriesRepository,
   private val contentRestrictionChecker: ContentRestrictionChecker,
+  private val blacklistedChapterRepository: BlacklistedChapterRepository,
 ) {
   @Operation(summary = "List series", description = "Use POST /api/v1/series/list instead. Deprecated since 1.19.0.", tags = [OpenApiConfiguration.TagNames.SERIES, OpenApiConfiguration.TagNames.DEPRECATED])
   @Deprecated("use /v1/series/list instead")
@@ -868,6 +871,28 @@ class SeriesController(
     // Stub endpoint - returns empty sources for now
     // Future: Track which metadata provider set each field
     return mapOf("sources" to emptyMap<String, Any>())
+  }
+
+  @GetMapping("v1/series/{seriesId}/blacklist")
+  @PreAuthorize("hasRole('ADMIN')")
+  fun getBlacklist(
+    @PathVariable seriesId: String,
+  ): Collection<BlacklistedChapter> {
+    seriesRepository.findByIdOrNull(seriesId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    return blacklistedChapterRepository.findBySeriesId(seriesId)
+  }
+
+  @DeleteMapping("v1/series/{seriesId}/blacklist/{blacklistId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun removeBlacklist(
+    @PathVariable seriesId: String,
+    @PathVariable blacklistId: String,
+  ) {
+    seriesRepository.findByIdOrNull(seriesId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    blacklistedChapterRepository.deleteById(blacklistId)
   }
 
   /**

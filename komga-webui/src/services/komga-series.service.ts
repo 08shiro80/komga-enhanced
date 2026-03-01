@@ -211,6 +211,30 @@ export default class KomgaSeriesService {
     }
   }
 
+  async getBlacklist(seriesId: string): Promise<any[]> {
+    try {
+      return (await this.http.get(`${API_SERIES}/${seriesId}/blacklist`)).data
+    } catch (e) {
+      let msg = 'An error occurred while trying to retrieve blacklisted chapters'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async removeBlacklist(seriesId: string, blacklistId: string) {
+    try {
+      await this.http.delete(`${API_SERIES}/${seriesId}/blacklist/${blacklistId}`)
+    } catch (e) {
+      let msg = 'An error occurred while trying to remove blacklisted chapter'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
   async deleteSeries(seriesId: string) {
     try {
       await this.http.delete(`${API_SERIES}/${seriesId}/file`)

@@ -17,6 +17,7 @@
 
       <series-actions-menu v-if="series"
                            :series="series"
+                           @manage-blacklist="showBlacklistDialog = true"
       />
       <v-toolbar-title>
         <span v-if="$_.get(series, 'metadata.title')">{{ series.metadata.title }}</span>
@@ -496,6 +497,10 @@
 
     </v-container>
 
+    <blacklist-dialog v-if="series"
+                      v-model="showBlacklistDialog"
+                      :series-id="series.id"
+    />
   </div>
 </template>
 
@@ -506,6 +511,7 @@ import CollectionsExpansionPanels from '@/components/CollectionsExpansionPanels.
 import EmptyState from '@/components/EmptyState.vue'
 import ItemBrowser from '@/components/ItemBrowser.vue'
 import ItemCard from '@/components/ItemCard.vue'
+import BlacklistDialog from '@/components/dialogs/BlacklistDialog.vue'
 import SeriesActionsMenu from '@/components/menus/SeriesActionsMenu.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import {parseQuerySort} from '@/functions/query-params'
@@ -588,6 +594,7 @@ const tags = require('language-tags')
 export default Vue.extend({
   name: 'BrowseSeries',
   components: {
+    BlacklistDialog,
     ToolbarSticky,
     ItemBrowser,
     PageSizeSelect,
@@ -638,6 +645,7 @@ export default Vue.extend({
       },
       readMore: false,
       readMoreTitles: false,
+      showBlacklistDialog: false,
     }
   },
   computed: {

@@ -111,7 +111,9 @@ export default Vue.extend({
       items: [] as HistoricalEventDto[],
       totalElements: 0,
       loading: true,
-      options: {} as any,
+      options: {
+        itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
+      } as any,
       dialogDetails: false,
       dialogDetailsItem: undefined as HistoricalEventDto | undefined,
       seriesCache: [] as SeriesDto[],
@@ -123,6 +125,9 @@ export default Vue.extend({
   watch: {
     options: {
       handler() {
+        if (this.options.itemsPerPage) {
+          this.$store.commit('setDataTablePageSize', this.options.itemsPerPage)
+        }
         this.loadData()
       },
       deep: true,

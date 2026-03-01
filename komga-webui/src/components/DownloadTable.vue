@@ -3,10 +3,14 @@
     <v-data-table
       :headers="headers"
       :items="downloads"
-      :items-per-page="10"
+      :items-per-page="itemsPerPage"
+      @update:items-per-page="onItemsPerPageChange"
       class="elevation-1"
       show-expand
       item-key="id"
+      :footer-props="{
+        itemsPerPageOptions: [10, 20, 50, 100],
+      }"
     >
       <template v-slot:item.title="{ item }">
         <div>
@@ -191,6 +195,7 @@ export default {
   },
   data() {
     return {
+      itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 10,
       headers: [
         { text: '', value: 'data-table-expand' },
         { text: 'Title', value: 'title' },
@@ -203,7 +208,15 @@ export default {
       selectedError: null,
     }
   },
+  mounted() {
+    const savedPageSize = this.$store?.state?.persistedState?.dataTablePageSize
+    if (savedPageSize) this.itemsPerPage = savedPageSize
+  },
   methods: {
+    onItemsPerPageChange(val) {
+      this.itemsPerPage = val
+      this.$store.commit('setDataTablePageSize', val)
+    },
     getStatusColor(status) {
       const colors = {
         PENDING: 'grey',

@@ -15,6 +15,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 | Manually downloading manga from MangaDex | **Automatic downloads** via gallery-dl integration |
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
 | Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
+| Unwanted chapters keep re-downloading | **Chapter blacklist** - permanently block chapters from being downloaded |
 | Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
 | Long vertical webtoon pages | **Page splitting** like TachiyomiSY |
 | Missing metadata | **MangaDex & AniList plugins** for rich metadata |
@@ -102,6 +103,15 @@ Rich metadata from multiple sources:
 - Configurable title preference (English/Romaji/Native)
 - Detailed series information
 
+### Chapter Blacklist
+
+Permanently prevent unwanted chapters from being re-downloaded:
+
+- **Blacklist & Delete** via book 3-dot menu — blacklists the chapter URL and deletes the book file
+- **Manage Blacklist** via series 3-dot menu — view and remove blacklisted chapters
+- Persists even after book deletion (stored in separate database table)
+- Respected by both the downloader and chapter checker
+
 ### Chapter URL Tracking
 
 Never download the same chapter twice:
@@ -129,6 +139,16 @@ Never download the same chapter twice:
 | GET | `/api/v1/downloads/progress` | SSE progress stream |
 | POST | `/api/v1/downloads/check-new` | Check for new chapters and queue |
 | POST | `/api/v1/downloads/check-only` | Check for new chapters only |
+
+### Chapter Blacklist
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/books/{bookId}/blacklist` | Blacklist a book's chapter |
+| DELETE | `/api/v1/books/{bookId}/blacklist` | Remove from blacklist |
+| GET | `/api/v1/books/{bookId}/blacklist` | Check if blacklisted |
+| GET | `/api/v1/series/{seriesId}/blacklist` | List blacklisted chapters |
+| DELETE | `/api/v1/series/{seriesId}/blacklist/{id}` | Remove blacklist entry |
 
 ### Follow Configuration
 
@@ -263,6 +283,7 @@ komga:
 | Page Splitting | No | Yes |
 | AniList Metadata | No | Yes |
 | Follow List Automation | No | Yes |
+| Chapter Blacklist | No | Yes |
 | Real-time Progress | No | Yes (SSE) |
 
 ---

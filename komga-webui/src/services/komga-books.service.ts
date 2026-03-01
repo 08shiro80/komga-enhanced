@@ -320,6 +320,39 @@ export default class KomgaBooksService {
     }
   }
 
+  async blacklistBook(bookId: string) {
+    try {
+      await this.http.post(`${API_BOOKS}/${bookId}/blacklist`)
+    } catch (e) {
+      let msg = 'An error occurred while trying to blacklist book'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async unblacklistBook(bookId: string) {
+    try {
+      await this.http.delete(`${API_BOOKS}/${bookId}/blacklist`)
+    } catch (e) {
+      let msg = 'An error occurred while trying to remove book from blacklist'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async isBookBlacklisted(bookId: string): Promise<boolean> {
+    try {
+      const response = (await this.http.get(`${API_BOOKS}/${bookId}/blacklist`)).data
+      return response.blacklisted
+    } catch (e) {
+      return false
+    }
+  }
+
   async getOversizedPages(minWidth?: number, minHeight?: number, pageRequest?: PageRequest): Promise<Page<OversizedPageDto>> {
     try {
       const params = {...pageRequest} as any

@@ -23,6 +23,7 @@ import org.gotson.komga.domain.model.ThumbnailBook
 import org.gotson.komga.domain.model.TypedBytes
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
+import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.HistoricalEventRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.MediaRepository
@@ -72,6 +73,7 @@ class BookLifecycle(
   private val komgaSettingsProvider: KomgaSettingsProvider,
   @Qualifier("pdfImageType")
   private val pdfImageType: ImageType,
+  private val chapterUrlRepository: ChapterUrlRepository,
 ) {
   private val resizeTargetFormat = ImageType.JPEG
 
@@ -391,6 +393,17 @@ class BookLifecycle(
     if (deletableBooks.isEmpty()) {
       logger.info { "No books to soft delete (all are protected)" }
       return
+    }
+
+    deletableBooks.forEach { book ->
+      try {
+        bookMetadataRepository.findByIdOrNull(book.id)?.let { metadata ->
+          metadata.links
+            .filter { it.url.toString().contains("mangadex.org/chapter/") }
+            .forEach { chapterUrlRepository.deleteByUrl(it.url.toString()) }
+        }
+      } catch (_: Exception) {
+      }
     }
 
     val deletedDate = LocalDateTime.now()

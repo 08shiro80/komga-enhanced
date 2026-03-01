@@ -25,6 +25,9 @@
         <v-list-item @click="markUnread" v-if="!isUnread">
           <v-list-item-title>{{ $t('menu.mark_unread') }}</v-list-item-title>
         </v-list-item>
+        <v-list-item @click="toggleBlacklist" v-if="isAdmin">
+          <v-list-item-title>{{ isBlacklisted ? 'Remove from Blacklist' : 'Blacklist & Delete' }}</v-list-item-title>
+        </v-list-item>
         <v-list-item @click="promptDeleteBook" class="list-danger" v-if="isAdmin">
           <v-list-item-title>{{ $t('menu.delete') }}</v-list-item-title>
         </v-list-item>
@@ -43,6 +46,7 @@ export default Vue.extend({
   data: () => {
     return {
       menuState: false,
+      isBlacklisted: false,
     }
   },
   props: {
@@ -58,6 +62,11 @@ export default Vue.extend({
   watch: {
     menuState (val) {
       this.$emit('update:menu', val)
+      if (val && this.isAdmin) {
+        this.$komgaBooks.isBookBlacklisted(this.book.id).then((result: boolean) => {
+          this.isBlacklisted = result
+        })
+      }
     },
   },
   computed: {
@@ -90,6 +99,20 @@ export default Vue.extend({
     },
     async markUnread () {
       await this.$komgaBooks.deleteReadProgress(this.book.id)
+    },
+    async toggleBlacklist () {
+      try {
+        if (this.isBlacklisted) {
+          await this.$komgaBooks.unblacklistBook(this.book.id)
+          this.isBlacklisted = false
+        } else {
+          await this.$komgaBooks.blacklistBook(this.book.id)
+          this.isBlacklisted = true
+          await this.$komgaBooks.deleteBook(this.book.id)
+        }
+      } catch (e) {
+        this.$eventHub.$emit('showSnackbar', {message: e.message, color: 'error'})
+      }
     },
     promptDeleteBook () {
       this.$store.dispatch('dialogDeleteBook', this.book)

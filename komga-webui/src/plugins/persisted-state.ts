@@ -43,6 +43,7 @@ export const persistedModule: Module<any, any> = {
       route: {},
     },
     importPath: '',
+    dataTablePageSize: undefined as unknown as number,
     duplicatesNewPageSize: 10,
     rememberMe: false,
     themePreset: 'default',
@@ -169,6 +170,9 @@ export const persistedModule: Module<any, any> = {
     },
     setImportPath(state, val) {
       state.importPath = val ?? ''
+    },
+    setDataTablePageSize(state, val) {
+      state.dataTablePageSize = val
     },
     setDuplicatesNewPageSize(state, val) {
       state.duplicatesNewPageSize = val

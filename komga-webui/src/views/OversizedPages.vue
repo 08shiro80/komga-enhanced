@@ -204,7 +204,9 @@ export default Vue.extend({
       totalPages: 0,
       loading: true,
       splitting: false,
-      options: {} as any,
+      options: {
+        itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
+      } as any,
       filterMinWidth: 4000,
       filterMinHeight: 4000,
       splitMaxHeight: 2000,
@@ -216,6 +218,9 @@ export default Vue.extend({
   watch: {
     options: {
       handler() {
+        if (this.options.itemsPerPage) {
+          this.$store.commit('setDataTablePageSize', this.options.itemsPerPage)
+        }
         this.loadPages()
       },
       deep: true,

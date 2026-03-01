@@ -87,8 +87,12 @@
                 :headers="headers"
                 :items="backups"
                 :loading="loading"
-                :items-per-page="10"
+                :items-per-page="itemsPerPage"
+                @update:items-per-page="onItemsPerPageChange"
                 class="elevation-1"
+                :footer-props="{
+                  itemsPerPageOptions: [10, 20, 50, 100],
+                }"
               >
                 <template v-slot:item.createdDate="{ item }">
                   {{ formatDate(item.createdDate) }}
@@ -225,6 +229,7 @@ export default {
   name: 'SettingsBackup',
   data() {
     return {
+      itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 10,
       backups: [],
       loading: false,
       creating: false,
@@ -254,9 +259,15 @@ export default {
     },
   },
   mounted() {
+    const savedPageSize = this.$store?.state?.persistedState?.dataTablePageSize
+    if (savedPageSize) this.itemsPerPage = savedPageSize
     this.loadBackups()
   },
   methods: {
+    onItemsPerPageChange(val) {
+      this.itemsPerPage = val
+      this.$store.commit('setDataTablePageSize', val)
+    },
     async loadBackups() {
       this.loading = true
       try {

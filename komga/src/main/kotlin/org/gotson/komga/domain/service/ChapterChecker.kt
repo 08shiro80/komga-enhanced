@@ -4,17 +4,18 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.DownloadStatus
+import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.nio.file.Path
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
@@ -50,9 +51,11 @@ data class ChapterCheckSummary(
 class ChapterChecker(
   private val followConfigRepository: FollowConfigRepository,
   private val chapterUrlRepository: ChapterUrlRepository,
+  private val blacklistedChapterRepository: BlacklistedChapterRepository,
   private val downloadQueueRepository: DownloadQueueRepository,
   private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
+  private val pluginConfigRepository: PluginConfigRepository,
   private val objectMapper: ObjectMapper,
 ) {
   private val httpClient: HttpClient =
@@ -187,21 +190,32 @@ class ChapterChecker(
     }
 
     try {
-      val aggregateResult = fetchMangaDexAggregate(mangaId)
-      val apiChapterCount = aggregateResult.chapterCount
-      val title = aggregateResult.title
+      val feedResult = fetchMangaDexFeedTotal(mangaId)
+      val apiChapterCount = feedResult.chapterCount
+      val title = feedResult.title
 
       val downloadedCount = countDownloadedChapters(url, mangaId)
       val filesystemCount = countFilesystemChapters(url)
 
-      val knownCount = maxOf(downloadedCount, filesystemCount)
+      val blacklistedCount =
+        blacklistedChapterRepository
+          .findAll()
+          .count { it.chapterUrl.contains(mangaId) }
+      val knownCount = filesystemCount + blacklistedCount
+
+      logger.info {
+        "Chapter check for ${title ?: mangaId}: api=$apiChapterCount, " +
+          "db=$downloadedCount, fs=$filesystemCount, blacklisted=$blacklistedCount, " +
+          "known=$knownCount"
+      }
+
       val newChaptersEstimate = maxOf(0, apiChapterCount - knownCount)
       val needsDownload = newChaptersEstimate > 0
 
       if (needsDownload) {
-        logger.info { "New chapters detected for ${title ?: mangaId}: $apiChapterCount available, $knownCount downloaded ($newChaptersEstimate new)" }
+        logger.info { "New chapters detected for ${title ?: mangaId}: $apiChapterCount available, $knownCount known ($newChaptersEstimate new)" }
       } else {
-        logger.debug { "Up to date: ${title ?: mangaId} ($knownCount/$apiChapterCount)" }
+        logger.info { "Up to date: ${title ?: mangaId} ($knownCount/$apiChapterCount)" }
       }
 
       return ChapterCheckResult(
@@ -230,19 +244,29 @@ class ChapterChecker(
     }
   }
 
-  private data class AggregateResult(
+  private data class FeedResult(
     val chapterCount: Int,
     val title: String?,
   )
 
-  private fun fetchMangaDexAggregate(mangaId: String): AggregateResult {
-    val aggregateUrl =
-      "https://api.mangadex.org/manga/$mangaId/aggregate?translatedLanguage[]=en"
+  private fun getDownloadLanguage(): String =
+    try {
+      pluginConfigRepository
+        .findByPluginIdAndKey("gallery-dl-downloader", "default_language")
+        ?.configValue ?: "en"
+    } catch (_: Exception) {
+      "en"
+    }
+
+  private fun fetchMangaDexFeedTotal(mangaId: String): FeedResult {
+    val language = getDownloadLanguage()
+    val feedUrl =
+      "https://api.mangadex.org/manga/$mangaId/feed?translatedLanguage[]=$language&limit=0"
 
     val request =
       HttpRequest
         .newBuilder()
-        .uri(URI.create(aggregateUrl))
+        .uri(URI.create(feedUrl))
         .timeout(Duration.ofSeconds(15))
         .GET()
         .build()
@@ -251,26 +275,15 @@ class ChapterChecker(
 
     if (response.statusCode() != 200) {
       throw GalleryDlAggregateFetchException(
-        "MangaDex aggregate API returned ${response.statusCode()} for manga $mangaId",
+        "MangaDex feed API returned ${response.statusCode()} for manga $mangaId",
       )
     }
 
     val json = objectMapper.readValue<Map<String, Any?>>(response.body())
-    var chapterCount = 0
-
-    @Suppress("UNCHECKED_CAST")
-    val volumes = json["volumes"] as? Map<String, Any?> ?: emptyMap()
-    volumes.values.forEach { volumeData ->
-      if (volumeData is Map<*, *>) {
-        @Suppress("UNCHECKED_CAST")
-        val chapters = volumeData["chapters"] as? Map<String, Any?> ?: emptyMap()
-        chapterCount += chapters.size
-      }
-    }
-
+    val chapterCount = (json["total"] as? Number)?.toInt() ?: 0
     val title = fetchMangaTitle(mangaId)
 
-    return AggregateResult(chapterCount = chapterCount, title = title)
+    return FeedResult(chapterCount = chapterCount, title = title)
   }
 
   private fun fetchMangaTitle(mangaId: String): String? {

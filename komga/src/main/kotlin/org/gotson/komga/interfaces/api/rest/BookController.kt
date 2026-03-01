@@ -1,5 +1,6 @@
 package org.gotson.komga.interfaces.api.rest
 
+import com.github.f4b6a3.tsid.TsidCreator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -12,6 +13,7 @@ import org.gotson.komga.application.tasks.HIGHEST_PRIORITY
 import org.gotson.komga.application.tasks.HIGH_PRIORITY
 import org.gotson.komga.application.tasks.LOWEST_PRIORITY
 import org.gotson.komga.application.tasks.TaskEmitter
+import org.gotson.komga.domain.model.BlacklistedChapter
 import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.Dimension
 import org.gotson.komga.domain.model.DomainEvent
@@ -26,8 +28,10 @@ import org.gotson.komga.domain.model.SearchCondition
 import org.gotson.komga.domain.model.SearchContext
 import org.gotson.komga.domain.model.SearchOperator
 import org.gotson.komga.domain.model.ThumbnailBook
+import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
+import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.MediaRepository
 import org.gotson.komga.domain.persistence.ReadListRepository
 import org.gotson.komga.domain.persistence.ThumbnailBookRepository
@@ -115,6 +119,8 @@ class BookController(
   private val webPubGenerator: WebPubGenerator,
   private val contentRestrictionChecker: ContentRestrictionChecker,
   private val commonBookController: CommonBookController,
+  private val blacklistedChapterRepository: BlacklistedChapterRepository,
+  private val chapterUrlRepository: ChapterUrlRepository,
 ) {
   @Deprecated("use /v1/books/list instead")
   @PageableAsQueryParam
@@ -752,6 +758,13 @@ class BookController(
   fun deleteBookFile(
     @PathVariable bookId: String,
   ) {
+    try {
+      val metadata = bookMetadataRepository.findById(bookId)
+      metadata.links
+        .filter { it.url.toString().contains("mangadex.org/chapter/") }
+        .forEach { chapterUrlRepository.deleteByUrl(it.url.toString()) }
+    } catch (_: Exception) {
+    }
     taskEmitter.deleteBook(
       bookId = bookId,
       priority = HIGHEST_PRIORITY,
@@ -798,5 +811,73 @@ class BookController(
         eventPublisher.publishEvent(DomainEvent.BookUpdated(updatedBook))
       }
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+  }
+
+  @PostMapping("api/v1/books/{bookId}/blacklist")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun blacklistBook(
+    @PathVariable bookId: String,
+  ) {
+    val book =
+      bookRepository.findByIdOrNull(bookId)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    val metadata = bookMetadataRepository.findById(bookId)
+    val chapterUrl =
+      metadata.links
+        .firstOrNull { it.url.toString().contains("mangadex.org/chapter/") }
+        ?.url
+        ?.toString()
+        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "No MangaDex chapter URL found")
+
+    if (!blacklistedChapterRepository.existsByChapterUrl(chapterUrl)) {
+      blacklistedChapterRepository.insert(
+        BlacklistedChapter(
+          id = TsidCreator.getTsid256().toString(),
+          seriesId = book.seriesId,
+          chapterUrl = chapterUrl,
+          chapterNumber = metadata.number,
+          chapterTitle = metadata.title,
+        ),
+      )
+    }
+    chapterUrlRepository.deleteByUrl(chapterUrl)
+  }
+
+  @DeleteMapping("api/v1/books/{bookId}/blacklist")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun unblacklistBook(
+    @PathVariable bookId: String,
+  ) {
+    bookRepository.findByIdOrNull(bookId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    val metadata = bookMetadataRepository.findById(bookId)
+    val chapterUrl =
+      metadata.links
+        .firstOrNull { it.url.toString().contains("mangadex.org/chapter/") }
+        ?.url
+        ?.toString()
+        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "No MangaDex chapter URL found")
+
+    blacklistedChapterRepository.deleteByChapterUrl(chapterUrl)
+  }
+
+  @GetMapping("api/v1/books/{bookId}/blacklist")
+  @PreAuthorize("hasRole('ADMIN')")
+  fun isBookBlacklisted(
+    @PathVariable bookId: String,
+  ): Map<String, Boolean> {
+    bookRepository.findByIdOrNull(bookId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    val metadata = bookMetadataRepository.findById(bookId)
+    val chapterUrl =
+      metadata.links
+        .firstOrNull { it.url.toString().contains("mangadex.org/chapter/") }
+        ?.url
+        ?.toString()
+
+    val blacklisted = chapterUrl != null && blacklistedChapterRepository.existsByChapterUrl(chapterUrl)
+    return mapOf("blacklisted" to blacklisted)
   }
 }

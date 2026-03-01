@@ -33,8 +33,12 @@
                 :headers="headers"
                 :items="plugins"
                 :loading="loading"
-                :items-per-page="10"
+                :items-per-page="itemsPerPage"
+                @update:items-per-page="onItemsPerPageChange"
                 class="elevation-1"
+                :footer-props="{
+                  itemsPerPageOptions: [10, 20, 50, 100],
+                }"
               >
                 <template v-slot:item.enabled="{ item }">
                   <v-switch
@@ -263,6 +267,7 @@ export default {
   name: 'PluginManager',
   data() {
     return {
+      itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 10,
       plugins: [],
       loading: false,
       toggling: null,
@@ -303,9 +308,15 @@ export default {
     },
   },
   mounted() {
+    const savedPageSize = this.$store?.state?.persistedState?.dataTablePageSize
+    if (savedPageSize) this.itemsPerPage = savedPageSize
     this.loadPlugins()
   },
   methods: {
+    onItemsPerPageChange(val) {
+      this.itemsPerPage = val
+      this.$store.commit('setDataTablePageSize', val)
+    },
     async loadPlugins() {
       this.loading = true
       try {

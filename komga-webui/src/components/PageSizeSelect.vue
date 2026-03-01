@@ -1,8 +1,9 @@
 <template>
   <v-menu offset-y>
     <template v-slot:activator="{on}">
-      <v-btn icon v-on="on">
-        <v-icon>mdi-view-grid-plus</v-icon>
+      <v-btn text v-on="on" class="text-none">
+        <v-icon left small>mdi-book-open-page-variant-outline</v-icon>
+        {{ value === 0 ? 'All' : value }}
       </v-btn>
     </template>
     <v-list :dark="dark">
@@ -12,7 +13,7 @@
                      :key="index"
                      @click="setPageSize(item)"
         >
-          <v-list-item-title>{{ item === 0 ? $t('pagination.all', 'All') : item }}</v-list-item-title>
+          <v-list-item-title>{{ item === 0 ? 'All' : item }}</v-list-item-title>
         </v-list-item>
       </v-list-item-group>
     </v-list>

@@ -57,13 +57,18 @@ export default Vue.extend({
       elements: [] as PageHashMatchDto[],
       totalElements: 0,
       loading: true,
-      options: {} as any,
+      options: {
+        itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
+      } as any,
       bookPageThumbnailUrl,
     }
   },
   watch: {
     options: {
       handler() {
+        if (this.options.itemsPerPage) {
+          this.$store.commit('setDataTablePageSize', this.options.itemsPerPage)
+        }
         this.loadData(this.hash)
       },
       deep: true,
