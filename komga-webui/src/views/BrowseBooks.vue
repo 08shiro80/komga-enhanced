@@ -259,7 +259,8 @@ export default Vue.extend({
   },
   async mounted() {
     this.$store.commit('setLibraryRoute', {id: this.libraryId, route: LIBRARY_ROUTE.BOOKS})
-    this.pageSize = this.$store.state.persistedState.browsingPageSize || this.pageSize
+    const savedPageSize = this.$store.state.persistedState.browsingPageSize
+    this.pageSize = savedPageSize !== undefined && savedPageSize !== null ? savedPageSize : this.pageSize
 
     // restore from query param
     await this.resetParams(this.$route, this.libraryId)
@@ -586,8 +587,8 @@ export default Vue.extend({
       this.selectedBooks = []
 
       const pageRequest = {
-        page: page - 1,
-        size: this.pageSize,
+        page: this.pageSize === 0 ? 0 : page - 1,
+        size: this.pageSize === 0 ? 2000000000 : this.pageSize,
       } as PageRequest
 
       if (sort) {

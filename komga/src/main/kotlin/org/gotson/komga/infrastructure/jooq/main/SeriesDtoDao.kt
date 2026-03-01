@@ -70,6 +70,7 @@ class SeriesDtoDao(
   private val slk = Tables.SERIES_METADATA_LINK
   private val sat = Tables.SERIES_METADATA_ALTERNATE_TITLE
   private val b = Tables.BOOK
+  private val bm = Tables.BOOK_METADATA
   private val bma = Tables.BOOK_METADATA_AGGREGATION
   private val bmaa = Tables.BOOK_METADATA_AGGREGATION_AUTHOR
   private val bmat = Tables.BOOK_METADATA_AGGREGATION_TAG
@@ -82,13 +83,24 @@ class SeriesDtoDao(
       *rs.fields(),
     )
 
+  private val newestBookReleaseDate =
+    DSL
+      .field(
+        DSL
+          .select(DSL.max(bm.RELEASE_DATE))
+          .from(bm)
+          .join(b)
+          .on(b.ID.eq(bm.BOOK_ID))
+          .where(b.SERIES_ID.eq(s.ID)),
+      )
+
   private val sorts =
     mapOf(
       "metadata.titleSort" to d.TITLE_SORT.collate(SqliteUdfDataSource.COLLATION_UNICODE_3),
       "createdDate" to s.CREATED_DATE,
       "created" to s.CREATED_DATE,
-      "lastModifiedDate" to DSL.field(DSL.select(DSL.max(b.LAST_MODIFIED_DATE)).from(b).where(b.SERIES_ID.eq(s.ID))),
-      "lastModified" to DSL.field(DSL.select(DSL.max(b.LAST_MODIFIED_DATE)).from(b).where(b.SERIES_ID.eq(s.ID))),
+      "lastModifiedDate" to newestBookReleaseDate,
+      "lastModified" to newestBookReleaseDate,
       "booksMetadata.releaseDate" to bma.RELEASE_DATE,
       "readDate" to rs.MOST_RECENT_READ_DATE,
       "collection.number" to cs.NUMBER,

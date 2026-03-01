@@ -8,11 +8,11 @@
     <v-list :dark="dark">
       <v-list-item-group v-model="selection">
 
-        <v-list-item v-for="(item, index) in items"
+        <v-list-item v-for="(item, index) in allItems"
                      :key="index"
                      @click="setPageSize(item)"
         >
-          <v-list-item-title>{{ item }}</v-list-item-title>
+          <v-list-item-title>{{ item === 0 ? $t('pagination.all', 'All') : item }}</v-list-item-title>
         </v-list-item>
       </v-list-item-group>
     </v-list>
@@ -43,10 +43,15 @@ export default Vue.extend({
       default: false,
     },
   },
+  computed: {
+    allItems(): number[] {
+      return [...(this.items as number[]), 0]
+    },
+  },
   watch: {
     value: {
       handler(val) {
-        this.selection = this.items.findIndex(x => x === val)
+        this.selection = this.allItems.findIndex(x => x === val)
       },
       immediate: true,
     },
