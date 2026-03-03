@@ -6,6 +6,29 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.0.9] - 2026-03-03
+
+### Bug Fixes
+- **gallery-dl compatibility with non-MangaDex sites** — `parseGalleryDlJson` only handled Queue messages (type 6) used by MangaDex extractors. Single-image sites like wallhaven.cc yield Directory (type 2) + Url (type 3) messages which were ignored, resulting in title="Unknown" and an exception. Now processes all three message types and uses a title fallback chain: `manga` field → `title` field → `category` field → URL-derived title.
+- **Title "Unknown" crash for non-MangaDex URLs** — `getChapterInfo()` threw `GalleryDlException` when the extracted title was "Unknown", making non-MangaDex sites unusable. Now derives a fallback title from the URL (e.g. `wallhaven.cc/w/e83mxl` → `"wallhaven - e83mxl"`).
+- **Downloads saved to "Unknown" folder when title not yet known** — `DownloadExecutor.processDownload()` used the queued title (often "Unknown" for non-MangaDex sites) as the folder name before `getChapterInfo` resolved the real title. Files ended up in `Mangas/Unknown/` even though the correct title was extracted later. Now renames (or moves files into) the correct folder after download completes.
+- **Publisher hardcoded to "MangaDex" for all sites** — `createSeriesJson` and `generateComicInfoXml` always set `publisher`/`<Publisher>` to "MangaDex", even for downloads from other sites like hdoujin, mangahere, or weebdex. Now derives the publisher from the source URL domain (e.g. "Hdoujin", "Mangahere", "Weebdex"). `<Web>` tag also uses the actual source URL instead of defaulting to `https://mangadex.org/`.
+
+- **"Search Online Metadata" button not applying metadata** — The menu button opened MetadataSearchDialog but clicking "Apply" only emitted an event without actually writing metadata to the series. Now calls `PATCH /api/v1/series/{id}/metadata` to apply title, summary, publisher, genres, tags, etc. directly. Series view reloads after applying.
+
+### New Features
+- **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `GalleryDlWrapper.kt` | `parseGalleryDlJson()` handles message types 2/3/6, `deriveTitleFromUrl()` fallback, `getGalleryDlPath()`/`applyGalleryDlEnv()` for PYTHONPATH, extracted `extractMetadataFields()` helper |
+| `DownloadExecutor.kt` | Rename/move download folder from "Unknown" to correct title after download completes, update title in DB |
+| `MetadataSearchDialog.vue` | `applyMetadata()` now calls series metadata update API instead of just emitting event |
+| `BrowseSeries.vue` | Wired `@search-metadata` event to open MetadataSearchDialog, reload series on apply |
+
+---
+
 ## [0.0.8] - 2026-02-28
 
 ### Improved

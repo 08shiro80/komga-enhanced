@@ -84,7 +84,7 @@ export default Vue.extend({
       this.$komgaSeries.refreshMetadata(this.series)
     },
     searchMetadata() {
-      this.$emit('search-metadata')
+      this.$store.dispatch('dialogUpdateSeries', {series: this.series, _tab: 6})
     },
     addToCollection() {
       this.$store.dispatch('dialogAddSeriesToCollection', [this.series.id])

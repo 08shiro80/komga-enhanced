@@ -52,6 +52,7 @@ export default new Vuex.Store({
     // series
     updateSeries: {} as SeriesDto | SeriesDto[],
     updateSeriesDialog: false,
+    updateSeriesTab: 0,
     deleteSeries: {} as SeriesDto | SeriesDto[],
     deleteSeriesDialog: false,
 
@@ -178,6 +179,9 @@ export default new Vuex.Store({
     setUpdateSeriesDialog(state, dialog) {
       state.updateSeriesDialog = dialog
     },
+    setUpdateSeriesTab(state, tab) {
+      state.updateSeriesTab = tab
+    },
     setBooksToCheck(state, count) {
       state.booksToCheck = count
     },
@@ -300,8 +304,14 @@ export default new Vuex.Store({
     },
 
     // series
-    dialogUpdateSeries({commit}, series) {
-      commit('setUpdateSeries', series)
+    dialogUpdateSeries({commit}, payload) {
+      if (payload && payload._tab !== undefined) {
+        commit('setUpdateSeries', payload.series)
+        commit('setUpdateSeriesTab', payload._tab)
+      } else {
+        commit('setUpdateSeries', payload)
+        commit('setUpdateSeriesTab', 0)
+      }
       commit('setUpdateSeriesDialog', true)
     },
     dialogUpdateSeriesDisplay({commit}, value) {

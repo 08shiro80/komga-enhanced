@@ -1,6 +1,6 @@
-# Komga with MangaDex Downloader
+# Komga Enhanced
 
-**Komga Enhanced** - A powerful manga media server with integrated MangaDex downloading, automatic chapter tracking, and Tachiyomi/Mihon backup import.
+**Komga Enhanced** - A powerful manga media server with integrated manga downloading from 250+ sites, automatic chapter tracking, and Tachiyomi/Mihon backup import.
 
 > **Built on [Komga](https://github.com/gotson/komga)** - Extends the excellent Komga media server with manga downloading and automation features.
 
@@ -12,7 +12,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 
 | Problem | Solution |
 |---------|----------|
-| Manually downloading manga from MangaDex | **Automatic downloads** via gallery-dl integration |
+| Manually downloading manga | **Automatic downloads** via gallery-dl — supports MangaDex, mangahere, hdoujin, senmanga, weebdex, and [250+ more sites](https://github.com/mikf/gallery-dl/blob/master/docs/supportedsites.md) |
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
 | Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
 | Unwanted chapters keep re-downloading | **Chapter blacklist** - permanently block chapters from being downloaded |
@@ -24,16 +24,18 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 
 ## Key Features
 
-### MangaDex Download System
+### Download System (250+ Sites)
 
-Download manga directly from MangaDex with full automation:
+Download manga from MangaDex, mangahere, hdoujin, senmanga, weebdex, and any site supported by [gallery-dl](https://github.com/mikf/gallery-dl/blob/master/docs/supportedsites.md):
 
 - **Queue-based downloads** with priority support
 - **Real-time progress** via Server-Sent Events (SSE)
 - **ComicInfo.xml injection** - metadata embedded in every CBZ
 - **Crash recovery** - skips already-downloaded chapters via DB + filesystem checks
-- **Rate limiting** - respects MangaDex API limits
+- **Rate limiting** - respects site-specific API limits
 - **Multi-language support** - download chapters in your preferred language
+- **Automatic publisher detection** - derives publisher from source site (MangaDex, Mangahere, etc.)
+- **Custom gallery-dl path** - point to a local gallery-dl checkout for latest extractors
 
 ```
 POST /api/v1/downloads
@@ -43,12 +45,14 @@ POST /api/v1/downloads
 }
 ```
 
+Any URL supported by gallery-dl works — not just MangaDex.
+
 ### Follow List Automation
 
 Automatically check for new chapters from your favorite manga:
 
 1. Create a `follow.txt` file in your library root
-2. Add MangaDex URLs (one per line)
+2. Add URLs (one per line) — MangaDex URLs get fast aggregate checking, other sites use gallery-dl
 3. Configure check interval (default: 24 hours)
 4. Fast parallel checking via MangaDex aggregate API (200 manga in under a minute)
 5. New chapters download automatically
@@ -57,14 +61,16 @@ Automatically check for new chapters from your favorite manga:
 # Example follow.txt
 https://mangadex.org/title/a1c7c817-4e59-43b7-9365-09c5f56e5eb1
 https://mangadex.org/title/32d76d19-8a05-4db0-9fc2-e0b0648fe9d0
+https://mangahere.cc/manga/one_piece/
+https://hdoujin.me/12345
 ```
 
 ### Tachiyomi/Mihon Migration
 
-Import your MangaDex library from Tachiyomi or Mihon:
+Import your manga library from Tachiyomi or Mihon:
 
 - Supports `.tachibk` (Mihon/forks) and `.proto.gz` (Tachiyomi) formats
-- Extracts all MangaDex URLs from your backup
+- Extracts MangaDex URLs from your backup
 - Adds URLs to your library's `follow.txt`
 - Duplicate detection prevents re-adding existing URLs
 
@@ -260,6 +266,8 @@ Create `~/.config/gallery-dl/config.json`:
 }
 ```
 
+To use a local gallery-dl checkout (e.g. for latest extractors), set `gallery_dl_path` in the plugin config to the directory containing the `gallery_dl` package. This sets `PYTHONPATH` so `python -m gallery_dl` loads from your local source.
+
 ### Follow List Check Interval
 
 Configure via API or application properties:
@@ -277,7 +285,7 @@ komga:
 | Feature | Original | This Fork |
 |---------|----------|-----------|
 | Media Server | Yes | Yes |
-| MangaDex Downloads | No | Yes |
+| Manga Downloads (250+ sites) | No | Yes |
 | Automatic Chapter Tracking | No | Yes |
 | Tachiyomi Import | No | Yes |
 | Page Splitting | No | Yes |
@@ -305,7 +313,7 @@ komga:
 - **Frontend:** Vue.js 2, Vuetify, TypeScript
 - **Database:** H2 (embedded) / SQLite
 - **Downloads:** gallery-dl integration
-- **Metadata:** MangaDex API, AniList GraphQL
+- **Metadata:** MangaDex API, AniList GraphQL, auto-detected from source site
 
 ---
 
@@ -324,7 +332,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 - [Komga](https://github.com/gotson/komga) by gotson - The excellent base media server
 - [gallery-dl](https://github.com/mikf/gallery-dl) by mikf - Download engine
-- [MangaDex](https://mangadex.org) - Manga source and API
+- [MangaDex](https://mangadex.org) - Primary manga source and API
 - [AniList](https://anilist.co) - Metadata source
 
 ---

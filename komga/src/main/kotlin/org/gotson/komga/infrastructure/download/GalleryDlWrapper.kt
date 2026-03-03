@@ -36,7 +36,7 @@ class GalleryDlWrapper(
     try {
       val command = getGalleryDlCommand() + "--version"
       val process =
-        ProcessBuilder()
+        applyGalleryDlEnv(ProcessBuilder())
           .command(command)
           .start()
 
@@ -489,7 +489,7 @@ class GalleryDlWrapper(
       val apiMetadata = fetchMangaDexMetadata(mangadexId)
       if (apiMetadata != null) {
         logger.info { "Using MangaDex API metadata: ${apiMetadata.title}" }
-        return apiMetadata
+        return apiMetadata.copy(sourceUrl = url)
       }
       logger.warn { "MangaDex API fetch failed, falling back to gallery-dl metadata" }
     }
@@ -511,7 +511,7 @@ class GalleryDlWrapper(
       logger.info { "Executing getChapterInfo: ${command.joinToString(" ")}" }
 
       val process =
-        ProcessBuilder()
+        applyGalleryDlEnv(ProcessBuilder())
           .command(command)
           .start()
 
@@ -547,10 +547,15 @@ class GalleryDlWrapper(
         throw GalleryDlException(errorMsg)
       }
 
-      val mangaInfo = parseGalleryDlJson(output.toString())
+      val mangaInfo =
+        parseGalleryDlJson(output.toString()).copy(sourceUrl = url)
 
-      // Verify we got a valid title
       if (mangaInfo.title.isBlank() || mangaInfo.title == "Unknown") {
+        val fallback = deriveTitleFromUrl(url)
+        if (fallback != null) {
+          logger.info { "No title in metadata, using URL-derived title: $fallback" }
+          return mangaInfo.copy(title = fallback)
+        }
         val errorMsg = "Failed to extract manga title from URL: $url"
         logToDatabase(org.gotson.komga.domain.model.LogLevel.ERROR, errorMsg)
         logger.error { errorMsg }
@@ -779,7 +784,7 @@ class GalleryDlWrapper(
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download: $url")
 
         val process =
-          ProcessBuilder()
+          applyGalleryDlEnv(ProcessBuilder())
             .command(command)
             .directory(File(System.getProperty("user.home")))
             .start()
@@ -919,7 +924,7 @@ class GalleryDlWrapper(
 
           try {
             val chapterProcess =
-              ProcessBuilder()
+              applyGalleryDlEnv(ProcessBuilder())
                 .command(chapterCommand)
                 .directory(File(System.getProperty("user.home")))
                 .start()
@@ -1091,9 +1096,51 @@ class GalleryDlWrapper(
     }
   }
 
+  private fun deriveTitleFromUrl(url: String): String? =
+    try {
+      val uri = URI(url)
+      val host = uri.host?.removePrefix("www.") ?: return null
+      val siteName = host.substringBeforeLast(".")
+      val pathSegments =
+        uri.path
+          ?.split("/")
+          ?.filter { it.isNotBlank() }
+          ?: emptyList()
+      val lastSegment = pathSegments.lastOrNull() ?: return null
+      val decoded =
+        lastSegment
+          .replace("-", " ")
+          .replace("_", " ")
+          .trim()
+      "$siteName - $decoded"
+    } catch (_: Exception) {
+      null
+    }
+
+  private fun getGalleryDlPath(): String? {
+    val pluginConfig =
+      pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
+    return pluginConfig["gallery_dl_path"]?.takeIf { it.isNotBlank() }
+  }
+
+  private fun applyGalleryDlEnv(processBuilder: ProcessBuilder): ProcessBuilder {
+    val galleryDlPath = getGalleryDlPath()
+    if (galleryDlPath != null) {
+      val env = processBuilder.environment()
+      val existing = env["PYTHONPATH"]
+      env["PYTHONPATH"] =
+        if (existing.isNullOrBlank()) galleryDlPath else "$galleryDlPath${File.pathSeparator}$existing"
+      logger.debug { "Set PYTHONPATH=$galleryDlPath for gallery-dl" }
+    }
+    return processBuilder
+  }
+
   private fun getGalleryDlCommand(): List<String> =
     try {
-      val process = ProcessBuilder().command("gallery-dl", "--version").start()
+      val process =
+        applyGalleryDlEnv(ProcessBuilder())
+          .command("gallery-dl", "--version")
+          .start()
       process.waitFor(2, TimeUnit.SECONDS)
       if (process.exitValue() == 0) {
         listOf("gallery-dl")
@@ -1110,7 +1157,10 @@ class GalleryDlWrapper(
     return pythonCmds
       .firstOrNull { python ->
         try {
-          val process = ProcessBuilder().command(python, "-m", "gallery_dl", "--version").start()
+          val process =
+            applyGalleryDlEnv(ProcessBuilder())
+              .command(python, "-m", "gallery_dl", "--version")
+              .start()
           process.waitFor(2, TimeUnit.SECONDS)
           process.exitValue() == 0
         } catch (e: Exception) {
@@ -1302,7 +1352,7 @@ class GalleryDlWrapper(
       logger.info { "Starting cover download: ${command.joinToString(" ")}" }
 
       val process =
-        ProcessBuilder()
+        applyGalleryDlEnv(ProcessBuilder())
           .command(command)
           .start()
 
@@ -1378,7 +1428,7 @@ class GalleryDlWrapper(
               "name" to mangaInfo.title,
               "alternate_titles" to alternateTitles,
             ).apply {
-              this["publisher"] = "MangaDex"
+              this["publisher"] = mangaInfo.publisher
               mangaInfo.mangaDexId?.let { this["comicid"] = it }
               mangaInfo.coverFilename?.let { this["cover_filename"] = it }
               mangaInfo.author?.let { this["author"] = it }
@@ -1480,9 +1530,9 @@ class GalleryDlWrapper(
   ${if (publishDate != null) "<Day>${publishDate.substring(8, 10)}</Day>" else ""}
   <Writer>$author</Writer>
   <Translator>$scanlationGroup</Translator>
-  <Publisher>MangaDex</Publisher>
+  <Publisher>${mangaInfo.publisher.escapeXml()}</Publisher>
   ${if (genres.isNotBlank()) "<Genre>$genres</Genre>" else ""}
-  <Web>${(chapterUrl ?: "https://mangadex.org/").escapeXml()}</Web>
+  <Web>${(chapterUrl ?: mangaInfo.sourceUrl ?: "").escapeXml()}</Web>
   ${if (pageCount > 0) "<PageCount>$pageCount</PageCount>" else ""}
   <LanguageISO>$language</LanguageISO>
   <Manga>$mangaType</Manga>
@@ -1875,6 +1925,7 @@ class GalleryDlWrapper(
     val alternativeTitlesSet = mutableSetOf<String>()
     val alternativeTitlesWithLangMap = mutableMapOf<String, String>()
     var totalChapters = 0
+    var category: String? = null
 
     var description: String? = null
 
@@ -1882,50 +1933,72 @@ class GalleryDlWrapper(
       val entries = objectMapper.readValue(json, List::class.java) as List<*>
 
       entries.forEach { entry ->
-        if (entry is List<*> && entry.size >= 3 && entry[0] == 6) {
-          totalChapters++
+        if (entry !is List<*> || entry.size < 2) return@forEach
+        val messageType = entry[0] as? Int ?: return@forEach
 
-          val metadata = entry[2] as? Map<*, *> ?: return@forEach
-
-          val mangaTitle = metadata["manga"] as? String
-          val lang = metadata["lang"] as? String
-
-          if (lang == "en" && mangaTitle != null) {
-            englishTitle = mangaTitle
-          }
-
-          if (title == null && mangaTitle != null) {
-            title = mangaTitle
-          }
-
-          if (description == null) {
-            description = metadata["description"] as? String
-          }
-
-          val mangaAlt = metadata["manga_alt"] as? List<*>
-          if (mangaAlt != null) {
-            mangaAlt.forEach { alt ->
-              if (alt is String) {
+        when (messageType) {
+          2 -> {
+            val metadata = entry[1] as? Map<*, *> ?: return@forEach
+            extractMetadataFields(
+              metadata,
+              onTitle = { mangaTitle, lang ->
+                if (lang == "en" && mangaTitle != null) englishTitle = mangaTitle
+                if (title == null && mangaTitle != null) title = mangaTitle
+              },
+              onDescription = { if (description == null) description = it },
+              onAltTitles = { alt, lang ->
                 alternativeTitlesSet.add(alt)
-
-                val detectedLang = detectLanguageFromTitle(alt)
-                alternativeTitlesWithLangMap[alt] = detectedLang
+                alternativeTitlesWithLangMap[alt] = lang
+              },
+              onAuthor = { if (author == null) author = it },
+              onGroup = { if (scanlationGroup == null) scanlationGroup = it },
+            )
+            if (category == null) category = metadata["category"] as? String
+            if (title == null) {
+              title = metadata["title"] as? String
+            }
+          }
+          3 -> {
+            totalChapters++
+            if (entry.size >= 3) {
+              val metadata = entry[2] as? Map<*, *> ?: return@forEach
+              extractMetadataFields(
+                metadata,
+                onTitle = { mangaTitle, lang ->
+                  if (lang == "en" && mangaTitle != null) englishTitle = mangaTitle
+                  if (title == null && mangaTitle != null) title = mangaTitle
+                },
+                onDescription = { if (description == null) description = it },
+                onAltTitles = { alt, lang ->
+                  alternativeTitlesSet.add(alt)
+                  alternativeTitlesWithLangMap[alt] = lang
+                },
+                onAuthor = { if (author == null) author = it },
+                onGroup = { if (scanlationGroup == null) scanlationGroup = it },
+              )
+              if (category == null) category = metadata["category"] as? String
+              if (title == null) {
+                title = metadata["title"] as? String
               }
             }
           }
-
-          if (mangaTitle != null && lang != null && lang != "en") {
-            alternativeTitlesWithLangMap[mangaTitle] = lang
-          }
-
-          if (author == null) {
-            val authors = metadata["author"] as? List<*>
-            author = authors?.firstOrNull() as? String
-          }
-
-          if (scanlationGroup == null) {
-            val groups = metadata["group"] as? List<*>
-            scanlationGroup = groups?.firstOrNull() as? String
+          6 -> {
+            totalChapters++
+            val metadata = entry[2] as? Map<*, *> ?: return@forEach
+            extractMetadataFields(
+              metadata,
+              onTitle = { mangaTitle, lang ->
+                if (lang == "en" && mangaTitle != null) englishTitle = mangaTitle
+                if (title == null && mangaTitle != null) title = mangaTitle
+              },
+              onDescription = { if (description == null) description = it },
+              onAltTitles = { alt, lang ->
+                alternativeTitlesSet.add(alt)
+                alternativeTitlesWithLangMap[alt] = lang
+              },
+              onAuthor = { if (author == null) author = it },
+              onGroup = { if (scanlationGroup == null) scanlationGroup = it },
+            )
           }
         }
       }
@@ -1933,7 +2006,7 @@ class GalleryDlWrapper(
       logger.error(e) { "Failed to parse gallery-dl JSON: ${json.take(500)}" }
     }
 
-    val finalTitle = englishTitle ?: title ?: "Unknown"
+    val finalTitle = englishTitle ?: title ?: category ?: "Unknown"
 
     return MangaInfo(
       title = finalTitle,
@@ -1944,6 +2017,47 @@ class GalleryDlWrapper(
       alternativeTitlesWithLanguage = alternativeTitlesWithLangMap,
       scanlationGroup = scanlationGroup,
     )
+  }
+
+  private inline fun extractMetadataFields(
+    metadata: Map<*, *>,
+    onTitle: (String?, String?) -> Unit,
+    onDescription: (String) -> Unit,
+    onAltTitles: (String, String) -> Unit,
+    onAuthor: (String) -> Unit,
+    onGroup: (String) -> Unit,
+  ) {
+    val mangaTitle = metadata["manga"] as? String
+    val lang = metadata["lang"] as? String
+    onTitle(mangaTitle, lang)
+
+    val desc = metadata["description"] as? String
+    if (desc != null) onDescription(desc)
+
+    val mangaAlt = metadata["manga_alt"] as? List<*>
+    if (mangaAlt != null) {
+      mangaAlt.forEach { alt ->
+        if (alt is String) {
+          onAltTitles(alt, detectLanguageFromTitle(alt))
+        }
+      }
+    }
+
+    if (mangaTitle != null && lang != null && lang != "en") {
+      onAltTitles(mangaTitle, lang)
+    }
+
+    val authors = metadata["author"] as? List<*>
+    val firstAuthor = authors?.firstOrNull() as? String
+    if (firstAuthor != null) onAuthor(firstAuthor)
+    if (firstAuthor == null) {
+      val authorStr = metadata["author"] as? String
+      if (authorStr != null) onAuthor(authorStr)
+    }
+
+    val groups = metadata["group"] as? List<*>
+    val firstGroup = groups?.firstOrNull() as? String
+    if (firstGroup != null) onGroup(firstGroup)
   }
 
   private fun detectLanguageFromTitle(title: String): String {
@@ -2059,7 +2173,22 @@ data class MangaInfo(
   val genres: List<String> = emptyList(),
   val coverFilename: String? = null,
   val mangaDexId: String? = null,
-)
+  val sourceUrl: String? = null,
+) {
+  val publisher: String
+    get() {
+      if (mangaDexId != null) return "MangaDex"
+      val url = sourceUrl ?: return "Unknown"
+      return try {
+        val host = URI(url).host?.removePrefix("www.") ?: return "Unknown"
+        host
+          .substringBeforeLast(".")
+          .replaceFirstChar { it.uppercaseChar() }
+      } catch (_: Exception) {
+        "Unknown"
+      }
+    }
+}
 
 data class ChapterInfo(
   val chapterNumber: String?,

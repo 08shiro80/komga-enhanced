@@ -73,6 +73,7 @@
     <edit-series-dialog
       v-model="updateSeriesDialog"
       :series="updateSeries"
+      :initial-tab="updateSeriesTab"
     />
 
     <confirmation-dialog
@@ -289,6 +290,9 @@ export default Vue.extend({
     },
     updateSeries(): SeriesDto | SeriesDto[] {
       return this.$store.state.updateSeries
+    },
+    updateSeriesTab(): number {
+      return this.$store.state.updateSeriesTab
     },
     deleteSeriesDialog: {
       get(): boolean {

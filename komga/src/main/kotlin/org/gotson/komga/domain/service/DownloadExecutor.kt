@@ -459,13 +459,41 @@ class DownloadExecutor(
         }
 
       if (result.success) {
-        val finalPath = destinationPath
         val finalTitle = result.mangaTitle ?: download.title
+        var finalPath = destinationPath
+
+        if (result.mangaTitle != null && sanitizeFileName(result.mangaTitle) != mangaFolderName) {
+          val correctedName = sanitizeFileName(result.mangaTitle)
+          val correctedPath = libraryPath.resolve(correctedName)
+          if (!correctedPath.toFile().exists()) {
+            val renamed = destinationPath.toFile().renameTo(correctedPath.toFile())
+            if (renamed) {
+              logger.info { "Renamed folder: $mangaFolderName -> $correctedName" }
+              finalPath = correctedPath
+            } else {
+              logger.warn { "Failed to rename folder: $mangaFolderName -> $correctedName" }
+            }
+          } else {
+            logger.info { "Target folder already exists, moving files: $mangaFolderName -> $correctedName" }
+            val srcDir = destinationPath.toFile()
+            srcDir.listFiles()?.forEach { file ->
+              val target = correctedPath.resolve(file.name).toFile()
+              if (!target.exists()) {
+                file.renameTo(target)
+              }
+            }
+            if (srcDir.listFiles()?.isEmpty() == true) {
+              srcDir.delete()
+              logger.info { "Removed empty folder: $mangaFolderName" }
+            }
+            finalPath = correctedPath
+          }
+        }
 
         logger.info { "Download completed to: $finalPath (manga folder: ${result.mangaTitle})" }
 
         updateDownloadStatus(
-          download,
+          download.copy(title = finalTitle),
           DownloadStatus.COMPLETED,
           completedDate = LocalDateTime.now(),
           progressPercent = 100,

@@ -762,6 +762,10 @@ export default Vue.extend({
       type: [Object as () => SeriesDto, Array as () => SeriesDto[]],
       required: true,
     },
+    initialTab: {
+      type: Number,
+      default: 0,
+    },
   },
   watch: {
     value(val) {
@@ -1061,7 +1065,7 @@ export default Vue.extend({
       return errors
     },
     dialogReset(series: SeriesDto | SeriesDto[]) {
-      this.tab = 0
+      this.tab = this.initialTab || 0
       this.$v.$reset();
       (this.$refs.linksForm as any)?.resetValidation();
       (this.$refs.titlesForm as any)?.resetValidation()

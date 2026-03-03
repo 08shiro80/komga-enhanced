@@ -227,6 +227,22 @@ export default Vue.extend({
     async applyMetadata(result: MetadataSearchResult) {
       try {
         const metadata = await this.$komgaPlugins.getMetadata(this.selectedPlugin, result.externalId)
+
+        if (this.entityType === 'series') {
+          const update: any = {}
+          if (metadata.title) update.title = metadata.title
+          if (metadata.titleSort) update.titleSort = metadata.titleSort
+          if (metadata.summary) update.summary = metadata.summary
+          if (metadata.publisher) update.publisher = metadata.publisher
+          if (metadata.ageRating != null) update.ageRating = metadata.ageRating
+          if (metadata.language) update.language = metadata.language
+          if (metadata.status) update.status = metadata.status
+          if (metadata.genres && metadata.genres.length > 0) update.genres = metadata.genres
+          if (metadata.tags && metadata.tags.length > 0) update.tags = metadata.tags
+
+          await this.$komgaSeries.updateMetadata(this.entityId, update)
+        }
+
         this.$emit('metadata-selected', metadata)
         this.dialogCancel()
       } catch (e) {
@@ -234,8 +250,7 @@ export default Vue.extend({
       }
     },
     viewDetails(result: MetadataSearchResult) {
-      // Could expand to show full details in a sub-dialog
-      console.log('View details for:', result)
+      // TODO: expand to show full details in a sub-dialog
     },
   },
 })
