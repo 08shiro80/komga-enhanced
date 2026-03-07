@@ -79,7 +79,7 @@ jobs:
 
       - name: Set up Docker Buildx
         if: inputs.docker_release || inputs.docker_private
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
         if: inputs.docker_release || inputs.docker_private
