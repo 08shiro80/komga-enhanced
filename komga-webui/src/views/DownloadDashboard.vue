@@ -226,6 +226,14 @@
                             <v-icon left>mdi-update</v-icon>
                             Check Now
                           </v-btn>
+                          <v-btn
+                            text
+                            @click="syncToMangaDex"
+                            :loading="syncingToMangaDex"
+                          >
+                            <v-icon left>mdi-cloud-upload</v-icon>
+                            Sync to MangaDex
+                          </v-btn>
                           <v-spacer></v-spacer>
                           <v-btn text @click="loadFollowTxt">
                             <v-icon left>mdi-refresh</v-icon>
@@ -543,6 +551,7 @@ export default {
       loadingFollowTxt: false,
       savingFollowTxt: false,
       checkingNow: false,
+      syncingToMangaDex: false,
       // Scheduler settings
       schedulerEnabled: false,
       schedulerInterval: 6,
@@ -662,6 +671,19 @@ export default {
         this.showError('Failed to trigger check: ' + error.message)
       } finally {
         this.checkingNow = false
+      }
+    },
+    async syncToMangaDex() {
+      if (!this.selectedLibrary) return
+      this.syncingToMangaDex = true
+      try {
+        const response = await this.$http.post(`/api/v1/downloads/follow-txt/${this.selectedLibrary.id}/sync-to-mangadex`)
+        this.showSuccess(response.data.message || `Synced ${response.data.followed}/${response.data.total} manga to MangaDex`)
+      } catch (error) {
+        const msg = error.response?.data?.error || error.message
+        this.showError('Sync failed: ' + msg)
+      } finally {
+        this.syncingToMangaDex = false
       }
     },
     async loadSchedulerSettings() {

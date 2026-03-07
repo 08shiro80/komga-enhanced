@@ -160,7 +160,7 @@
               :key="key"
               v-model="pluginConfig[key]"
               :label="formatConfigKey(key)"
-              :type="key.includes('password') ? 'password' : 'text'"
+              :type="key.includes('password') || key.includes('secret') ? 'password' : 'text'"
               outlined
               dense
               class="mb-2"
@@ -374,11 +374,20 @@ export default {
         const response = await this.$http.get(`/api/v1/plugins/${plugin.id}/config`)
         this.pluginConfig = response.data || {}
 
-        if (plugin.id === 'gallery-dl-downloader' && Object.keys(this.pluginConfig).length === 0) {
-          this.pluginConfig = {
-            mangadex_username: '',
-            mangadex_password: '',
-            default_language: 'en',
+        if (plugin.configSchema) {
+          try {
+            const schema = JSON.parse(plugin.configSchema)
+            if (schema.properties) {
+              Object.keys(schema.properties).forEach(key => {
+                if (!(key in this.pluginConfig)) {
+                  this.pluginConfig[key] = schema.properties[key].default != null
+                    ? String(schema.properties[key].default)
+                    : ''
+                }
+              })
+            }
+          } catch (e) {
+            // ignore schema parse errors
           }
         }
 

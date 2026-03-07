@@ -92,6 +92,62 @@ class PluginInitializer(
           configSchema = null,
           dependencies = null,
         ),
+        Plugin(
+          id = "mangadex-subscription",
+          name = "MangaDex Subscription Sync",
+          version = "1.0.0",
+          author = "Komga Team",
+          description = "Watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Requires a MangaDex personal API client (register at mangadex.org/settings).",
+          enabled = false,
+          pluginType = PluginType.DOWNLOAD,
+          entryPoint = "org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer",
+          sourceUrl = "https://api.mangadex.org",
+          installedDate = LocalDateTime.now(),
+          lastUpdated = LocalDateTime.now(),
+          configSchema =
+            """
+            {
+              "type": "object",
+              "properties": {
+                "client_id": {
+                  "type": "string",
+                  "title": "Client ID",
+                  "description": "MangaDex personal API client ID"
+                },
+                "client_secret": {
+                  "type": "string",
+                  "title": "Client Secret",
+                  "format": "password",
+                  "description": "MangaDex personal API client secret"
+                },
+                "username": {
+                  "type": "string",
+                  "title": "MangaDex Username"
+                },
+                "password": {
+                  "type": "string",
+                  "title": "MangaDex Password",
+                  "format": "password"
+                },
+                "sync_interval_minutes": {
+                  "type": "integer",
+                  "title": "Check Interval (minutes)",
+                  "default": 30,
+                  "description": "How often to check the subscription feed for new chapters"
+                },
+                "language": {
+                  "type": "string",
+                  "title": "Language",
+                  "default": "en",
+                  "description": "Preferred chapter language (ISO 639-1)",
+                  "enum": ["en", "ja", "de", "fr", "es", "it", "pt", "ru", "zh", "ko"]
+                }
+              },
+              "required": ["client_id", "client_secret", "username", "password"]
+            }
+            """.trimIndent(),
+          dependencies = null,
+        ),
       )
 
     // Insert missing plugins only (upsert behavior)

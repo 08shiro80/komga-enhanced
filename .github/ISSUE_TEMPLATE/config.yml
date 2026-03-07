@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 💡️Feature idea
-    url: https://github.com/gotson/komga/discussions/new?category=ideas
+    url: https://github.com/08shiro80/komga-enhanced/discussions/new?category=ideas
     about: Suggest a feature to improve Komga
   - name: 🖥️ Komga website
     url: https://komga.org/docs/faq
@@ -9,3 +9,6 @@ contact_links:
   - name: ⚠️ Mihon extension
     url: https://github.com/keiyoushi/extensions-source
     about: Issues and requests about the Mihon extension should be opened in the keiyoushi/extensions repository instead
+  - name: ⚠️ Downloader Gallery-dl
+    url: https://github.com/mikf/gallery-dl
+    about: Requests about the Gallery-dl downloader should be opened in the mikf/gallery-dl repository instead

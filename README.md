@@ -16,6 +16,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
 | Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
 | Unwanted chapters keep re-downloading | **Chapter blacklist** - permanently block chapters from being downloaded |
+| Syncing MangaDex subscriptions | **MangaDex Subscription Sync** auto-downloads from your feed |
 | Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
 | Long vertical webtoon pages | **Page splitting** like TachiyomiSY |
 | Missing metadata | **MangaDex & AniList plugins** for rich metadata |
@@ -64,6 +65,36 @@ https://mangadex.org/title/32d76d19-8a05-4db0-9fc2-e0b0648fe9d0
 https://mangahere.cc/manga/one_piece/
 https://hdoujin.me/12345
 ```
+
+### MangaDex Subscription Feed Sync
+
+Automatically sync new chapters from your MangaDex subscription feed — completely independent from the follow.txt system:
+
+1. Create a [MangaDex API Client](https://mangadex.org/settings) (Personal Client)
+2. Enable the `mangadex-subscription` plugin in **Settings → Plugins**
+3. Enter your `client_id`, `client_secret`, `username`, and `password`
+4. The syncer authenticates via OAuth2, creates/reuses a CustomList, and polls your subscription feed
+
+**How it works:**
+- Authenticates with MangaDex via OAuth2 (password grant through Keycloak)
+- Creates a dedicated CustomList (`Komga Sync`) for tracking
+- Periodically checks `GET /subscription/feed` for new chapters
+- Filters by your configured language (default: `en`)
+- Queues new manga for download automatically
+- Resilient to temporary MangaDex API failures (retries on next scheduled check)
+
+**Configuration** (via Plugin Manager UI):
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `client_id` | — | MangaDex API Client ID |
+| `client_secret` | — | MangaDex API Client Secret |
+| `username` | — | MangaDex username |
+| `password` | — | MangaDex password |
+| `sync_interval_minutes` | 30 | How often to check for new chapters |
+| `language` | en | Chapter language filter |
+
+**No app restart needed** — the syncer automatically restarts when you save config or toggle the plugin.
 
 ### Tachiyomi/Mihon Migration
 
@@ -291,6 +322,7 @@ komga:
 | Page Splitting | No | Yes |
 | AniList Metadata | No | Yes |
 | Follow List Automation | No | Yes |
+| MangaDex Subscription Sync | No | Yes |
 | Chapter Blacklist | No | Yes |
 | Real-time Progress | No | Yes (SSE) |
 

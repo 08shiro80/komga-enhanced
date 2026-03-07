@@ -6,6 +6,7 @@ import jakarta.validation.Valid
 import org.gotson.komga.domain.model.Plugin
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.service.OnlineMetadataProvider
+import org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer
 import org.gotson.komga.infrastructure.metadata.anilist.AniListMetadataPlugin
 import org.gotson.komga.infrastructure.metadata.mangadex.MangaDexMetadataPlugin
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
@@ -37,6 +38,7 @@ class PluginController(
   private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
   private val mangaDexMetadataPlugin: MangaDexMetadataPlugin,
   private val aniListMetadataPlugin: AniListMetadataPlugin,
+  private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
 ) {
   private fun getMetadataProvider(pluginId: String): OnlineMetadataProvider? =
     when (pluginId) {
@@ -83,6 +85,10 @@ class PluginController(
       ),
     )
     logger.info { "Plugin $id updated successfully" }
+
+    if (id == "mangadex-subscription") {
+      mangaDexSubscriptionSyncer.restart()
+    }
   }
 
   @DeleteMapping("{id}")
@@ -173,6 +179,10 @@ class PluginController(
           configValue = value,
         )
       pluginConfigRepository.insert(pluginConfig)
+    }
+
+    if (id == "mangadex-subscription") {
+      mangaDexSubscriptionSyncer.restart()
     }
   }
 

@@ -578,6 +578,86 @@ class GalleryDlWrapper(
     }
   }
 
+  fun fetchGalleryDlChapterMapping(url: String): Map<String, ChapterDownloadInfo> {
+    val output = StringBuilder()
+    val configFile = createInfoConfigFile()
+
+    try {
+      val command =
+        getGalleryDlCommand().toMutableList().apply {
+          add(url)
+          add("-j")
+          add("--simulate")
+          add("--config")
+          add(configFile.absolutePath)
+        }
+
+      val process =
+        applyGalleryDlEnv(ProcessBuilder())
+          .command(command)
+          .start()
+
+      BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+        reader.lines().forEach { line -> output.appendLine(line) }
+      }
+      BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
+        reader.lines().forEach { _ -> }
+      }
+
+      if (!process.waitFor(60, TimeUnit.SECONDS)) {
+        process.destroyForcibly()
+        configFile.delete()
+        return emptyMap()
+      }
+      configFile.delete()
+      if (process.exitValue() != 0) return emptyMap()
+
+      val mapping = mutableMapOf<String, ChapterDownloadInfo>()
+      val entries = objectMapper.readValue(output.toString(), List::class.java) as? List<*> ?: return emptyMap()
+
+      entries.forEach { entry ->
+        if (entry !is List<*> || entry.size < 3) return@forEach
+        val messageType = entry[0] as? Int ?: return@forEach
+        if (messageType != 6) return@forEach
+
+        val chapterUrl = entry[1] as? String ?: return@forEach
+        val metadata = entry[2] as? Map<*, *> ?: return@forEach
+
+        val chapterIdNum = metadata["chapter_id"]
+        val chapterId = chapterIdNum?.toString() ?: return@forEach
+        val chapterNum = metadata["chapter"]
+        val chapterMinor = metadata["chapter-minor"] as? String ?: metadata["chapter_minor"] as? String ?: ""
+        val chapterNumber =
+          if (chapterNum != null) {
+            val numStr = chapterNum.toString()
+            if (chapterMinor.isNotBlank() && !chapterMinor.startsWith(".")) "$numStr.$chapterMinor" else "$numStr$chapterMinor"
+          } else {
+            null
+          }
+
+        mapping[chapterId] =
+          ChapterDownloadInfo(
+            chapterId = chapterId,
+            chapterNumber = chapterNumber,
+            chapterTitle = null,
+            volume = null,
+            pages = 0,
+            scanlationGroup = null,
+            publishDate = metadata["date"] as? String,
+            language = metadata["language"] as? String ?: metadata["lang"] as? String,
+            chapterUrl = chapterUrl,
+          )
+      }
+
+      logger.info { "Parsed ${mapping.size} chapters from gallery-dl simulate output" }
+      return mapping
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to parse gallery-dl chapter mapping" }
+      configFile.delete()
+      return emptyMap()
+    }
+  }
+
   private fun createInfoConfigFile(): File {
     val tempFile = File.createTempFile("gallery-dl-info-", ".json")
 
@@ -638,6 +718,9 @@ class GalleryDlWrapper(
       val seriesJson = readSeriesJson(destinationPath)
       val configFile = createTempConfigFile()
 
+      val pluginConfig = pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
+      val defaultLanguage = pluginConfig["default_language"] ?: "en"
+
       val command =
         getGalleryDlCommand().toMutableList().apply {
           add(url)
@@ -645,8 +728,10 @@ class GalleryDlWrapper(
           add(destinationPath.toString())
           add("--config")
           add(configFile.absolutePath)
-          add("-o")
-          add("lang=en")
+          if (extractMangaDexId(url) != null) {
+            add("-o")
+            add("lang=$defaultLanguage")
+          }
         }
 
       try {
@@ -780,7 +865,14 @@ class GalleryDlWrapper(
       val totalChapters = chapters.size
 
       if (allChapters.isEmpty()) {
-        logger.info { "Starting single download (non-MangaDex or no chapters): ${command.joinToString(" ")}" }
+        val galleryDlChapterMap =
+          if (mangaDexId == null) {
+            fetchGalleryDlChapterMapping(url)
+          } else {
+            emptyMap()
+          }
+
+        logger.info { "Starting bulk download: $url (chapter mapping: ${galleryDlChapterMap.size} chapters)" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download: $url")
 
         val process =
@@ -796,7 +888,7 @@ class GalleryDlWrapper(
           BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
             reader.lines().forEach { line ->
               output.appendLine(line)
-              logger.debug { "gallery-dl: $line" }
+              logger.info { "gallery-dl: $line" }
 
               if (line.contains("✔") || line.contains("*")) {
                 filesDownloaded++
@@ -809,7 +901,7 @@ class GalleryDlWrapper(
           BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
             reader.lines().forEach { line ->
               errorOutput.appendLine(line)
-              logger.debug { "gallery-dl stderr: $line" }
+              logger.info { "gallery-dl stderr: $line" }
 
               val progress = parseGalleryDlProgress(line, filesDownloaded)
               if (progress != null && progress.percent > lastProgress) {
@@ -833,19 +925,36 @@ class GalleryDlWrapper(
           throw GalleryDlException("Download failed with exit code $exitCode: ${errorOutput.toString().trim()}")
         }
 
+        val cbzFilesInSubdirs =
+          destDir
+            .walkTopDown()
+            .filter { it.isFile && it.extension.lowercase() == "cbz" && it.parentFile != destDir }
+            .toList()
+        if (cbzFilesInSubdirs.isNotEmpty()) {
+          logger.info { "Found ${cbzFilesInSubdirs.size} CBZ files in subdirectories, moving to root" }
+          cbzFilesInSubdirs.forEach { cbzFile ->
+            val target = File(destDir, cbzFile.name)
+            if (!target.exists()) {
+              cbzFile.renameTo(target)
+              logger.info { "Moved ${cbzFile.relativeTo(destDir).path} -> ${target.name}" }
+            }
+          }
+          destDir.walkTopDown().filter { it.isDirectory && it != destDir && it.listFiles()?.isEmpty() == true }.forEach { it.delete() }
+        }
+
         val downloadedCbzFiles =
           destDir
             .listFiles()
             ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
             ?: emptyList()
 
-        logger.info { "Found ${downloadedCbzFiles.size} CBZ files, injecting ComicInfo.xml" }
+        logger.info { "Found ${downloadedCbzFiles.size} CBZ files, processing metadata" }
 
         val retryChapters =
           if (mangaDexId != null) {
             try {
               fetchAllChaptersFromMangaDex(mangaDexId).also {
-                if (it.isNotEmpty()) logger.info { "Fetched ${it.size} chapters from MangaDex API (retry after download)" }
+                if (it.isNotEmpty()) logger.info { "Fetched ${it.size} chapters from MangaDex API" }
               }
             } catch (_: Exception) {
               emptyList()
@@ -874,12 +983,45 @@ class GalleryDlWrapper(
 
               val desiredName = buildDesiredCbzName(matched)
               val desiredFile = File(destDir, desiredName)
-              if (cbzFile.name != desiredName && !desiredFile.exists()) {
-                cbzFile.renameTo(desiredFile)
-                logger.info { "Renamed ${cbzFile.name} -> $desiredName" }
+              if (cbzFile.name != desiredName) {
+                if (desiredFile.exists()) {
+                  cbzFile.delete()
+                  logger.info { "Deleted duplicate ${cbzFile.name} ($desiredName already exists)" }
+                } else {
+                  cbzFile.renameTo(desiredFile)
+                  logger.info { "Renamed ${cbzFile.name} -> $desiredName" }
+                }
               }
             } else {
-              addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
+              val cbzNameNoExt = cbzFile.nameWithoutExtension
+              val galleryDlMatch = galleryDlChapterMap[cbzNameNoExt]
+              if (galleryDlMatch != null) {
+                val chapterInfo =
+                  ChapterInfo(
+                    chapterNumber = galleryDlMatch.chapterNumber,
+                    chapterTitle = galleryDlMatch.chapterTitle,
+                    volume = galleryDlMatch.volume,
+                    pages = galleryDlMatch.pages,
+                    scanlationGroup = galleryDlMatch.scanlationGroup,
+                    publishDate = galleryDlMatch.publishDate,
+                    language = galleryDlMatch.language,
+                  )
+                addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, galleryDlMatch.chapterUrl)
+
+                val desiredName = buildDesiredCbzName(galleryDlMatch)
+                val desiredFile = File(destDir, desiredName)
+                if (cbzFile.name != desiredName) {
+                  if (desiredFile.exists()) {
+                    cbzFile.delete()
+                    logger.info { "Deleted duplicate ${cbzFile.name} ($desiredName already exists)" }
+                  } else {
+                    cbzFile.renameTo(desiredFile)
+                    logger.info { "Renamed ${cbzFile.name} -> $desiredName" }
+                  }
+                }
+              } else {
+                addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
+              }
             }
           } catch (e: Exception) {
             logger.warn(e) { "Failed to inject ComicInfo.xml into ${cbzFile.name}" }
@@ -1252,6 +1394,11 @@ class GalleryDlWrapper(
           "directory" to listOf("{gallery_id}"),
           "filename" to "{page:>03}.{extension}",
         ),
+      "rawkuma" to
+        mapOf(
+          "directory" to listOf("{chapter_id}"),
+          "filename" to "{page:>03}.{extension}",
+        ),
     )
 
   private fun createTempConfigFile(): File {
@@ -1280,8 +1427,6 @@ class GalleryDlWrapper(
         "extractor" to
           mutableMapOf<String, Any>(
             "base-directory" to "",
-            "directory" to listOf("c{chapter:>03}"),
-            "filename" to "{page:>03}.{extension}",
           ).apply {
             putAll(websiteConfigs)
           },

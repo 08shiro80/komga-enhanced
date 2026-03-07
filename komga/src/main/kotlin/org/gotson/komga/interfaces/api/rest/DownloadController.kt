@@ -10,6 +10,7 @@ import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.service.ChapterChecker
 import org.gotson.komga.domain.service.DownloadExecutor
 import org.gotson.komga.domain.service.DownloadScheduler
+import org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
 import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckResultDto
@@ -52,6 +53,7 @@ class DownloadController(
   private val downloadScheduler: DownloadScheduler,
   private val libraryRepository: LibraryRepository,
   private val chapterChecker: ChapterChecker,
+  private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
 ) {
   @GetMapping
   @Operation(summary = "List all downloads", tags = [TagNames.DOWNLOADS])
@@ -264,6 +266,22 @@ class DownloadController(
     return ResponseEntity
       .status(HttpStatus.ACCEPTED)
       .body(mapOf("message" to "Follow list check started in background"))
+  }
+
+  @PostMapping("follow-txt/{libraryId}/sync-to-mangadex")
+  @Operation(summary = "Upload follow.txt MangaDex URLs to MangaDex follows list", tags = [TagNames.DOWNLOADS])
+  fun syncFollowsToMangaDex(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, Any>> {
+    val result = mangaDexSubscriptionSyncer.syncFollowsToMangaDex(libraryId)
+    if (result.error != null) {
+      return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(mapOf("error" to result.error, "followed" to result.followed, "total" to result.total))
+    }
+    return ResponseEntity.ok(
+      mapOf("followed" to result.followed, "total" to result.total, "message" to "Synced ${result.followed}/${result.total} manga to MangaDex follows"),
+    )
   }
 
   @GetMapping("scheduler")

@@ -1,5 +1,5 @@
 name: 🐞 Issue report
-description: Report an issue in Komga
+description: Report an issue in Komga Enhanced
 labels:
   - triage
 body:
@@ -72,13 +72,11 @@ body:
   - type: dropdown
     attributes:
       label: Installation method
-      description: How did you install Komga?
+      description: How did you install Komga Enhanced?
       multiple: false
       options:
         - jar
         - Docker
-        - Microsoft Store
-        - from download.komga.org
         - other (please provide more details below)
     validations:
       required: true
