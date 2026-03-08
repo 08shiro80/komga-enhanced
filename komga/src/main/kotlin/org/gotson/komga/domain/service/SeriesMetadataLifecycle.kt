@@ -122,6 +122,12 @@ class SeriesMetadataLifecycle(
         totalBookCount = patches.mapNotNull { it.totalBookCount }.maxOrNull(),
         collections = emptySet(),
         alternateTitles = null,
+        links =
+          patches
+            .mapNotNull { it.links }
+            .flatten()
+            .distinctBy { it.url }
+            .ifEmpty { null },
       )
 
     handlePatchForSeriesMetadata(aggregatedPatch, series)

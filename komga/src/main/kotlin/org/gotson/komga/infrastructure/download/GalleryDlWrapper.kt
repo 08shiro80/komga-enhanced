@@ -864,7 +864,30 @@ class GalleryDlWrapper(
       var filesDownloaded = 0
       val totalChapters = chapters.size
 
-      if (allChapters.isEmpty()) {
+      if (allChapters.isEmpty() && mangaDexId != null) {
+        logger.warn { "MangaDex chapter API returned empty for $mangaDexId — skipping bulk download to prevent re-downloads" }
+        logToDatabase(
+          org.gotson.komga.domain.model.LogLevel.WARN,
+          "MangaDex chapter API returned empty for $mangaDexId, skipping download",
+        )
+        configFile.delete()
+
+        val downloadedFiles =
+          destDir
+            .listFiles()
+            ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+            ?.map { it.absolutePath }
+            ?: emptyList()
+
+        return DownloadResult(
+          success = true,
+          filesDownloaded = downloadedFiles.size,
+          downloadedFiles = downloadedFiles,
+          totalChapters = downloadedFiles.size,
+          errorMessage = null,
+          mangaTitle = mangaInfo.title,
+        )
+      } else if (allChapters.isEmpty()) {
         val galleryDlChapterMap =
           if (mangaDexId == null) {
             fetchGalleryDlChapterMapping(url)

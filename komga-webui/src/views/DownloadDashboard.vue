@@ -227,6 +227,7 @@
                             Check Now
                           </v-btn>
                           <v-btn
+                            v-if="mangaDexPluginEnabled"
                             text
                             @click="syncToMangaDex"
                             :loading="syncingToMangaDex"
@@ -552,6 +553,7 @@ export default {
       savingFollowTxt: false,
       checkingNow: false,
       syncingToMangaDex: false,
+      mangaDexPluginEnabled: false,
       // Scheduler settings
       schedulerEnabled: false,
       schedulerInterval: 6,
@@ -598,6 +600,7 @@ export default {
     this.loadDownloads()
     this.loadLibraries()
     this.loadSchedulerSettings()
+    this.loadMangaDexPluginStatus()
     this.setupSseListeners()
   },
   beforeDestroy() {
@@ -684,6 +687,14 @@ export default {
         this.showError('Sync failed: ' + msg)
       } finally {
         this.syncingToMangaDex = false
+      }
+    },
+    async loadMangaDexPluginStatus() {
+      try {
+        const response = await this.$http.get('/api/v1/plugins/mangadex-subscription')
+        this.mangaDexPluginEnabled = response.data.enabled
+      } catch (_) {
+        this.mangaDexPluginEnabled = false
       }
     },
     async loadSchedulerSettings() {

@@ -36,6 +36,23 @@ class SeriesMetadataDao(
 
   override fun findByIdOrNull(seriesId: String): SeriesMetadata? = dslRO.findOne(seriesId)?.toDomain(dslRO.findGenres(seriesId), dslRO.findTags(seriesId), dslRO.findSharingLabels(seriesId), dslRO.findLinks(seriesId), dslRO.findAlternateTitles(seriesId))
 
+  private val s = Tables.SERIES
+
+  override fun findSeriesIdByLinkUrlContaining(
+    libraryId: String,
+    urlPart: String,
+  ): String? =
+    dslRO
+      .select(slk.SERIES_ID)
+      .from(slk)
+      .join(s)
+      .on(s.ID.eq(slk.SERIES_ID))
+      .where(s.LIBRARY_ID.eq(libraryId))
+      .and(s.DELETED_DATE.isNull)
+      .and(slk.URL.contains(urlPart))
+      .limit(1)
+      .fetchOneInto(String::class.java)
+
   private fun DSLContext.findOne(seriesId: String) =
     this
       .selectFrom(d)

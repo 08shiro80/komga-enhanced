@@ -31,6 +31,8 @@ private data class ActiveDownload(
 class DownloadExecutor(
   private val downloadQueueRepository: DownloadQueueRepository,
   private val libraryRepository: LibraryRepository,
+  private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
+  private val seriesMetadataRepository: org.gotson.komga.domain.persistence.SeriesMetadataRepository,
   private val galleryDlWrapper: GalleryDlWrapper,
   private val libraryLifecycle: LibraryLifecycle,
   private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
@@ -399,8 +401,8 @@ class DownloadExecutor(
 
       val mangaDexId = GalleryDlWrapper.extractMangaDexId(download.sourceUrl)
       val existingFolder =
-        if (mangaDexId != null) {
-          findExistingMangaFolder(libraryPath, mangaDexId)
+        if (mangaDexId != null && download.libraryId != null) {
+          findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)
         } else {
           null
         }
@@ -408,9 +410,33 @@ class DownloadExecutor(
       val destinationPath =
         if (existingFolder != null) {
           if (existingFolder.name != mangaFolderName) {
-            logger.info { "Found existing folder by MangaDex ID: ${existingFolder.name} (title now: $mangaFolderName)" }
+            val correctPath = libraryPath.resolve(mangaFolderName)
+            if (!correctPath.toFile().exists()) {
+              val renamed = existingFolder.renameTo(correctPath.toFile())
+              if (renamed) {
+                logger.info { "Renamed folder to correct title: ${existingFolder.name} -> $mangaFolderName" }
+                correctPath
+              } else {
+                logger.warn { "Failed to rename folder: ${existingFolder.name} -> $mangaFolderName" }
+                existingFolder.toPath()
+              }
+            } else {
+              logger.info { "Correct folder already exists, moving files from ${existingFolder.name} -> $mangaFolderName" }
+              existingFolder.listFiles()?.forEach { file ->
+                val target = correctPath.resolve(file.name).toFile()
+                if (!target.exists()) {
+                  file.renameTo(target)
+                }
+              }
+              if (existingFolder.listFiles()?.isEmpty() == true) {
+                existingFolder.delete()
+                logger.info { "Removed empty folder: ${existingFolder.name}" }
+              }
+              correctPath
+            }
+          } else {
+            existingFolder.toPath()
           }
-          existingFolder.toPath()
         } else {
           libraryPath.resolve(mangaFolderName)
         }
@@ -636,22 +662,34 @@ class DownloadExecutor(
   }
 
   private fun findExistingMangaFolder(
+    libraryId: String,
     libraryPath: java.nio.file.Path,
     mangaDexId: String,
   ): java.io.File? {
-    val libraryDir = libraryPath.toFile()
-    if (!libraryDir.exists()) return null
-
-    return libraryDir.listFiles()?.firstOrNull { dir ->
-      if (!dir.isDirectory) return@firstOrNull false
-      val seriesJson = dir.resolve("series.json")
-      if (!seriesJson.exists()) return@firstOrNull false
-      try {
-        seriesJson.readText().contains(mangaDexId)
-      } catch (_: Exception) {
-        false
+    val seriesId =
+      seriesMetadataRepository.findSeriesIdByLinkUrlContaining(libraryId, mangaDexId)
+    if (seriesId != null) {
+      val series = seriesRepository.findByIdOrNull(seriesId)
+      if (series != null && series.path.toFile().exists()) {
+        logger.info { "findExistingMangaFolder: found via DB link: ${series.path}" }
+        return series.path.toFile()
       }
     }
+
+    val idWithSpaces = mangaDexId.replace("-", " ")
+    val allSeries = seriesRepository.findAllByLibraryId(libraryId)
+    val byPath =
+      allSeries.firstOrNull { series ->
+        val path = series.url.toString()
+        path.contains(mangaDexId) || path.contains(idWithSpaces)
+      }
+    if (byPath != null && byPath.path.toFile().exists()) {
+      logger.info { "findExistingMangaFolder: found by DB path: ${byPath.path}" }
+      return byPath.path.toFile()
+    }
+
+    logger.info { "findExistingMangaFolder: no existing folder found for $mangaDexId" }
+    return null
   }
 
   private fun sanitizeFileName(name: String): String =

@@ -9,11 +9,13 @@ import org.gotson.komga.domain.model.Series
 import org.gotson.komga.domain.model.SeriesMetadata
 import org.gotson.komga.domain.model.SeriesMetadataPatch
 import org.gotson.komga.domain.model.Sidecar
+import org.gotson.komga.domain.model.WebLink
 import org.gotson.komga.infrastructure.metadata.SeriesMetadataProvider
 import org.gotson.komga.infrastructure.metadata.mylar.dto.AlternateTitleEntry
 import org.gotson.komga.infrastructure.metadata.mylar.dto.Status
 import org.gotson.komga.infrastructure.sidecar.SidecarSeriesConsumer
 import org.springframework.stereotype.Service
+import java.net.URI
 import kotlin.io.path.notExists
 import org.gotson.komga.infrastructure.metadata.mylar.dto.Series as MylarSeries
 
@@ -61,6 +63,13 @@ class MylarSeriesProvider(
           }
         }
 
+      val links =
+        if (metadata.comicid.isNotBlank()) {
+          listOf(WebLink("MangaDex", URI("https://mangadex.org/title/${metadata.comicid}")))
+        } else {
+          null
+        }
+
       return SeriesMetadataPatch(
         title = title,
         titleSort = title,
@@ -81,6 +90,7 @@ class MylarSeriesProvider(
         totalBookCount = metadata.totalIssues,
         collections = emptySet(),
         alternateTitles = alternateTitles,
+        links = links,
       ).also {
         logger.info { "Returning patch with ${it.alternateTitles?.size ?: 0} alternate titles for series: ${series.name}" }
       }

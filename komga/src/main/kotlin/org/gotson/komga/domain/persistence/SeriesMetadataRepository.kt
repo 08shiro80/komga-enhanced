@@ -7,6 +7,11 @@ interface SeriesMetadataRepository {
 
   fun findByIdOrNull(seriesId: String): SeriesMetadata?
 
+  fun findSeriesIdByLinkUrlContaining(
+    libraryId: String,
+    urlPart: String,
+  ): String?
+
   fun insert(metadata: SeriesMetadata)
 
   fun update(metadata: SeriesMetadata)

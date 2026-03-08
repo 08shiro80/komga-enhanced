@@ -13,4 +13,5 @@ data class SeriesMetadataPatch(
   val totalBookCount: Int?,
   val collections: Set<String>,
   val alternateTitles: List<AlternateTitle>?,
+  val links: List<WebLink>? = null,
 )
