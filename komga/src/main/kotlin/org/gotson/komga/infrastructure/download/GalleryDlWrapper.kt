@@ -1038,8 +1038,13 @@ class GalleryDlWrapper(
         logger.info { "Downloading $totalChapters chapters one by one" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download of $totalChapters chapters: $url")
 
+        val failuresFile = File(destDir, ".chapter-failures.json")
+        val chapterFailures = loadChapterFailures(failuresFile)
+        val mangaDexId = extractMangaDexId(url)
+
         chapters.forEachIndexed { index, chapter ->
           if (isCancelled()) {
+            saveChapterFailures(failuresFile, chapterFailures)
             logger.info { "Download cancelled before chapter ${index + 1}/$totalChapters, stopping" }
             configFile.delete()
             return DownloadResult(
@@ -1053,6 +1058,26 @@ class GalleryDlWrapper(
           }
 
           val chapterNum = chapter.chapterNumber ?: "${index + 1}"
+          val failCount = chapterFailures[chapter.chapterUrl] ?: 0
+          if (failCount >= 3) {
+            if (!blacklistedChapterRepository.existsByChapterUrl(chapter.chapterUrl)) {
+              blacklistedChapterRepository.insert(
+                org.gotson.komga.domain.model.BlacklistedChapter(
+                  id =
+                    java.util.UUID
+                      .randomUUID()
+                      .toString(),
+                  seriesId = mangaDexId ?: "",
+                  chapterUrl = chapter.chapterUrl,
+                  chapterNumber = chapter.chapterNumber,
+                  chapterTitle = chapter.chapterTitle,
+                ),
+              )
+              logger.info { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
+            }
+            return@forEachIndexed
+          }
+
           logger.info { "Downloading chapter $chapterNum (${index + 1}/$totalChapters): ${chapter.chapterUrl}" }
 
           val chapterCommand =
@@ -1164,13 +1189,17 @@ class GalleryDlWrapper(
               val progressPercent = ((index + 1) * 100) / totalChapters
               onProgress(DownloadProgress(filesDownloaded, totalChapters, progressPercent, "Downloaded chapter $chapterNum"))
             } else {
-              logger.warn { "Chapter $chapterNum download failed with exit code ${chapterProcess.exitValue()}" }
+              val exitCode = chapterProcess.exitValue()
+              chapterFailures[chapter.chapterUrl] = failCount + 1
+              logger.warn { "Chapter $chapterNum download failed with exit code $exitCode (attempt ${failCount + 1}/3)" }
             }
           } catch (e: Exception) {
+            chapterFailures[chapter.chapterUrl] = failCount + 1
             logger.warn(e) { "Error downloading chapter $chapterNum" }
           }
         }
 
+        saveChapterFailures(failuresFile, chapterFailures)
         normalizeDoubleBracketFilenames(destDir)
         configFile.delete()
       }
@@ -2251,6 +2280,34 @@ class GalleryDlWrapper(
     } catch (_: NumberFormatException) {
       chapterNumStr
     }
+
+  @Suppress("UNCHECKED_CAST")
+  private fun loadChapterFailures(file: File): MutableMap<String, Int> =
+    try {
+      if (file.exists()) {
+        val map = objectMapper.readValue(file, Map::class.java) as Map<String, Any>
+        map.mapValues { (it.value as Number).toInt() }.toMutableMap()
+      } else {
+        mutableMapOf()
+      }
+    } catch (_: Exception) {
+      mutableMapOf()
+    }
+
+  private fun saveChapterFailures(
+    file: File,
+    failures: Map<String, Int>,
+  ) {
+    try {
+      if (failures.isEmpty()) {
+        if (file.exists()) file.delete()
+      } else {
+        objectMapper.writeValue(file, failures)
+      }
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to save chapter failures" }
+    }
+  }
 
   private fun normalizeDoubleBracketFilenames(dir: File) {
     val cbzFiles =

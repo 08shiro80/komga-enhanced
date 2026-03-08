@@ -397,7 +397,23 @@ class DownloadExecutor(
           Paths.get(System.getProperty("user.home"), "Downloads", "komga")
         }
 
-      val destinationPath = libraryPath.resolve(mangaFolderName)
+      val mangaDexId = GalleryDlWrapper.extractMangaDexId(download.sourceUrl)
+      val existingFolder =
+        if (mangaDexId != null) {
+          findExistingMangaFolder(libraryPath, mangaDexId)
+        } else {
+          null
+        }
+
+      val destinationPath =
+        if (existingFolder != null) {
+          if (existingFolder.name != mangaFolderName) {
+            logger.info { "Found existing folder by MangaDex ID: ${existingFolder.name} (title now: $mangaFolderName)" }
+          }
+          existingFolder.toPath()
+        } else {
+          libraryPath.resolve(mangaFolderName)
+        }
 
       if (!destinationPath.toFile().exists()) {
         destinationPath.toFile().mkdirs()
@@ -617,6 +633,25 @@ class DownloadExecutor(
         lastModifiedDate = LocalDateTime.now(),
       ),
     )
+  }
+
+  private fun findExistingMangaFolder(
+    libraryPath: java.nio.file.Path,
+    mangaDexId: String,
+  ): java.io.File? {
+    val libraryDir = libraryPath.toFile()
+    if (!libraryDir.exists()) return null
+
+    return libraryDir.listFiles()?.firstOrNull { dir ->
+      if (!dir.isDirectory) return@firstOrNull false
+      val seriesJson = dir.resolve("series.json")
+      if (!seriesJson.exists()) return@firstOrNull false
+      try {
+        seriesJson.readText().contains(mangaDexId)
+      } catch (_: Exception) {
+        false
+      }
+    }
   }
 
   private fun sanitizeFileName(name: String): String =

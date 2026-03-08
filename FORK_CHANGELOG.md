@@ -20,6 +20,8 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **"Search Online Metadata" button not applying metadata** — The menu button opened MetadataSearchDialog but clicking "Apply" only emitted an event without actually writing metadata to the series. Now calls `PATCH /api/v1/series/{id}/metadata` to apply title, summary, publisher, genres, tags, etc. directly. Series view reloads after applying.
 - **Non-MangaDex multi-chapter sites only downloaded 1 CBZ** — Sites like rawkuma return Queue messages (type 6) with individual chapter URLs, but the download code only built chapter lists from the MangaDex API. Non-MangaDex sites fell back to "single download" which lumped all images into one CBZ. Now extracts chapter info (number, URL, volume, group) from Queue messages and downloads each chapter individually with proper CBZ naming and ComicInfo.xml injection.
 - **MangaDex 429 rate limit crashes downloads** — When MangaDex API returns 429, gallery-dl also fails with `ValueError: Either 'seconds' or 'until' is required`. `getChapterInfo()` threw immediately, permanently failing the download. Now retries up to 2 times with 5-second delays when rate-limited.
+- **Re-downloads when MangaDex title changes** — `DownloadExecutor` derived the folder path from the manga title. If MangaDex changed the title, a new empty folder was created and all chapters re-downloaded. Now searches for an existing folder containing the same MangaDex ID in `series.json` before creating a new one.
+- **Paid/unavailable chapters retried indefinitely** — Chapters from paid services (e.g. J-Novel Club) always fail with exit code 4 but were retried every time the download ran. Now tracks failures in `.chapter-failures.json` per manga folder and auto-blacklists chapters after 3 failed attempts.
 
 ### New Features
 - **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
@@ -27,8 +29,8 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `GalleryDlWrapper.kt` | `parseGalleryDlJson()` handles message types 2/3/6, collects `queuedChapters` from Queue messages, `deriveTitleFromUrl()` fallback, `getGalleryDlPath()`/`applyGalleryDlEnv()` for PYTHONPATH, extracted `extractMetadataFields()` helper, non-MangaDex per-chapter download |
-| `DownloadExecutor.kt` | Rename/move download folder from "Unknown" to correct title after download completes, update title in DB |
+| `GalleryDlWrapper.kt` | `parseGalleryDlJson()` handles message types 2/3/6, collects `queuedChapters` from Queue messages, `deriveTitleFromUrl()` fallback, `getGalleryDlPath()`/`applyGalleryDlEnv()` for PYTHONPATH, extracted `extractMetadataFields()` helper, non-MangaDex per-chapter download, `.chapter-failures.json` tracking + auto-blacklist after 3 failures |
+| `DownloadExecutor.kt` | Rename/move download folder from "Unknown" to correct title after download completes, `findExistingMangaFolder()` finds folder by MangaDex ID in series.json |
 | `MetadataSearchDialog.vue` | `applyMetadata()` now calls series metadata update API instead of just emitting event |
 | `BrowseSeries.vue` | Wired `@search-metadata` event to open MetadataSearchDialog, reload series on apply |
 | `SeriesActionsMenu.vue` | "Search Online Metadata" opens EditSeriesDialog on metadata tab via Vuex |
