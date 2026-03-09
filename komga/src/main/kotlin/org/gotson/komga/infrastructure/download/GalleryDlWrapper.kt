@@ -31,6 +31,17 @@ class GalleryDlWrapper(
 ) {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
+  private var lastMangaDexRequestTime = 0L
+  private val mangaDexMinIntervalMs = 450L
+
+  private fun throttleMangaDexApi() {
+    val now = System.currentTimeMillis()
+    val elapsed = now - lastMangaDexRequestTime
+    if (elapsed < mangaDexMinIntervalMs) {
+      Thread.sleep(mangaDexMinIntervalMs - elapsed)
+    }
+    lastMangaDexRequestTime = System.currentTimeMillis()
+  }
 
   fun isInstalled(): Boolean =
     try {
@@ -88,7 +99,15 @@ class GalleryDlWrapper(
           .GET()
           .build()
 
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      throttleMangaDexApi()
+      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+
+      if (response.statusCode() == 429) {
+        logger.warn { "MangaDex rate limited (429) for manga $mangaId, waiting 2s and retrying" }
+        Thread.sleep(2000)
+        throttleMangaDexApi()
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      }
 
       if (response.statusCode() != 200) {
         logger.warn { "MangaDex API returned ${response.statusCode()} for manga $mangaId" }
@@ -245,8 +264,14 @@ class GalleryDlWrapper(
 
   companion object {
     private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
+    private val UUID_PATTERN = """[a-f0-9]{8}[- ][a-f0-9]{4}[- ][a-f0-9]{4}[- ][a-f0-9]{4}[- ][a-f0-9]{12}""".toRegex()
 
     fun extractMangaDexId(url: String): String? = MANGADEX_ID_REGEX.find(url)?.groupValues?.get(1)
+
+    fun isUuidDerivedTitle(title: String): Boolean {
+      val lower = title.lowercase().trim()
+      return lower.startsWith("mangadex - ") && UUID_PATTERN.containsMatchIn(lower)
+    }
   }
 
   private fun downloadMangaCover(
@@ -327,7 +352,15 @@ class GalleryDlWrapper(
           .GET()
           .build()
 
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      throttleMangaDexApi()
+      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+
+      if (response.statusCode() == 429) {
+        logger.warn { "MangaDex rate limited (429) for chapter $chapterId, waiting 2s" }
+        Thread.sleep(2000)
+        throttleMangaDexApi()
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      }
 
       if (response.statusCode() != 200) {
         logger.warn { "MangaDex chapter API returned ${response.statusCode()} for chapter $chapterId" }
@@ -415,7 +448,15 @@ class GalleryDlWrapper(
             .GET()
             .build()
 
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        throttleMangaDexApi()
+        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+
+        if (response.statusCode() == 429) {
+          logger.warn { "MangaDex rate limited (429) on feed, waiting 2s" }
+          Thread.sleep(2000)
+          throttleMangaDexApi()
+          response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        }
 
         if (response.statusCode() != 200) {
           logger.warn { "MangaDex feed API returned ${response.statusCode()}" }
@@ -701,7 +742,15 @@ class GalleryDlWrapper(
 
     try {
       logger.info { "Fetching metadata for $url" }
-      val mangaInfo = getChapterInfo(url)
+      var mangaInfo = getChapterInfo(url)
+
+      if (isUuidDerivedTitle(mangaInfo.title)) {
+        val folderName = destinationPath.fileName.toString()
+        if (folderName.isNotBlank() && !isUuidDerivedTitle(folderName)) {
+          logger.info { "Overriding UUID-derived title '${mangaInfo.title}' with folder name: $folderName" }
+          mangaInfo = mangaInfo.copy(title = folderName)
+        }
+      }
       logger.info { "Using title: ${mangaInfo.title}" }
 
       val destDir = destinationPath.toFile()
@@ -2009,6 +2058,7 @@ class GalleryDlWrapper(
         ?: return
 
     var updated = 0
+    var renamedCount = 0
     val alreadyUpdated = mutableSetOf<String>()
     for (chapter in allChapters) {
       val chapterNumStr = chapter.chapterNumber ?: continue
@@ -2040,30 +2090,39 @@ class GalleryDlWrapper(
 
       if (matchingCbz.absolutePath in alreadyUpdated) continue
 
-      if (hasComicInfoXml(matchingCbz)) continue
+      if (!hasComicInfoXml(matchingCbz)) {
+        try {
+          val chapterInfo =
+            ChapterInfo(
+              chapterNumber = chapter.chapterNumber,
+              chapterTitle = chapter.chapterTitle,
+              volume = chapter.volume,
+              pages = chapter.pages,
+              scanlationGroup = chapter.scanlationGroup,
+              publishDate = chapter.publishDate,
+              language = chapter.language,
+            )
+          addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+          alreadyUpdated.add(matchingCbz.absolutePath)
+          updated++
+          logger.info { "Injected missing ComicInfo.xml into ${matchingCbz.name}" }
+        } catch (e: Exception) {
+          logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
+        }
+      }
 
-      try {
-        val chapterInfo =
-          ChapterInfo(
-            chapterNumber = chapter.chapterNumber,
-            chapterTitle = chapter.chapterTitle,
-            volume = chapter.volume,
-            pages = chapter.pages,
-            scanlationGroup = chapter.scanlationGroup,
-            publishDate = chapter.publishDate,
-            language = chapter.language,
-          )
-        addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
-        alreadyUpdated.add(matchingCbz.absolutePath)
-        updated++
-        logger.info { "Injected missing ComicInfo.xml into ${matchingCbz.name}" }
-      } catch (e: Exception) {
-        logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
+      val desiredName = buildDesiredCbzName(chapter)
+      val desiredFile = File(destDir, desiredName)
+      if (matchingCbz.name != desiredName && !desiredFile.exists()) {
+        if (matchingCbz.renameTo(desiredFile)) {
+          renamedCount++
+          logger.info { "Renamed existing ${matchingCbz.name} -> $desiredName" }
+        }
       }
     }
 
-    if (updated > 0) {
-      logger.info { "Updated $updated existing CBZ files" }
+    if (updated > 0 || renamedCount > 0) {
+      logger.info { "Existing CBZ update: $updated ComicInfo injected, $renamedCount renamed" }
     }
   }
 

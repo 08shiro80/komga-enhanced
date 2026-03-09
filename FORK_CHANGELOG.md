@@ -6,12 +6,15 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.0.9] - 2026-03-03
+## [0.0.9] - 2026-03-09
 
 ### New Features
 - **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Uses the new CustomList-based subscription API instead of polling each manga individually. On first setup, creates a "Komga Subscriptions" CustomList and subscribes to it. Periodic feed checks (default every 30 min) query `GET /subscription/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
 
 ### Bug Fixes
+- **Folders renamed to "mangadex - UUID" format** — When MangaDex API metadata fetch failed during download, `getChapterInfo()` fell back to `deriveTitleFromUrl()` which produced titles like "mangadex - 576f3eec a728 4f36 a87f dd3fc2342812". The post-download rename logic then renamed correct folders (e.g. "Fushi no Kami...") to this UUID name. Fixed by: (1) removing the post-download rename entirely, (2) adding UUID-derived title detection that prevents renaming proper folders to UUID names, (3) overriding UUID-derived titles with the existing folder name inside `download()`.
+- **BLACKLISTED_CHAPTER FK constraint violation** — `seriesId` was set to MangaDex UUID instead of Komga's internal SERIES.ID, causing every blacklist insert to crash. Now passes the correct Komga series ID from `findExistingMangaFolder`.
+- **Unnecessary ComicInfo.xml rewrites on every run** — `hasMismatchedDates()` decompressed and recompressed every CBZ to check dates, even when nothing changed. Replaced with `hasComicInfoXml()` that only checks file existence.
 - **gallery-dl compatibility with non-MangaDex sites** — `parseGalleryDlJson` only handled Queue messages (type 6) used by MangaDex extractors. Single-image sites like wallhaven.cc yield Directory (type 2) + Url (type 3) messages which were ignored, resulting in title="Unknown" and an exception. Now processes all three message types and uses a title fallback chain: `manga` field → `title` field → `category` field → URL-derived title.
 - **Title "Unknown" crash for non-MangaDex URLs** — `getChapterInfo()` threw `GalleryDlException` when the extracted title was "Unknown", making non-MangaDex sites unusable. Now derives a fallback title from the URL (e.g. `wallhaven.cc/w/e83mxl` → `"wallhaven - e83mxl"`).
 - **Downloads saved to "Unknown" folder when title not yet known** — `DownloadExecutor.processDownload()` used the queued title (often "Unknown" for non-MangaDex sites) as the folder name before `getChapterInfo` resolved the real title. Files ended up in `Mangas/Unknown/` even though the correct title was extracted later. Now renames (or moves files into) the correct folder after download completes.

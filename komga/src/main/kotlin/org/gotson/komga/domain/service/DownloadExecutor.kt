@@ -409,9 +409,12 @@ class DownloadExecutor(
       val existingFolder = lookupResult?.folder
       val komgaSeriesId = lookupResult?.komgaSeriesId
 
+      val shouldRenameToTitle =
+        !GalleryDlWrapper.isUuidDerivedTitle(mangaFolderName)
+
       val destinationPath =
         if (existingFolder != null) {
-          if (existingFolder.name != mangaFolderName) {
+          if (shouldRenameToTitle && existingFolder.name != mangaFolderName) {
             val correctPath = libraryPath.resolve(mangaFolderName)
             if (!correctPath.toFile().exists()) {
               val renamed = existingFolder.renameTo(correctPath.toFile())
@@ -437,9 +440,15 @@ class DownloadExecutor(
               correctPath
             }
           } else {
+            if (!shouldRenameToTitle && existingFolder.name != mangaFolderName) {
+              logger.info { "Skipping rename: '$mangaFolderName' looks like a UUID-derived name, keeping '${existingFolder.name}'" }
+            }
             existingFolder.toPath()
           }
         } else {
+          if (!shouldRenameToTitle) {
+            logger.warn { "Download title '$mangaFolderName' looks UUID-derived, but no existing folder found — using it as fallback" }
+          }
           libraryPath.resolve(mangaFolderName)
         }
 
@@ -505,35 +514,7 @@ class DownloadExecutor(
 
       if (result.success) {
         val finalTitle = result.mangaTitle ?: download.title
-        var finalPath = destinationPath
-
-        if (result.mangaTitle != null && sanitizeFileName(result.mangaTitle) != mangaFolderName) {
-          val correctedName = sanitizeFileName(result.mangaTitle)
-          val correctedPath = libraryPath.resolve(correctedName)
-          if (!correctedPath.toFile().exists()) {
-            val renamed = destinationPath.toFile().renameTo(correctedPath.toFile())
-            if (renamed) {
-              logger.info { "Renamed folder: $mangaFolderName -> $correctedName" }
-              finalPath = correctedPath
-            } else {
-              logger.warn { "Failed to rename folder: $mangaFolderName -> $correctedName" }
-            }
-          } else {
-            logger.info { "Target folder already exists, moving files: $mangaFolderName -> $correctedName" }
-            val srcDir = destinationPath.toFile()
-            srcDir.listFiles()?.forEach { file ->
-              val target = correctedPath.resolve(file.name).toFile()
-              if (!target.exists()) {
-                file.renameTo(target)
-              }
-            }
-            if (srcDir.listFiles()?.isEmpty() == true) {
-              srcDir.delete()
-              logger.info { "Removed empty folder: $mangaFolderName" }
-            }
-            finalPath = correctedPath
-          }
-        }
+        val finalPath = destinationPath
 
         logger.info { "Download completed to: $finalPath (manga folder: ${result.mangaTitle})" }
 
