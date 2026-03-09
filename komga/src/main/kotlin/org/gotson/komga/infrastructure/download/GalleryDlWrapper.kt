@@ -691,6 +691,7 @@ class GalleryDlWrapper(
     url: String,
     destinationPath: Path,
     libraryPath: Path? = null,
+    komgaSeriesId: String? = null,
     isCancelled: () -> Boolean = { false },
     onProcessStarted: (Process) -> Unit = {},
     onProgress: (DownloadProgress) -> Unit = {},
@@ -1083,20 +1084,22 @@ class GalleryDlWrapper(
           val chapterNum = chapter.chapterNumber ?: "${index + 1}"
           val failCount = chapterFailures[chapter.chapterUrl] ?: 0
           if (failCount >= 3) {
-            if (!blacklistedChapterRepository.existsByChapterUrl(chapter.chapterUrl)) {
+            if (komgaSeriesId != null && !blacklistedChapterRepository.existsByChapterUrl(chapter.chapterUrl)) {
               blacklistedChapterRepository.insert(
                 org.gotson.komga.domain.model.BlacklistedChapter(
                   id =
                     java.util.UUID
                       .randomUUID()
                       .toString(),
-                  seriesId = mangaDexId ?: "",
+                  seriesId = komgaSeriesId,
                   chapterUrl = chapter.chapterUrl,
                   chapterNumber = chapter.chapterNumber,
                   chapterTitle = chapter.chapterTitle,
                 ),
               )
               logger.info { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
+            } else if (komgaSeriesId == null) {
+              logger.warn { "Cannot blacklist chapter $chapterNum: series not yet in database" }
             }
             return@forEachIndexed
           }
@@ -2037,9 +2040,7 @@ class GalleryDlWrapper(
 
       if (matchingCbz.absolutePath in alreadyUpdated) continue
 
-      val needsDateFix = hasMismatchedDates(matchingCbz, chapter.publishDate)
-
-      if (!needsDateFix) continue
+      if (hasComicInfoXml(matchingCbz)) continue
 
       try {
         val chapterInfo =
@@ -2055,7 +2056,7 @@ class GalleryDlWrapper(
         addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
         alreadyUpdated.add(matchingCbz.absolutePath)
         updated++
-        logger.info { "Updated ComicInfo.xml (dates) in ${matchingCbz.name}" }
+        logger.info { "Injected missing ComicInfo.xml into ${matchingCbz.name}" }
       } catch (e: Exception) {
         logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
       }
@@ -2066,38 +2067,19 @@ class GalleryDlWrapper(
     }
   }
 
-  private fun hasMismatchedDates(
-    cbzFile: File,
-    publishDate: String?,
-  ): Boolean {
-    if (publishDate == null || publishDate.length < 10) return false
-    val expectedYear = publishDate.substring(0, 4)
-    val expectedMonth = publishDate.substring(5, 7)
-    val expectedDay = publishDate.substring(8, 10)
+  private fun hasComicInfoXml(cbzFile: File): Boolean {
     try {
       ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
         var entry = zipIn.nextEntry
         while (entry != null) {
-          if (entry.name == "ComicInfo.xml") {
-            val xml = zipIn.readBytes().toString(Charsets.UTF_8)
-            val yearMatch = Regex("<Year>(\\d+)</Year>").find(xml)
-            val monthMatch = Regex("<Month>(\\d+)</Month>").find(xml)
-            val dayMatch = Regex("<Day>(\\d+)</Day>").find(xml)
-            if (yearMatch == null) return true
-            if (yearMatch.groupValues[1] != expectedYear) return true
-            val existingMonth = monthMatch?.groupValues?.get(1)?.padStart(2, '0')
-            val existingDay = dayMatch?.groupValues?.get(1)?.padStart(2, '0')
-            if (existingMonth != expectedMonth) return true
-            if (existingDay != expectedDay) return true
-            return false
-          }
+          if (entry.name == "ComicInfo.xml") return true
           entry = zipIn.nextEntry
         }
       }
     } catch (_: Exception) {
       return false
     }
-    return true
+    return false
   }
 
   private fun readSeriesJson(destinationPath: Path): Map<String, Any?>? {

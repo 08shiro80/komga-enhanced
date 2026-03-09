@@ -400,12 +400,14 @@ class DownloadExecutor(
         }
 
       val mangaDexId = GalleryDlWrapper.extractMangaDexId(download.sourceUrl)
-      val existingFolder =
-        if (mangaDexId != null && download.libraryId != null) {
-          findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)
+      val lookupResult =
+        if (download.libraryId != null) {
+          findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId, mangaFolderName)
         } else {
           null
         }
+      val existingFolder = lookupResult?.folder
+      val komgaSeriesId = lookupResult?.komgaSeriesId
 
       val destinationPath =
         if (existingFolder != null) {
@@ -455,6 +457,7 @@ class DownloadExecutor(
           url = download.sourceUrl,
           destinationPath = destinationPath,
           libraryPath = library?.path,
+          komgaSeriesId = komgaSeriesId,
           isCancelled = isCancelled,
           onProcessStarted = { process -> setActiveProcess(download.id, process) },
         ) { progress ->
@@ -661,34 +664,54 @@ class DownloadExecutor(
     )
   }
 
+  private data class FolderLookupResult(
+    val folder: java.io.File,
+    val komgaSeriesId: String,
+  )
+
   private fun findExistingMangaFolder(
     libraryId: String,
     libraryPath: java.nio.file.Path,
-    mangaDexId: String,
-  ): java.io.File? {
-    val seriesId =
-      seriesMetadataRepository.findSeriesIdByLinkUrlContaining(libraryId, mangaDexId)
-    if (seriesId != null) {
-      val series = seriesRepository.findByIdOrNull(seriesId)
-      if (series != null && series.path.toFile().exists()) {
-        logger.info { "findExistingMangaFolder: found via DB link: ${series.path}" }
-        return series.path.toFile()
+    mangaDexId: String?,
+    mangaFolderName: String,
+  ): FolderLookupResult? {
+    if (mangaDexId != null) {
+      val seriesId =
+        seriesMetadataRepository.findSeriesIdByLinkUrlContaining(libraryId, mangaDexId)
+      if (seriesId != null) {
+        val series = seriesRepository.findByIdOrNull(seriesId)
+        if (series != null && series.path.toFile().exists()) {
+          logger.info { "findExistingMangaFolder: found via DB link: ${series.path}" }
+          return FolderLookupResult(series.path.toFile(), series.id)
+        }
       }
     }
 
-    val idWithSpaces = mangaDexId.replace("-", " ")
     val allSeries = seriesRepository.findAllByLibraryId(libraryId)
-    val byPath =
-      allSeries.firstOrNull { series ->
-        val path = series.url.toString()
-        path.contains(mangaDexId) || path.contains(idWithSpaces)
+
+    if (mangaDexId != null) {
+      val idWithSpaces = mangaDexId.replace("-", " ")
+      val byPath =
+        allSeries.firstOrNull { series ->
+          val path = series.url.toString()
+          path.contains(mangaDexId) || path.contains(idWithSpaces)
+        }
+      if (byPath != null && byPath.path.toFile().exists()) {
+        logger.info { "findExistingMangaFolder: found by DB path containing UUID: ${byPath.path}" }
+        return FolderLookupResult(byPath.path.toFile(), byPath.id)
       }
-    if (byPath != null && byPath.path.toFile().exists()) {
-      logger.info { "findExistingMangaFolder: found by DB path: ${byPath.path}" }
-      return byPath.path.toFile()
     }
 
-    logger.info { "findExistingMangaFolder: no existing folder found for $mangaDexId" }
+    val byFolderName =
+      allSeries.firstOrNull { series ->
+        series.path.fileName.toString() == mangaFolderName
+      }
+    if (byFolderName != null && byFolderName.path.toFile().exists()) {
+      logger.info { "findExistingMangaFolder: found by folder name: ${byFolderName.path}" }
+      return FolderLookupResult(byFolderName.path.toFile(), byFolderName.id)
+    }
+
+    logger.info { "findExistingMangaFolder: no existing folder found for ${mangaDexId ?: mangaFolderName}" }
     return null
   }
 
