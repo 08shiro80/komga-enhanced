@@ -40,6 +40,7 @@ dependencies {
   implementation(kotlin("reflect"))
 
   api(platform(SpringBootPlugin.BOM_COORDINATES))
+  api(platform("com.fasterxml.jackson:jackson-bom:2.21.1"))
 
   api("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")

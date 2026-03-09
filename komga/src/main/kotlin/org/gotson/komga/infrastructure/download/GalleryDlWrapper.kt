@@ -2060,37 +2060,43 @@ class GalleryDlWrapper(
     var updated = 0
     var renamedCount = 0
     val alreadyUpdated = mutableSetOf<String>()
-    for (chapter in allChapters) {
-      val chapterNumStr = chapter.chapterNumber ?: continue
-      val paddedNum = padChapterNumber(chapterNumStr)
+    val groupRegex = """\[([^\]]+)\]\s*$""".toRegex()
 
-      val chapterStr =
-        try {
-          val num = chapterNumStr.toDouble()
-          if (num == num.toLong().toDouble()) {
-            num.toLong().toString()
+    for (cbzFile in cbzFiles) {
+      if (cbzFile.absolutePath in alreadyUpdated) continue
+      val fileName = cbzFile.nameWithoutExtension
+      val nameLower = fileName.lowercase()
+      val isOldFormat = nameLower.startsWith("c") && !nameLower.startsWith("ch.")
+
+      val chapterNum = extractChapterNumFromFilename(nameLower) ?: continue
+      val fileGroup =
+        groupRegex
+          .find(fileName)
+          ?.groupValues
+          ?.get(1)
+          ?.trim()
+
+      val chapter =
+        allChapters.find { ch ->
+          val chNum = ch.chapterNumber ?: return@find false
+          val padded = padChapterNumber(chNum)
+          val plain =
+            try {
+              val n = chNum.toDouble()
+              if (n == n.toLong().toDouble()) n.toLong().toString() else chNum
+            } catch (_: NumberFormatException) {
+              chNum
+            }
+          val numMatch = chapterNum == padded || chapterNum == plain
+          if (!numMatch) return@find false
+          if (fileGroup != null) {
+            ch.scanlationGroup != null && fileGroup.equals(ch.scanlationGroup, ignoreCase = true)
           } else {
-            chapterNumStr
+            true
           }
-        } catch (_: NumberFormatException) {
-          chapterNumStr
-        }
-
-      val matchingCbz =
-        cbzFiles.find { file ->
-          val name = file.nameWithoutExtension.lowercase()
-          name == "c$paddedNum" ||
-            name.startsWith("c$paddedNum ") ||
-            name == "c$chapterStr" ||
-            name.startsWith("c$chapterStr ") ||
-            name == "ch. $paddedNum" ||
-            name.startsWith("ch. $paddedNum -") ||
-            name.startsWith("ch. $paddedNum ")
         } ?: continue
 
-      if (matchingCbz.absolutePath in alreadyUpdated) continue
-
-      if (!hasComicInfoXml(matchingCbz)) {
+      if (!hasComicInfoXml(cbzFile)) {
         try {
           val chapterInfo =
             ChapterInfo(
@@ -2102,21 +2108,23 @@ class GalleryDlWrapper(
               publishDate = chapter.publishDate,
               language = chapter.language,
             )
-          addComicInfoToCbzWithChapterInfo(matchingCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
-          alreadyUpdated.add(matchingCbz.absolutePath)
+          addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+          alreadyUpdated.add(cbzFile.absolutePath)
           updated++
-          logger.info { "Injected missing ComicInfo.xml into ${matchingCbz.name}" }
+          logger.info { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
         } catch (e: Exception) {
-          logger.debug { "Failed to update ComicInfo.xml in ${matchingCbz.name}: ${e.message}" }
+          logger.debug { "Failed to update ComicInfo.xml in ${cbzFile.name}: ${e.message}" }
         }
       }
 
-      val desiredName = buildDesiredCbzName(chapter)
-      val desiredFile = File(destDir, desiredName)
-      if (matchingCbz.name != desiredName && !desiredFile.exists()) {
-        if (matchingCbz.renameTo(desiredFile)) {
-          renamedCount++
-          logger.info { "Renamed existing ${matchingCbz.name} -> $desiredName" }
+      if (isOldFormat) {
+        val desiredName = buildDesiredCbzName(chapter)
+        val desiredFile = File(destDir, desiredName)
+        if (!desiredFile.exists()) {
+          if (cbzFile.renameTo(desiredFile)) {
+            renamedCount++
+            logger.info { "Renamed existing ${cbzFile.name} -> $desiredName" }
+          }
         }
       }
     }
@@ -2394,6 +2402,14 @@ class GalleryDlWrapper(
         }
       }
     }
+  }
+
+  private fun extractChapterNumFromFilename(nameLower: String): String? {
+    val cMatch = Regex("""^c(\d+(?:\.\d+)?)""").find(nameLower)
+    if (cMatch != null) return cMatch.groupValues[1]
+    val chMatch = Regex("""^ch\.\s*(\d+(?:\.\d+)?)""").find(nameLower)
+    if (chMatch != null) return chMatch.groupValues[1]
+    return null
   }
 
   private fun buildDesiredCbzName(chapter: ChapterDownloadInfo): String {
