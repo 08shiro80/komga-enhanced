@@ -43,6 +43,40 @@ class GalleryDlWrapper(
     lastMangaDexRequestTime = System.currentTimeMillis()
   }
 
+  fun getMangaDexChapterCount(mangaDexId: String): Int? =
+    try {
+      throttleMangaDexApi()
+      val pluginConfig =
+        pluginConfigRepository
+          .findByPluginId(pluginId)
+          .associate { it.configKey to it.configValue }
+      val language = pluginConfig["default_language"] ?: "en"
+      val feedUrl =
+        "https://api.mangadex.org/manga/$mangaDexId/feed?translatedLanguage[]=$language&limit=0"
+      val httpClient =
+        HttpClient
+          .newBuilder()
+          .connectTimeout(Duration.ofSeconds(10))
+          .build()
+      val request =
+        HttpRequest
+          .newBuilder()
+          .uri(URI.create(feedUrl))
+          .timeout(Duration.ofSeconds(10))
+          .GET()
+          .build()
+      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      if (response.statusCode() == 200) {
+        val json = objectMapper.readValue<Map<String, Any?>>(response.body())
+        (json["total"] as? Number)?.toInt()
+      } else {
+        null
+      }
+    } catch (e: Exception) {
+      logger.debug { "Failed to get MangaDex chapter count for $mangaDexId: ${e.message}" }
+      null
+    }
+
   fun isInstalled(): Boolean =
     try {
       val command = getGalleryDlCommand() + "--version"

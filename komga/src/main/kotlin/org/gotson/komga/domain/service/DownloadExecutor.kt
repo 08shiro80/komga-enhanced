@@ -399,40 +399,22 @@ class DownloadExecutor(
         }
 
       val mangaDexId = GalleryDlWrapper.extractMangaDexId(download.sourceUrl)
-      val mangaFolderName = mangaDexId ?: sanitizeFileName(download.title ?: "Unknown")
 
-      val lookupResult =
-        if (download.libraryId != null && mangaDexId != null) {
-          findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)
-        } else {
-          null
-        }
-      val existingFolder = lookupResult?.folder
-      val komgaSeriesId = lookupResult?.komgaSeriesId
+      val destinationPath: java.nio.file.Path
+      val komgaSeriesId: String?
 
-      val destinationPath =
-        if (existingFolder != null) {
-          if (existingFolder.name != mangaFolderName) {
-            val uuidPath = libraryPath.resolve(mangaFolderName)
-            if (!uuidPath.toFile().exists()) {
-              val renamed = existingFolder.renameTo(uuidPath.toFile())
-              if (renamed) {
-                logger.info { "Migrated folder to UUID name: ${existingFolder.name} -> $mangaFolderName" }
-                migrateCbzToGalleryDlFormat(uuidPath.toFile())
-                uuidPath
-              } else {
-                logger.warn { "Failed to migrate folder to UUID name, keeping: ${existingFolder.name}" }
-                existingFolder.toPath()
-              }
-            } else {
-              existingFolder.toPath()
-            }
+      if (mangaDexId != null) {
+        destinationPath = libraryPath.resolve(mangaDexId)
+        komgaSeriesId =
+          if (download.libraryId != null) {
+            findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)?.komgaSeriesId
           } else {
-            existingFolder.toPath()
+            null
           }
-        } else {
-          libraryPath.resolve(mangaFolderName)
-        }
+      } else {
+        destinationPath = libraryPath.resolve(sanitizeFileName(download.title ?: "Unknown"))
+        komgaSeriesId = null
+      }
 
       if (!destinationPath.toFile().exists()) {
         destinationPath.toFile().mkdirs()
@@ -440,6 +422,42 @@ class DownloadExecutor(
       }
 
       logger.info { "Starting download to: $destinationPath" }
+
+      if (mangaDexId != null) {
+        val existingCbzCount =
+          destinationPath
+            .toFile()
+            .listFiles()
+            ?.count { it.isFile && it.extension.lowercase() == "cbz" }
+            ?: 0
+        val apiChapterCount = galleryDlWrapper.getMangaDexChapterCount(mangaDexId)
+        if (apiChapterCount != null && apiChapterCount > 0 && existingCbzCount >= apiChapterCount) {
+          logger.info { "Pre-check: ${download.title} has $existingCbzCount CBZs, API reports $apiChapterCount chapters — skipping download" }
+          updateDownloadStatus(
+            download,
+            DownloadStatus.COMPLETED,
+            completedDate = LocalDateTime.now(),
+            progressPercent = 100,
+            destinationPath = destinationPath.toString(),
+          )
+          downloadProgressHandler.broadcastProgress(
+            DownloadProgressDto(
+              type = "completed",
+              downloadId = download.id,
+              mangaTitle = download.title,
+              url = download.sourceUrl,
+              status = "COMPLETED",
+              currentChapter = null,
+              totalChapters = apiChapterCount,
+              completedChapters = apiChapterCount,
+              filesDownloaded = 0,
+              percentage = 100,
+              error = null,
+            ),
+          )
+          return
+        }
+      }
 
       val isCancelled = { cancelledIds.contains(download.id) }
 

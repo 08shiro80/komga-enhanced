@@ -346,18 +346,27 @@ class ChapterChecker(
         val libraryDir = library.path.toFile()
         if (!libraryDir.exists()) return@forEach
 
+        val uuidFolder = java.io.File(libraryDir, mangaId)
+        if (uuidFolder.exists() && uuidFolder.isDirectory) {
+          totalCbzCount +=
+            uuidFolder
+              .listFiles()
+              ?.count { it.isFile && it.extension.lowercase() == "cbz" }
+              ?: 0
+          return@forEach
+        }
+
         libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { mangaDir ->
           val seriesJson = mangaDir.resolve("series.json")
           if (seriesJson.exists()) {
             try {
               val content = seriesJson.readText()
               if (content.contains(mangaId)) {
-                val cbzCount =
+                totalCbzCount +=
                   mangaDir
                     .listFiles()
                     ?.count { it.isFile && it.extension.lowercase() == "cbz" }
                     ?: 0
-                totalCbzCount += cbzCount
               }
             } catch (_: Exception) {
             }
