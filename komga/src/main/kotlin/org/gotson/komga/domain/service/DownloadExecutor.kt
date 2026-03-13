@@ -391,7 +391,6 @@ class DownloadExecutor(
           null
         }
 
-      val mangaFolderName = sanitizeFileName(download.title ?: "Unknown")
       val libraryPath =
         if (library != null) {
           library.path
@@ -400,55 +399,38 @@ class DownloadExecutor(
         }
 
       val mangaDexId = GalleryDlWrapper.extractMangaDexId(download.sourceUrl)
+      val mangaFolderName = mangaDexId ?: sanitizeFileName(download.title ?: "Unknown")
+
       val lookupResult =
-        if (download.libraryId != null) {
-          findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId, mangaFolderName)
+        if (download.libraryId != null && mangaDexId != null) {
+          findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)
         } else {
           null
         }
       val existingFolder = lookupResult?.folder
       val komgaSeriesId = lookupResult?.komgaSeriesId
 
-      val shouldRenameToTitle =
-        !GalleryDlWrapper.isUuidDerivedTitle(mangaFolderName)
-
       val destinationPath =
         if (existingFolder != null) {
-          if (shouldRenameToTitle && existingFolder.name != mangaFolderName) {
-            val correctPath = libraryPath.resolve(mangaFolderName)
-            if (!correctPath.toFile().exists()) {
-              val renamed = existingFolder.renameTo(correctPath.toFile())
+          if (existingFolder.name != mangaFolderName) {
+            val uuidPath = libraryPath.resolve(mangaFolderName)
+            if (!uuidPath.toFile().exists()) {
+              val renamed = existingFolder.renameTo(uuidPath.toFile())
               if (renamed) {
-                logger.info { "Renamed folder to correct title: ${existingFolder.name} -> $mangaFolderName" }
-                correctPath
+                logger.info { "Migrated folder to UUID name: ${existingFolder.name} -> $mangaFolderName" }
+                migrateCbzToGalleryDlFormat(uuidPath.toFile())
+                uuidPath
               } else {
-                logger.warn { "Failed to rename folder: ${existingFolder.name} -> $mangaFolderName" }
+                logger.warn { "Failed to migrate folder to UUID name, keeping: ${existingFolder.name}" }
                 existingFolder.toPath()
               }
             } else {
-              logger.info { "Correct folder already exists, moving files from ${existingFolder.name} -> $mangaFolderName" }
-              existingFolder.listFiles()?.forEach { file ->
-                val target = correctPath.resolve(file.name).toFile()
-                if (!target.exists()) {
-                  file.renameTo(target)
-                }
-              }
-              if (existingFolder.listFiles()?.isEmpty() == true) {
-                existingFolder.delete()
-                logger.info { "Removed empty folder: ${existingFolder.name}" }
-              }
-              correctPath
+              existingFolder.toPath()
             }
           } else {
-            if (!shouldRenameToTitle && existingFolder.name != mangaFolderName) {
-              logger.info { "Skipping rename: '$mangaFolderName' looks like a UUID-derived name, keeping '${existingFolder.name}'" }
-            }
             existingFolder.toPath()
           }
         } else {
-          if (!shouldRenameToTitle) {
-            logger.warn { "Download title '$mangaFolderName' looks UUID-derived, but no existing folder found — using it as fallback" }
-          }
           libraryPath.resolve(mangaFolderName)
         }
 
@@ -653,52 +635,166 @@ class DownloadExecutor(
   private fun findExistingMangaFolder(
     libraryId: String,
     libraryPath: java.nio.file.Path,
-    mangaDexId: String?,
-    mangaFolderName: String,
+    mangaDexId: String,
   ): FolderLookupResult? {
-    if (mangaDexId != null) {
-      val seriesId =
-        seriesMetadataRepository.findSeriesIdByLinkUrlContaining(libraryId, mangaDexId)
-      if (seriesId != null) {
-        val series = seriesRepository.findByIdOrNull(seriesId)
-        if (series != null && series.path.toFile().exists()) {
-          logger.info { "findExistingMangaFolder: found via DB link: ${series.path}" }
-          return FolderLookupResult(series.path.toFile(), series.id)
-        }
+    val uuidFolder = libraryPath.resolve(mangaDexId).toFile()
+    if (uuidFolder.exists()) {
+      val series =
+        seriesRepository
+          .findAllByLibraryId(libraryId)
+          .firstOrNull { it.path.toFile() == uuidFolder }
+      return FolderLookupResult(uuidFolder, series?.id ?: "")
+    }
+
+    val seriesId =
+      seriesMetadataRepository.findSeriesIdByLinkUrlContaining(libraryId, mangaDexId)
+    if (seriesId != null) {
+      val series = seriesRepository.findByIdOrNull(seriesId)
+      if (series != null && series.path.toFile().exists()) {
+        logger.info { "findExistingMangaFolder: found via DB link: ${series.path}" }
+        return FolderLookupResult(series.path.toFile(), series.id)
       }
     }
 
     val allSeries = seriesRepository.findAllByLibraryId(libraryId)
-
-    if (mangaDexId != null) {
-      val idWithSpaces = mangaDexId.replace("-", " ")
-      val byPath =
-        allSeries.firstOrNull { series ->
-          val path = series.url.toString()
-          path.contains(mangaDexId) || path.contains(idWithSpaces)
-        }
-      if (byPath != null && byPath.path.toFile().exists()) {
-        logger.info { "findExistingMangaFolder: found by DB path containing UUID: ${byPath.path}" }
-        return FolderLookupResult(byPath.path.toFile(), byPath.id)
-      }
-    }
-
-    val byFolderName =
+    val idWithSpaces = mangaDexId.replace("-", " ")
+    val byPath =
       allSeries.firstOrNull { series ->
-        series.path.fileName.toString() == mangaFolderName
+        val path = series.url.toString()
+        path.contains(mangaDexId) || path.contains(idWithSpaces)
       }
-    if (byFolderName != null && byFolderName.path.toFile().exists()) {
-      logger.info { "findExistingMangaFolder: found by folder name: ${byFolderName.path}" }
-      return FolderLookupResult(byFolderName.path.toFile(), byFolderName.id)
+    if (byPath != null && byPath.path.toFile().exists()) {
+      logger.info { "findExistingMangaFolder: found by path containing UUID: ${byPath.path}" }
+      return FolderLookupResult(byPath.path.toFile(), byPath.id)
     }
 
-    logger.info { "findExistingMangaFolder: no existing folder found for ${mangaDexId ?: mangaFolderName}" }
+    val libraryDir = libraryPath.toFile()
+    if (libraryDir.isDirectory) {
+      val match =
+        libraryDir
+          .listFiles()
+          ?.filter { it.isDirectory }
+          ?.firstOrNull { dir ->
+            val seriesJson = java.io.File(dir, "series.json")
+            seriesJson.exists() &&
+              try {
+                val content = seriesJson.readText()
+                content.contains(mangaDexId) || content.contains(idWithSpaces)
+              } catch (_: Exception) {
+                false
+              }
+          }
+      if (match != null) {
+        val series = allSeries.firstOrNull { it.path.toFile() == match }
+        logger.info { "findExistingMangaFolder: found by series.json scan: ${match.absolutePath}" }
+        return FolderLookupResult(match, series?.id ?: "")
+      }
+    }
+
     return null
   }
+
+  fun migrateLibraryToUuidFolders(libraryId: String): MigrationResult {
+    val library = libraryRepository.findByIdOrNull(libraryId) ?: return MigrationResult(0, 0)
+    val libraryDir = library.path.toFile()
+    if (!libraryDir.isDirectory) return MigrationResult(0, 0)
+
+    var foldersRenamed = 0
+    var cbzRenamed = 0
+
+    val folders =
+      libraryDir
+        .listFiles()
+        ?.filter { it.isDirectory }
+        ?: return MigrationResult(0, 0)
+
+    for (folder in folders) {
+      if (MANGADEX_UUID_REGEX.matches(folder.name)) continue
+
+      val seriesJson = java.io.File(folder, "series.json")
+      if (!seriesJson.exists()) continue
+
+      val content =
+        try {
+          seriesJson.readText()
+        } catch (_: Exception) {
+          continue
+        }
+
+      val mangaDexId = extractMangaDexIdFromSeriesJson(content) ?: continue
+      val uuidFolder = java.io.File(libraryDir, mangaDexId)
+      if (uuidFolder.exists()) continue
+
+      if (folder.renameTo(uuidFolder)) {
+        foldersRenamed++
+        logger.info { "Migrated folder: ${folder.name} -> $mangaDexId" }
+        cbzRenamed += migrateCbzToGalleryDlFormat(uuidFolder)
+      } else {
+        logger.warn { "Failed to migrate folder: ${folder.name}" }
+      }
+    }
+
+    if (foldersRenamed > 0) {
+      logger.info { "Migration complete: $foldersRenamed folders, $cbzRenamed CBZs renamed" }
+    }
+
+    return MigrationResult(foldersRenamed, cbzRenamed)
+  }
+
+  private fun migrateCbzToGalleryDlFormat(folder: java.io.File): Int {
+    val chPattern = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*?\[([^\]]+)\]\.cbz$""")
+    val chNoGroup = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*\.cbz$""")
+    var renamed = 0
+
+    val cbzFiles =
+      folder
+        .listFiles()
+        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+        ?: return 0
+
+    for (cbz in cbzFiles) {
+      val matchGroup = chPattern.find(cbz.name)
+      val matchNoGroup = if (matchGroup == null) chNoGroup.find(cbz.name) else null
+
+      val newName =
+        if (matchGroup != null) {
+          val num = matchGroup.groupValues[1]
+          val group = matchGroup.groupValues[2]
+          "c$num [$group].cbz"
+        } else if (matchNoGroup != null) {
+          val num = matchNoGroup.groupValues[1]
+          "c$num.cbz"
+        } else {
+          continue
+        }
+
+      val target = java.io.File(folder, newName)
+      if (!target.exists() && cbz.renameTo(target)) {
+        renamed++
+        logger.info { "Migrated CBZ: ${cbz.name} -> $newName" }
+      }
+    }
+
+    return renamed
+  }
+
+  private fun extractMangaDexIdFromSeriesJson(content: String): String? {
+    val match = Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
+    return match?.groupValues?.get(1)
+  }
+
+  data class MigrationResult(
+    val foldersRenamed: Int,
+    val cbzRenamed: Int,
+  )
 
   private fun sanitizeFileName(name: String): String =
     name
       .replace(Regex("[\\\\/:*?\"<>|]"), "")
       .trim()
       .trimEnd('.')
+
+  companion object {
+    private val MANGADEX_UUID_REGEX = Regex("""^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$""")
+  }
 }

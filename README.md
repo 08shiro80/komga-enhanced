@@ -15,6 +15,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 | Manually downloading manga | **Automatic downloads** via gallery-dl — supports MangaDex, mangahere, hdoujin, senmanga, weebdex, and [250+ more sites](https://github.com/mikf/gallery-dl/blob/master/docs/supportedsites.md) |
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
 | Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
+| Title changes cause re-downloads | **UUID folder names** - MangaDex UUID as folder name, immune to title changes |
 | Unwanted chapters keep re-downloading | **Chapter blacklist** - permanently block chapters from being downloaded |
 | Syncing MangaDex subscriptions | **MangaDex Subscription Sync** auto-downloads from your feed |
 | Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
@@ -32,6 +33,7 @@ Download manga from MangaDex, mangahere, hdoujin, senmanga, weebdex, and any sit
 - **Queue-based downloads** with priority support
 - **Real-time progress** via Server-Sent Events (SSE)
 - **ComicInfo.xml injection** - metadata embedded in every CBZ
+- **UUID folder names** - uses MangaDex UUID as folder name, immune to title changes and mislabeled titles
 - **Crash recovery** - skips already-downloaded chapters via DB + filesystem checks
 - **Rate limiting** - respects site-specific API limits
 - **Multi-language support** - download chapters in your preferred language
@@ -176,6 +178,7 @@ Never download the same chapter twice:
 | GET | `/api/v1/downloads/progress` | SSE progress stream |
 | POST | `/api/v1/downloads/check-new` | Check for new chapters and queue |
 | POST | `/api/v1/downloads/check-only` | Check for new chapters only |
+| POST | `/api/v1/downloads/{libraryId}/migrate-to-uuid` | Migrate title folders to UUID names |
 
 ### Chapter Blacklist
 

@@ -6,7 +6,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.0.9] - 2026-03-09
+## [0.0.9] - 2026-03-11
 
 ### New Features
 - **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Uses the new CustomList-based subscription API instead of polling each manga individually. On first setup, creates a "Komga Subscriptions" CustomList and subscribes to it. Periodic feed checks (default every 30 min) query `GET /subscription/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
@@ -27,14 +27,25 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **Bulk re-download when MangaDex chapter API returns empty** — If `fetchAllChaptersFromMangaDex` returned an empty list (API error/timeout), the code fell into the gallery-dl bulk download path, re-downloading all chapters. Now returns early for MangaDex URLs when the chapter API returns empty, preventing accidental full re-downloads.
 - **Paid/unavailable chapters retried indefinitely** — Chapters from paid services (e.g. J-Novel Club) always fail with exit code 4 but were retried every time the download ran. Now tracks failures in `.chapter-failures.json` per manga folder and auto-blacklists chapters after 3 failed attempts.
 
+### Changed
+- **UUID folder names for MangaDex downloads** — Download folders now use the MangaDex UUID as folder name instead of the manga title. This eliminates re-downloads caused by MangaDex title changes. Existing title-based folders are automatically migrated to UUID names on next download. Series title in Komga still comes from `series.json`, not the folder name.
+- **No more CBZ file renaming** — gallery-dl's native filenames (e.g. `c005 [No Group Scanlation].cbz`) are kept as-is instead of being renamed to `Ch. 005 - Long Title [Group].cbz`. Shorter, avoids conflicts between groups with same chapter numbers.
+- **Dockerfile fix** — Removed `dpkg-architecture` call that caused build failure (exit code 127), changed `WORKDIR app` to `WORKDIR /app`.
+
+### Removed
+- `buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle` — dead code after removing CBZ rename logic
+
 ### New Features
 - **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `GalleryDlWrapper.kt` | `parseGalleryDlJson()` handles message types 2/3/6, collects `queuedChapters` from Queue messages, `deriveTitleFromUrl()` fallback, `getGalleryDlPath()`/`applyGalleryDlEnv()` for PYTHONPATH, extracted `extractMetadataFields()` helper, non-MangaDex per-chapter download, `.chapter-failures.json` tracking + auto-blacklist after 3 failures, block bulk download when MangaDex chapter API returns empty |
-| `DownloadExecutor.kt` | Rename/move download folder from "Unknown" to correct title after download completes, `findExistingMangaFolder()` searches folder names AND series.json for MangaDex UUID (hyphens/spaces), full debug logging |
+| `GalleryDlWrapper.kt` | Removed all CBZ rename logic (`buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle`, `UUID_PATTERN`), `updateExistingCbzChapterUrls` now only injects ComicInfo.xml without renaming |
+| `DownloadExecutor.kt` | Folder name = MangaDex UUID (fallback: sanitized title for non-MangaDex), simplified `findExistingMangaFolder` (UUID folder check first, then DB + series.json lookup), `migrateLibraryToUuidFolders()` one-time migration with CBZ rename (`Ch. XXX - Title [Group].cbz` → `cXXX [Group].cbz`), `migrateCbzToGalleryDlFormat()` |
+| `DownloadController.kt` | New endpoint `POST /{libraryId}/migrate-to-uuid` for manual migration trigger |
+| `Dockerfile.tpl` | Removed `dpkg-architecture` RUN, `WORKDIR /app` instead of `WORKDIR app` |
+| `README.md` | Added UUID folder names to feature list, migration endpoint to API table |
 | `MetadataSearchDialog.vue` | `applyMetadata()` now calls series metadata update API instead of just emitting event |
 | `BrowseSeries.vue` | Wired `@search-metadata` event to open MetadataSearchDialog, reload series on apply |
 | `SeriesActionsMenu.vue` | "Search Online Metadata" opens EditSeriesDialog on metadata tab via Vuex |

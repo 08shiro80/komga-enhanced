@@ -58,36 +58,6 @@ class GalleryDlWrapper(
       false
     }
 
-  fun getEnglishTitleForFolderName(url: String): String {
-    try {
-      val mangaInfo = getChapterInfo(url) // This now throws with detailed errors
-      val title = mangaInfo.title
-
-      val sanitized =
-        title
-          .replace(Regex("""[\\/:*?"<>|]"""), " ")
-          .replace(Regex("""\s+"""), " ") // Collapse multiple spaces
-          .trim()
-
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.INFO,
-        "Extracted English title for folder: '$sanitized' from URL: $url",
-      )
-
-      return sanitized
-    } catch (e: Exception) {
-      val errorMsg = "Failed to extract English title from $url: ${e.message}"
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.ERROR,
-        errorMsg,
-        e.stackTraceToString(),
-      )
-      logger.error(e) { errorMsg }
-
-      return "Unknown"
-    }
-  }
-
   private fun fetchMangaDexMetadata(mangaId: String): MangaInfo? {
     try {
       val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
@@ -264,14 +234,8 @@ class GalleryDlWrapper(
 
   companion object {
     private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
-    private val UUID_PATTERN = """[a-f0-9]{8}[- ][a-f0-9]{4}[- ][a-f0-9]{4}[- ][a-f0-9]{4}[- ][a-f0-9]{12}""".toRegex()
 
     fun extractMangaDexId(url: String): String? = MANGADEX_ID_REGEX.find(url)?.groupValues?.get(1)
-
-    fun isUuidDerivedTitle(title: String): Boolean {
-      val lower = title.lowercase().trim()
-      return lower.startsWith("mangadex - ") && UUID_PATTERN.containsMatchIn(lower)
-    }
   }
 
   private fun downloadMangaCover(
@@ -744,13 +708,6 @@ class GalleryDlWrapper(
       logger.info { "Fetching metadata for $url" }
       var mangaInfo = getChapterInfo(url)
 
-      if (isUuidDerivedTitle(mangaInfo.title)) {
-        val folderName = destinationPath.fileName.toString()
-        if (folderName.isNotBlank() && !isUuidDerivedTitle(folderName)) {
-          logger.info { "Overriding UUID-derived title '${mangaInfo.title}' with folder name: $folderName" }
-          mangaInfo = mangaInfo.copy(title = folderName)
-        }
-      }
       logger.info { "Using title: ${mangaInfo.title}" }
 
       val destDir = destinationPath.toFile()
@@ -1053,18 +1010,6 @@ class GalleryDlWrapper(
                   language = matched.language,
                 )
               addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, matched.chapterUrl)
-
-              val desiredName = buildDesiredCbzName(matched)
-              val desiredFile = File(destDir, desiredName)
-              if (cbzFile.name != desiredName) {
-                if (desiredFile.exists()) {
-                  cbzFile.delete()
-                  logger.info { "Deleted duplicate ${cbzFile.name} ($desiredName already exists)" }
-                } else {
-                  cbzFile.renameTo(desiredFile)
-                  logger.info { "Renamed ${cbzFile.name} -> $desiredName" }
-                }
-              }
             } else {
               val cbzNameNoExt = cbzFile.nameWithoutExtension
               val galleryDlMatch = galleryDlChapterMap[cbzNameNoExt]
@@ -1080,18 +1025,6 @@ class GalleryDlWrapper(
                     language = galleryDlMatch.language,
                   )
                 addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, galleryDlMatch.chapterUrl)
-
-                val desiredName = buildDesiredCbzName(galleryDlMatch)
-                val desiredFile = File(destDir, desiredName)
-                if (cbzFile.name != desiredName) {
-                  if (desiredFile.exists()) {
-                    cbzFile.delete()
-                    logger.info { "Deleted duplicate ${cbzFile.name} ($desiredName already exists)" }
-                  } else {
-                    cbzFile.renameTo(desiredFile)
-                    logger.info { "Renamed ${cbzFile.name} -> $desiredName" }
-                  }
-                }
               } else {
                 addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
               }
@@ -1246,16 +1179,7 @@ class GalleryDlWrapper(
                       language = chapter.language,
                     )
                   addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
-
-                  val desiredName = buildDesiredCbzName(chapter)
-                  val desiredFile = File(destDir, desiredName)
-
-                  if (targetCbz.name != desiredName && !desiredFile.exists()) {
-                    targetCbz.renameTo(desiredFile)
-                    logger.info { "Renamed ${targetCbz.name} -> $desiredName" }
-                  } else {
-                    logger.info { "Processed ${targetCbz.name}" }
-                  }
+                  logger.info { "Processed ${targetCbz.name}" }
                 } catch (e: Exception) {
                   logger.warn(e) { "Failed to process CBZ ${targetCbz.name}" }
                 }
@@ -2058,16 +1982,15 @@ class GalleryDlWrapper(
         ?: return
 
     var updated = 0
-    var renamedCount = 0
     val alreadyUpdated = mutableSetOf<String>()
     val groupRegex = """\[([^\]]+)\]\s*$""".toRegex()
 
     for (cbzFile in cbzFiles) {
       if (cbzFile.absolutePath in alreadyUpdated) continue
+      if (hasComicInfoXml(cbzFile)) continue
+
       val fileName = cbzFile.nameWithoutExtension
       val nameLower = fileName.lowercase()
-      val isOldFormat = nameLower.startsWith("c") && !nameLower.startsWith("ch.")
-
       val chapterNum = extractChapterNumFromFilename(nameLower) ?: continue
       val fileGroup =
         groupRegex
@@ -2096,41 +2019,28 @@ class GalleryDlWrapper(
           }
         } ?: continue
 
-      if (!hasComicInfoXml(cbzFile)) {
-        try {
-          val chapterInfo =
-            ChapterInfo(
-              chapterNumber = chapter.chapterNumber,
-              chapterTitle = chapter.chapterTitle,
-              volume = chapter.volume,
-              pages = chapter.pages,
-              scanlationGroup = chapter.scanlationGroup,
-              publishDate = chapter.publishDate,
-              language = chapter.language,
-            )
-          addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
-          alreadyUpdated.add(cbzFile.absolutePath)
-          updated++
-          logger.info { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
-        } catch (e: Exception) {
-          logger.debug { "Failed to update ComicInfo.xml in ${cbzFile.name}: ${e.message}" }
-        }
-      }
-
-      if (isOldFormat) {
-        val desiredName = buildDesiredCbzName(chapter)
-        val desiredFile = File(destDir, desiredName)
-        if (!desiredFile.exists()) {
-          if (cbzFile.renameTo(desiredFile)) {
-            renamedCount++
-            logger.info { "Renamed existing ${cbzFile.name} -> $desiredName" }
-          }
-        }
+      try {
+        val chapterInfo =
+          ChapterInfo(
+            chapterNumber = chapter.chapterNumber,
+            chapterTitle = chapter.chapterTitle,
+            volume = chapter.volume,
+            pages = chapter.pages,
+            scanlationGroup = chapter.scanlationGroup,
+            publishDate = chapter.publishDate,
+            language = chapter.language,
+          )
+        addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+        alreadyUpdated.add(cbzFile.absolutePath)
+        updated++
+        logger.info { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
+      } catch (e: Exception) {
+        logger.debug { "Failed to update ComicInfo.xml in ${cbzFile.name}: ${e.message}" }
       }
     }
 
-    if (updated > 0 || renamedCount > 0) {
-      logger.info { "Existing CBZ update: $updated ComicInfo injected, $renamedCount renamed" }
+    if (updated > 0) {
+      logger.info { "Existing CBZ update: $updated ComicInfo injected" }
     }
   }
 
@@ -2411,34 +2321,6 @@ class GalleryDlWrapper(
     if (chMatch != null) return chMatch.groupValues[1]
     return null
   }
-
-  private fun buildDesiredCbzName(chapter: ChapterDownloadInfo): String {
-    val chapterNumStr = chapter.chapterNumber ?: "000"
-    val paddedNum = padChapterNumber(chapterNumStr)
-
-    val titlePart =
-      if (!chapter.chapterTitle.isNullOrBlank()) {
-        " - ${sanitizeFsName(chapter.chapterTitle)}"
-      } else {
-        ""
-      }
-
-    val groupPart =
-      if (!chapter.scanlationGroup.isNullOrBlank()) {
-        " [${sanitizeFsName(chapter.scanlationGroup)}]"
-      } else {
-        ""
-      }
-
-    return "Ch. $paddedNum$titlePart$groupPart.cbz"
-  }
-
-  private fun sanitizeFsName(name: String): String =
-    name
-      .replace(Regex("""[\\/:*?"<>|]"""), " ")
-      .replace(Regex("""\s+"""), " ")
-      .trim()
-      .trimEnd('.')
 }
 
 data class MangaInfo(

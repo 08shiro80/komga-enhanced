@@ -268,6 +268,20 @@ class DownloadController(
       .body(mapOf("message" to "Follow list check started in background"))
   }
 
+  @PostMapping("{libraryId}/migrate-to-uuid")
+  @Operation(summary = "Migrate title-based folders to UUID folder names", tags = [TagNames.DOWNLOADS])
+  fun migrateToUuidFolders(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, Any>> {
+    val result = downloadExecutor.migrateLibraryToUuidFolders(libraryId)
+    return ResponseEntity.ok(
+      mapOf(
+        "foldersRenamed" to result.foldersRenamed,
+        "cbzRenamed" to result.cbzRenamed,
+      ),
+    )
+  }
+
   @PostMapping("follow-txt/{libraryId}/sync-to-mangadex")
   @Operation(summary = "Upload follow.txt MangaDex URLs to MangaDex follows list", tags = [TagNames.DOWNLOADS])
   fun syncFollowsToMangaDex(
