@@ -779,8 +779,10 @@ class DownloadExecutor(
   }
 
   private fun extractMangaDexIdFromSeriesJson(content: String): String? {
-    val match = Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
-    return match?.groupValues?.get(1)
+    val comicIdMatch = Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""").find(content)
+    if (comicIdMatch != null) return comicIdMatch.groupValues[1]
+    val urlMatch = Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
+    return urlMatch?.groupValues?.get(1)
   }
 
   data class MigrationResult(
