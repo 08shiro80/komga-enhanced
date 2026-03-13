@@ -181,8 +181,10 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: docker-build
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ${{ inputs.docker_private && '08shiro80/komga-private' || '08shiro80/komga' }}:latest
             ${{ inputs.docker_private && '08shiro80/komga-private' || '08shiro80/komga' }}:${{ steps.versions.outputs.version_next }}

@@ -709,7 +709,10 @@ class DownloadExecutor(
         ?: return MigrationResult(0, 0)
 
     for (folder in folders) {
-      if (MANGADEX_UUID_REGEX.matches(folder.name)) continue
+      if (MANGADEX_UUID_REGEX.matches(folder.name)) {
+        cbzRenamed += migrateCbzToGalleryDlFormat(folder)
+        continue
+      }
 
       val seriesJson = java.io.File(folder, "series.json")
       if (!seriesJson.exists()) continue
@@ -734,7 +737,7 @@ class DownloadExecutor(
       }
     }
 
-    if (foldersRenamed > 0) {
+    if (foldersRenamed > 0 || cbzRenamed > 0) {
       logger.info { "Migration complete: $foldersRenamed folders, $cbzRenamed CBZs renamed" }
     }
 
@@ -742,8 +745,10 @@ class DownloadExecutor(
   }
 
   private fun migrateCbzToGalleryDlFormat(folder: java.io.File): Int {
-    val chPattern = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*?\[([^\]]+)\]\.cbz$""")
-    val chNoGroup = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*\.cbz$""")
+    val chTitleGroup = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*?\[([^\]]+)\]\.cbz$""")
+    val chGroupOnly = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*\[([^\]]+)\]\.cbz$""")
+    val chTitleOnly = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*\.cbz$""")
+    val chPlain = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\.cbz$""")
     var renamed = 0
 
     val cbzFiles =
@@ -753,20 +758,24 @@ class DownloadExecutor(
         ?: return 0
 
     for (cbz in cbzFiles) {
-      val matchGroup = chPattern.find(cbz.name)
-      val matchNoGroup = if (matchGroup == null) chNoGroup.find(cbz.name) else null
+      val match =
+        chTitleGroup.find(cbz.name)
+          ?: chGroupOnly.find(cbz.name)
+          ?: chTitleOnly.find(cbz.name)
+          ?: chPlain.find(cbz.name)
+          ?: continue
+
+      val num = match.groupValues[1]
+      val group = match.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }
 
       val newName =
-        if (matchGroup != null) {
-          val num = matchGroup.groupValues[1]
-          val group = matchGroup.groupValues[2]
+        if (group != null) {
           "c$num [$group].cbz"
-        } else if (matchNoGroup != null) {
-          val num = matchNoGroup.groupValues[1]
-          "c$num.cbz"
         } else {
-          continue
+          "c$num.cbz"
         }
+
+      if (cbz.name == newName) continue
 
       val target = java.io.File(folder, newName)
       if (!target.exists() && cbz.renameTo(target)) {

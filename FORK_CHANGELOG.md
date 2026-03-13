@@ -6,7 +6,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.0.9] - 2026-03-11
+## [0.0.9] - 2026-03-13
 
 ### New Features
 - **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Uses the new CustomList-based subscription API instead of polling each manga individually. On first setup, creates a "Komga Subscriptions" CustomList and subscribes to it. Periodic feed checks (default every 30 min) query `GET /subscription/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
@@ -32,8 +32,14 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **No more CBZ file renaming** — gallery-dl's native filenames (e.g. `c005 [No Group Scanlation].cbz`) are kept as-is instead of being renamed to `Ch. 005 - Long Title [Group].cbz`. Shorter, avoids conflicts between groups with same chapter numbers.
 - **Dockerfile fix** — Removed `dpkg-architecture` call that caused build failure (exit code 127), changed `WORKDIR app` to `WORKDIR /app`.
 
+### Performance
+- **Docker build ~50% faster** — Pre-built kepubify binary instead of Go compilation (~6 min saved), runtime libs instead of -dev packages, removed `apt-get upgrade`, dropped arm/v7 (32-bit ARM), added GitHub Actions Docker layer cache (`cache-from/cache-to: type=gha`)
+- **Sass 1.79 migration** — Bumped `sass` from `^1.32.13` to `~1.79.0` so `silenceDeprecations: ['slash-div']` in vue.config.js takes effect, eliminating ~475 Vuetify SASS deprecation warnings during frontend build
+
 ### Removed
 - `buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle` — dead code after removing CBZ rename logic
+- **arm/v7 (32-bit ARM) Docker platform** — barely used, extremely slow under QEMU emulation. arm64 and amd64 remain.
+- **Go toolchain from Docker build** — kepubify is now downloaded as pre-built binary from GitHub releases instead of compiled from source
 
 ### New Features
 - **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
@@ -44,7 +50,9 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `GalleryDlWrapper.kt` | Removed all CBZ rename logic (`buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle`, `UUID_PATTERN`), `updateExistingCbzChapterUrls` now only injects ComicInfo.xml without renaming |
 | `DownloadExecutor.kt` | Folder name = MangaDex UUID (fallback: sanitized title for non-MangaDex), simplified `findExistingMangaFolder` (UUID folder check first, then DB + series.json lookup), `migrateLibraryToUuidFolders()` one-time migration with CBZ rename (`Ch. XXX - Title [Group].cbz` → `cXXX [Group].cbz`), `migrateCbzToGalleryDlFormat()` |
 | `DownloadController.kt` | New endpoint `POST /{libraryId}/migrate-to-uuid` for manual migration trigger |
-| `Dockerfile.tpl` | Removed `dpkg-architecture` RUN, `WORKDIR /app` instead of `WORKDIR app` |
+| `Dockerfile.tpl` | Pre-built kepubify binary, runtime libs statt -dev, removed apt-get upgrade, removed arm/v7 stage |
+| `release.yml` | Dropped `linux/arm/v7` platform, added Docker layer cache (`cache-from/cache-to: type=gha`) |
+| `package.json` | `sass` bumped from `^1.32.13` to `~1.79.0` |
 | `README.md` | Added UUID folder names to feature list, migration endpoint to API table |
 | `MetadataSearchDialog.vue` | `applyMetadata()` now calls series metadata update API instead of just emitting event |
 | `BrowseSeries.vue` | Wired `@search-metadata` event to open MetadataSearchDialog, reload series on apply |
