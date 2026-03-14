@@ -816,34 +816,6 @@ class GalleryDlWrapper(
       val urlsFromCbz = extractChapterUrlsFromCbzFiles(destDir)
       logger.info { "CBZ ComicInfo check: Found ${urlsFromCbz.size} chapter URLs in existing CBZ files" }
 
-      val existingCbzFiles =
-        destDir
-          .listFiles()
-          ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
-          ?.map { it.nameWithoutExtension.lowercase() }
-          ?.toSet()
-          ?: emptySet()
-      logger.info { "File system check: Found ${existingCbzFiles.size} existing CBZ files" }
-
-      val chaptersByNumber = allChapters.groupBy { it.chapterNumber }
-      val multiGroupChapterNumbers =
-        chaptersByNumber
-          .filter { (_, chaps) -> chaps.map { it.scanlationGroup }.distinct().size > 1 }
-          .keys
-          .toSet()
-      if (multiGroupChapterNumbers.isNotEmpty()) {
-        logger.info { "Multi-group chapters detected: ${multiGroupChapterNumbers.size} chapter numbers with multiple groups" }
-      }
-
-      val multiVolumeChapterNumbers =
-        chaptersByNumber
-          .filter { (_, chaps) -> chaps.map { it.volume }.distinct().size > 1 }
-          .keys
-          .toSet()
-      if (multiVolumeChapterNumbers.isNotEmpty()) {
-        logger.info { "Multi-volume chapters detected: ${multiVolumeChapterNumbers.size} chapter numbers across multiple volumes" }
-      }
-
       val blacklistedUrls = blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
 
       val chapters =
@@ -854,75 +826,10 @@ class GalleryDlWrapper(
           }
 
           if (chapter.chapterUrl in urlsFromCbz) {
-            logger.debug { "Skipping chapter ${chapter.chapterNumber} - URL found in existing CBZ" }
             return@filter false
           }
 
-          val chapterNumStr = chapter.chapterNumber ?: return@filter true
-          val chapterStr =
-            try {
-              val num = chapterNumStr.toDouble()
-              if (num == num.toLong().toDouble()) {
-                num.toLong().toString()
-              } else {
-                chapterNumStr
-              }
-            } catch (_: NumberFormatException) {
-              chapterNumStr
-            }
-
-          val paddedNum = padChapterNumber(chapterNumStr)
-
-          val groupTag = chapter.scanlationGroup?.lowercase()
-
-          if (chapterNumStr in multiVolumeChapterNumbers) {
-            logger.debug { "Chapter $chapterStr vol=${chapter.volume} [${chapter.scanlationGroup}] — multi-volume, skipping filename match" }
-            return@filter true
-          }
-
-          val volumeTag = chapter.volume?.lowercase()
-
-          val alreadyExists =
-            existingCbzFiles.any { name ->
-              val chapterPart =
-                if (name.matches(Regex("^v\\d+ .+"))) {
-                  name.substringAfter(" ")
-                } else {
-                  name
-                }
-
-              val matchesChapterNum =
-                chapterPart == "c$chapterStr" ||
-                  chapterPart == "c$chapterNumStr" ||
-                  chapterPart == "c$paddedNum" ||
-                  chapterPart.startsWith("c$chapterStr ") ||
-                  chapterPart.startsWith("c$chapterNumStr ") ||
-                  chapterPart.startsWith("c$paddedNum ") ||
-                  chapterPart == "ch. $paddedNum" ||
-                  chapterPart.startsWith("ch. $paddedNum -") ||
-                  chapterPart.startsWith("ch. $paddedNum ") ||
-                  chapterPart == "chapter$chapterStr" ||
-                  chapterPart == "chapter $chapterStr" ||
-                  chapterPart == "ch$chapterStr" ||
-                  chapterPart == "ch $chapterStr"
-
-              if (!matchesChapterNum) return@any false
-
-              if (volumeTag != null && name.matches(Regex("^v\\d+ .+"))) {
-                val fileVolume = name.substringBefore(" ").removePrefix("v")
-                if (fileVolume != volumeTag) return@any false
-              }
-
-              if (groupTag == null) return@any true
-              name.contains("[$groupTag]")
-            }
-
-          if (alreadyExists) {
-            logger.debug { "Skipping chapter $chapterStr [${chapter.scanlationGroup}] - CBZ file already exists" }
-          } else {
-            logger.info { "Chapter $chapterStr [${chapter.scanlationGroup}] not found on disk — will download (url: ${chapter.chapterUrl})" }
-          }
-          !alreadyExists
+          true
         }
 
       val skippedByUrl = allChapters.count { it.chapterUrl in urlsFromCbz }
@@ -931,7 +838,7 @@ class GalleryDlWrapper(
       if (skippedCount > 0) {
         logger.info {
           "Skipping $skippedCount already downloaded chapters, ${chapters.size} remaining to download " +
-            "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist, by filename: ${skippedCount - skippedByUrl - skippedByBlacklist})"
+            "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist)"
         }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Skipping $skippedCount already downloaded chapters")
 
@@ -1222,19 +1129,17 @@ class GalleryDlWrapper(
                   .filter { System.currentTimeMillis() - it.lastModified() < 120_000 }
                   .sortedByDescending { it.lastModified() }
 
+              fun matchesChapter(name: String): Boolean {
+                val chapterPart =
+                  if (name.matches(Regex("^v\\d+ .+"))) name.substringAfter(" ") else name
+                return chapterPart.startsWith("c$paddedChapter ") || chapterPart == "c$paddedChapter" ||
+                  chapterPart.startsWith("c$chapterStr ") || chapterPart == "c$chapterStr" ||
+                  chapterPart.startsWith("ch. $paddedChapter ") || chapterPart.startsWith("ch. $paddedChapter-") || chapterPart == "ch. $paddedChapter"
+              }
+
               val targetCbz =
-                recentCbzFiles.find { file ->
-                  val name = file.nameWithoutExtension.lowercase()
-                  name.startsWith("c$paddedChapter ") || name == "c$paddedChapter" ||
-                    name.startsWith("c$chapterStr ") || name == "c$chapterStr" ||
-                    name.startsWith("ch. $paddedChapter ") || name.startsWith("ch. $paddedChapter-") || name == "ch. $paddedChapter"
-                }
-                  ?: cbzFiles.find { file ->
-                    val name = file.nameWithoutExtension.lowercase()
-                    name.startsWith("c$paddedChapter ") || name == "c$paddedChapter" ||
-                      name.startsWith("c$chapterStr ") || name == "c$chapterStr" ||
-                      name.startsWith("ch. $paddedChapter ") || name.startsWith("ch. $paddedChapter-") || name == "ch. $paddedChapter"
-                  }
+                recentCbzFiles.find { matchesChapter(it.nameWithoutExtension.lowercase()) }
+                  ?: cbzFiles.find { matchesChapter(it.nameWithoutExtension.lowercase()) }
 
               if (targetCbz == null) {
                 logger.warn { "Could not find CBZ file for chapter $chapterNum (expected c$paddedChapter or c$chapterStr)" }

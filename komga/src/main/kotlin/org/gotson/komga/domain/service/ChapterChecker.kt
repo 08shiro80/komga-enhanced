@@ -195,16 +195,14 @@ class ChapterChecker(
       val apiChapterCount = feedResult.chapterCount
       val title = feedResult.title
 
-      val downloadedCount = countDownloadedChapters(url, mangaId)
+      val downloadedCount = countDownloadedChapters(mangaId)
       val filesystemCount = countFilesystemChapters(url)
-
       val blacklistedCount = countBlacklistedChapters(mangaId)
-      val knownCount = filesystemCount + blacklistedCount
+      val knownCount = maxOf(downloadedCount, filesystemCount) + blacklistedCount
 
       logger.info {
         "Chapter check for ${title ?: mangaId}: api=$apiChapterCount, " +
-          "db=$downloadedCount, fs=$filesystemCount, blacklisted=$blacklistedCount, " +
-          "known=$knownCount"
+          "db=$downloadedCount, fs=$filesystemCount, blacklisted=$blacklistedCount, known=$knownCount"
       }
 
       val newChaptersEstimate = maxOf(0, apiChapterCount - knownCount)
@@ -320,18 +318,24 @@ class ChapterChecker(
     }
   }
 
-  private fun countDownloadedChapters(
-    url: String,
-    mangaId: String,
-  ): Int =
-    try {
-      chapterUrlRepository
-        .findAll()
-        .count { it.url.contains(mangaId) }
-    } catch (e: Exception) {
-      logger.warn(e) { "Error counting downloaded chapters for $mangaId, falling back to 0" }
-      0
+  private fun findSeriesForManga(mangaId: String): org.gotson.komga.domain.model.Series? {
+    val byUuid = seriesRepository.findByMangaDexUuid(mangaId)
+    if (byUuid != null) return byUuid
+
+    val folder = findMangaFolder(mangaId) ?: return null
+    libraryRepository.findAll().forEach { library ->
+      if (folder.absolutePath.startsWith(library.path.toFile().absolutePath)) {
+        val folderUrl = folder.toURI().toURL()
+        return seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, folderUrl)
+      }
     }
+    return null
+  }
+
+  private fun countDownloadedChapters(mangaId: String): Int {
+    val series = findSeriesForManga(mangaId) ?: return 0
+    return chapterUrlRepository.countBySeriesId(series.id).toInt()
+  }
 
   private fun countFilesystemChapters(url: String): Int {
     val mangaId = GalleryDlWrapper.extractMangaDexId(url) ?: return 0
@@ -371,24 +375,8 @@ class ChapterChecker(
   }
 
   private fun countBlacklistedChapters(mangaId: String): Int {
-    try {
-      val folder = findMangaFolder(mangaId) ?: return 0
-      libraryRepository.findAll().forEach { library ->
-        if (folder.absolutePath.startsWith(library.path.toFile().absolutePath)) {
-          val folderUrl = folder.toURI().toURL()
-          val series = seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, folderUrl)
-          if (series != null) {
-            val count = blacklistedChapterRepository.findBySeriesId(series.id).size
-            logger.debug { "Blacklist for $mangaId: folder=${folder.name}, series=${series.id}, count=$count" }
-            return count
-          }
-          logger.debug { "No series found for $mangaId at URL $folderUrl in library ${library.id}" }
-        }
-      }
-    } catch (e: Exception) {
-      logger.debug { "Error counting blacklisted chapters for $mangaId: ${e.message}" }
-    }
-    return 0
+    val series = findSeriesForManga(mangaId) ?: return 0
+    return blacklistedChapterRepository.findBySeriesId(series.id).size
   }
 }
 

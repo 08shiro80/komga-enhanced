@@ -38,7 +38,7 @@ class GuestAccessFilter(
     var guestAuthSet = false
     if (SecurityContextHolder.getContext().authentication == null &&
       request.method == "GET" &&
-      isGuestPath(request.requestURI)
+      isGuestPath(request.servletPath)
     ) {
       if (isGuestModeEnabled()) {
         val guestUser = buildGuestUser()

@@ -52,29 +52,6 @@ enum class DownloadStatus {
   CANCELLED,
 }
 
-data class DownloadItem(
-  val id: String,
-  val queueId: String,
-  val chapterNumber: String,
-  val chapterTitle: String?,
-  val chapterUrl: String?,
-  val status: DownloadStatus = DownloadStatus.PENDING,
-  val fileSizeBytes: Int?,
-  val downloadedBytes: Int = 0,
-  val filePath: String?,
-  val scanlationGroup: String?,
-  val errorMessage: String?,
-  val startedDate: LocalDateTime?,
-  val completedDate: LocalDateTime?,
-  override val createdDate: LocalDateTime = LocalDateTime.now(),
-  override val lastModifiedDate: LocalDateTime = LocalDateTime.now(),
-) : Auditable {
-  fun getProgressPercent(): Int {
-    if (fileSizeBytes == null || fileSizeBytes == 0) return 0
-    return ((downloadedBytes.toDouble() / fileSizeBytes) * 100).toInt()
-  }
-}
-
 data class UpdateCheck(
   val id: String,
   val seriesId: String,

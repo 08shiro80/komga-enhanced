@@ -395,17 +395,6 @@ class BookLifecycle(
       return
     }
 
-    deletableBooks.forEach { book ->
-      try {
-        bookMetadataRepository.findByIdOrNull(book.id)?.let { metadata ->
-          metadata.links
-            .filter { it.url.toString().contains("mangadex.org/chapter/") }
-            .forEach { chapterUrlRepository.deleteByUrl(it.url.toString()) }
-        }
-      } catch (_: Exception) {
-      }
-    }
-
     val deletedDate = LocalDateTime.now()
     bookRepository.update(deletableBooks.map { it.copy(deletedDate = deletedDate) })
 

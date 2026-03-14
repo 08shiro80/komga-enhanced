@@ -6,67 +6,88 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.0.9] - 2026-03-13
-
-### New Features
-- **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Uses the new CustomList-based subscription API instead of polling each manga individually. On first setup, creates a "Komga Subscriptions" CustomList and subscribes to it. Periodic feed checks (default every 30 min) query `GET /subscription/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
+## [0.1.0] - 2026-03-15
 
 ### Bug Fixes
-- **BookControllerTest ConcurrentModificationException** — Unicode book file test (`given book with Unicode name when getting book file then attachment name is correct`) failed with `ConcurrentModificationException` in Spring Boot actuator's `HttpExchangesFilter`. The filter iterates response headers via `LinkedCaseInsensitiveMap` while MockMvc modifies them concurrently. Fixed by making `HttpExchangeConfiguration` conditional on `management.httpexchanges.recording.enabled` property and disabling it in test profile.
-- **Race condition: ChapterChecker reports false "new chapters"** — `countFilesystemChapters()` relied on reading `series.json` to find manga folders. When the download worker was writing `series.json` simultaneously, the file was briefly unreadable, causing the filesystem count to drop to 0. This made ChapterChecker think all chapters were "new" and re-queue already-downloaded manga. Now checks UUID folder name directly first (no file I/O needed), falling back to `series.json` scan only for non-UUID folders.
-- **Downloads processed even when all chapters exist** — When the ChapterChecker falsely queued a download (due to the race condition above, or when queued downloads became stale), the full gallery-dl process ran, making MangaDex API calls and checking every chapter file — only to find nothing to download. Now performs a lightweight pre-check before starting gallery-dl: compares CBZ count on disk against MangaDex API chapter count, and skips the download immediately if all chapters are already present.
-
-### Changed
-- **Simplified MangaDex folder naming** — Download destination for MangaDex manga is now always `<libraryPath>/<mangaDexId>` directly, without the `findExistingMangaFolder` → rename dance. gallery-dl writes directly into the UUID folder. The folder rename/migration logic in `processDownload` is removed — existing title-based folders can be migrated via the `migrateLibraryToUuidFolders` API endpoint instead.
-- **Folders renamed to "mangadex - UUID" format** — When MangaDex API metadata fetch failed during download, `getChapterInfo()` fell back to `deriveTitleFromUrl()` which produced titles like "mangadex - 576f3eec a728 4f36 a87f dd3fc2342812". The post-download rename logic then renamed correct folders (e.g. "Fushi no Kami...") to this UUID name. Fixed by: (1) removing the post-download rename entirely, (2) adding UUID-derived title detection that prevents renaming proper folders to UUID names, (3) overriding UUID-derived titles with the existing folder name inside `download()`.
-- **BLACKLISTED_CHAPTER FK constraint violation** — `seriesId` was set to MangaDex UUID instead of Komga's internal SERIES.ID, causing every blacklist insert to crash. Now passes the correct Komga series ID from `findExistingMangaFolder`.
-- **Unnecessary ComicInfo.xml rewrites on every run** — `hasMismatchedDates()` decompressed and recompressed every CBZ to check dates, even when nothing changed. Replaced with `hasComicInfoXml()` that only checks file existence.
-- **gallery-dl compatibility with non-MangaDex sites** — `parseGalleryDlJson` only handled Queue messages (type 6) used by MangaDex extractors. Single-image sites like wallhaven.cc yield Directory (type 2) + Url (type 3) messages which were ignored, resulting in title="Unknown" and an exception. Now processes all three message types and uses a title fallback chain: `manga` field → `title` field → `category` field → URL-derived title.
-- **Title "Unknown" crash for non-MangaDex URLs** — `getChapterInfo()` threw `GalleryDlException` when the extracted title was "Unknown", making non-MangaDex sites unusable. Now derives a fallback title from the URL (e.g. `wallhaven.cc/w/e83mxl` → `"wallhaven - e83mxl"`).
-- **Downloads saved to "Unknown" folder when title not yet known** — `DownloadExecutor.processDownload()` used the queued title (often "Unknown" for non-MangaDex sites) as the folder name before `getChapterInfo` resolved the real title. Files ended up in `Mangas/Unknown/` even though the correct title was extracted later. Now renames (or moves files into) the correct folder after download completes.
-- **Publisher hardcoded to "MangaDex" for all sites** — `createSeriesJson` and `generateComicInfoXml` always set `publisher`/`<Publisher>` to "MangaDex", even for downloads from other sites like hdoujin, mangahere, or weebdex. Now derives the publisher from the source URL domain (e.g. "Hdoujin", "Mangahere", "Weebdex"). `<Web>` tag also uses the actual source URL instead of defaulting to `https://mangadex.org/`.
-
-- **"Search Online Metadata" button not applying metadata** — The menu button opened MetadataSearchDialog but clicking "Apply" only emitted an event without actually writing metadata to the series. Now calls `PATCH /api/v1/series/{id}/metadata` to apply title, summary, publisher, genres, tags, etc. directly. Series view reloads after applying.
-- **Non-MangaDex multi-chapter sites only downloaded 1 CBZ** — Sites like rawkuma return Queue messages (type 6) with individual chapter URLs, but the download code only built chapter lists from the MangaDex API. Non-MangaDex sites fell back to "single download" which lumped all images into one CBZ. Now extracts chapter info (number, URL, volume, group) from Queue messages and downloads each chapter individually with proper CBZ naming and ComicInfo.xml injection.
-- **MangaDex 429 rate limit crashes downloads** — When MangaDex API returns 429, gallery-dl also fails with `ValueError: Either 'seconds' or 'until' is required`. `getChapterInfo()` threw immediately, permanently failing the download. Now retries up to 2 times with 5-second delays when rate-limited.
-- **Re-downloads when MangaDex title changes** — `DownloadExecutor` derived the folder path from the manga title. If MangaDex changed the title, a new empty folder was created and all chapters re-downloaded. Now `findExistingMangaFolder()` searches both folder names and `series.json` content for the MangaDex UUID (with hyphens or spaces), with full debug logging.
-- **Bulk re-download when MangaDex chapter API returns empty** — If `fetchAllChaptersFromMangaDex` returned an empty list (API error/timeout), the code fell into the gallery-dl bulk download path, re-downloading all chapters. Now returns early for MangaDex URLs when the chapter API returns empty, preventing accidental full re-downloads.
-- **Paid/unavailable chapters retried indefinitely** — Chapters from paid services (e.g. J-Novel Club) always fail with exit code 4 but were retried every time the download ran. Now tracks failures in `.chapter-failures.json` per manga folder and auto-blacklists chapters after 3 failed attempts.
-
-### Changed
-- **UUID folder names for MangaDex downloads** — Download folders now use the MangaDex UUID as folder name instead of the manga title. This eliminates re-downloads caused by MangaDex title changes. Existing title-based folders are automatically migrated to UUID names on next download. Series title in Komga still comes from `series.json`, not the folder name.
-- **No more CBZ file renaming** — gallery-dl's native filenames (e.g. `c005 [No Group Scanlation].cbz`) are kept as-is instead of being renamed to `Ch. 005 - Long Title [Group].cbz`. Shorter, avoids conflicts between groups with same chapter numbers.
-- **Dockerfile fix** — Removed `dpkg-architecture` call that caused build failure (exit code 127), changed `WORKDIR app` to `WORKDIR /app`.
-
-### Performance
-- **Docker build ~50% faster** — Pre-built kepubify binary instead of Go compilation (~6 min saved), runtime libs instead of -dev packages, removed `apt-get upgrade`, dropped arm/v7 (32-bit ARM), added GitHub Actions Docker layer cache (`cache-from/cache-to: type=gha`)
-- **Sass 1.79 migration** — Bumped `sass` from `^1.32.13` to `~1.79.0` so `silenceDeprecations: ['slash-div']` in vue.config.js takes effect, eliminating ~475 Vuetify SASS deprecation warnings during frontend build
+- **CHAPTER_URL entries deleted on soft-delete** — `BookLifecycle.softDeleteMany` deleted CHAPTER_URL entries when books were soft-deleted (e.g. during library scan when CBZ files were modified by ComicInfo.xml injection). This caused `countDownloadedChapters` to return decreasing values over time, making the ChapterChecker think chapters were missing and re-queue downloads. Fixed by removing the CHAPTER_URL deletion from soft-delete — only hard-delete (via FK CASCADE on SERIES) and explicit API delete should remove entries.
+- **mangaDexUuid overwritten with null on every series update** — `SeriesDao.toDomain()` can't read `MANGADEX_UUID` (jOOQ codegen not run), so every normal Komga series update (book count, metadata, etc.) wrote `mangaDexUuid = null` back to DB. Fixed by only writing `mangaDexUuid` in `insert()`/`update()` when the value is not null.
+- **syncMangaDexUuid ran for all ~300 series every library scan** — Because `mangaDexUuid` was always null in the Series object (see above), `syncMangaDexUuid` re-read `series.json` and re-set the UUID for every series on every scan. Fixed by checking via `findByMangaDexUuid` whether the UUID is already correctly assigned before reading `series.json`.
+- **CBZ file detection failed for volume-prefixed filenames** — After gallery-dl downloads a chapter, ComicInfo.xml injection couldn't find the CBZ because it only matched `c021`/`c21` but not `v4 c021 [Group]`. Fixed by stripping `v<N> ` prefix before matching.
 
 ### Removed
-- `buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle` — dead code after removing CBZ rename logic
-- **arm/v7 (32-bit ARM) Docker platform** — barely used, extremely slow under QEMU emulation. arm64 and amd64 remain.
-- **Go toolchain from Docker build** — kepubify is now downloaded as pre-built binary from GitHub releases instead of compiled from source
-
-### New Features
-- **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
+- **Redundant download tables** — Dropped `DOWNLOAD_CHAPTER_HISTORY` and `DOWNLOAD_ITEM` tables (Flyway migration). Both were never used in code (repositories existed but were never injected). `CHAPTER_URL` is the single source of truth for downloaded chapter tracking. Also removed `DownloadChapterHistory.kt`, `DownloadChapterHistoryRepository.kt`, `DownloadChapterHistoryDao.kt`, `DownloadItemRepository.kt`, `DownloadItemDao.kt`, and `DownloadItem` from `DownloadQueue.kt`.
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `GalleryDlWrapper.kt` | Removed all CBZ rename logic (`buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle`, `UUID_PATTERN`), `updateExistingCbzChapterUrls` now only injects ComicInfo.xml without renaming |
-| `DownloadExecutor.kt` | Folder name = MangaDex UUID (fallback: sanitized title for non-MangaDex), simplified `findExistingMangaFolder` (UUID folder check first, then DB + series.json lookup), `migrateLibraryToUuidFolders()` one-time migration with CBZ rename (`Ch. XXX - Title [Group].cbz` → `cXXX [Group].cbz`), `migrateCbzToGalleryDlFormat()` |
-| `DownloadController.kt` | New endpoint `POST /{libraryId}/migrate-to-uuid` for manual migration trigger |
-| `Dockerfile.tpl` | Pre-built kepubify binary, runtime libs statt -dev, removed apt-get upgrade, removed arm/v7 stage |
-| `release.yml` | Dropped `linux/arm/v7` platform, added Docker layer cache (`cache-from/cache-to: type=gha`) |
-| `package.json` | `sass` bumped from `^1.32.13` to `~1.79.0` |
-| `README.md` | Added UUID folder names to feature list, migration endpoint to API table |
-| `MetadataSearchDialog.vue` | `applyMetadata()` now calls series metadata update API instead of just emitting event |
-| `BrowseSeries.vue` | Wired `@search-metadata` event to open MetadataSearchDialog, reload series on apply |
-| `SeriesActionsMenu.vue` | "Search Online Metadata" opens EditSeriesDialog on metadata tab via Vuex |
-| `store.ts` | Added `updateSeriesTab` state + mutation for opening EditSeriesDialog on specific tab |
-| `ReusableDialogs.vue` | Passes `initial-tab` prop to EditSeriesDialog |
-| `EditSeriesDialog.vue` | Added `initialTab` prop, `dialogReset` uses it |
+| `SeriesDao.kt` | `insert()`/`update()` only write `mangaDexUuid` when not null |
+| `ChapterUrlImporter.kt` | `syncMangaDexUuid` checks DB before reading series.json |
+| `BookLifecycle.kt` | Removed CHAPTER_URL deletion from `softDeleteMany` |
+| `GalleryDlWrapper.kt` | CBZ detection strips `v<N> ` prefix |
+| `V20260315000001__drop_redundant_download_tables.sql` | Drop `DOWNLOAD_CHAPTER_HISTORY` and `DOWNLOAD_ITEM` |
 
+---
+
+## [0.0.9] - 2026-03-14
+
+### New Features
+- **MangaDex UUID ↔ Komga Series ID mapping** — New `MANGADEX_UUID` column on the SERIES table (Flyway migration) enables direct DB lookup between MangaDex manga UUIDs and Komga series IDs. Eliminates filesystem scanning for series identification. `DownloadExecutor` sets `mangaDexUuid` on the series after successful download. `ChapterChecker` and `findExistingMangaFolder` use direct DB lookup as primary method, falling back to filesystem scan only when no DB mapping exists.
+- **ChapterUrlImporter imports from ComicInfo.xml** — During library scan, reads `<Web>` tags from ComicInfo.xml inside CBZ files and imports chapter URLs into the `CHAPTER_URL` table with the correct Komga series ID. Enables accurate `countDownloadedChapters` via DB instead of filesystem counting. Also extracts chapter number, volume, title, language, and scanlation group from ComicInfo.xml.
+- **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Uses the new CustomList-based subscription API instead of polling each manga individually. On first setup, creates a "Komga Subscriptions" CustomList and subscribes to it. Periodic feed checks (default every 30 min) query `GET /subscription/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
+- **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
+
+### Bug Fixes
+- **7 missing chapters not downloading** — CBZ filename matching in `GalleryDlWrapper` falsely marked multi-group chapters as "already downloaded" when only a different group's version existed. Removed filename matching entirely — only URL-based matching (ComicInfo.xml `<Web>` tag) and blacklist are used now.
+- **6 mangas unnecessarily queued every check** — `ChapterChecker.countDownloadedChapters` searched `url.contains(mangaId)` but chapter URLs don't contain manga IDs, so DB count was always 0. Fixed to use `findSeriesForManga` + `countBySeriesId`. Known count now uses `maxOf(dbCount, fsCount) + blacklistedCount`.
+- **Guest browsing ("als Gast durchsuchen") broken** — `GuestAccessFilter` used `request.requestURI` which includes the `/komga` context path, so `isGuestPath()` never matched. Fixed to use `request.servletPath`.
+- **CBZ file detection after download fails for volume-prefixed filenames** — After gallery-dl downloads a chapter, ComicInfo.xml injection couldn't find the CBZ because it only matched `c021` / `c21` but not `v4 c021 [Group]`. Now strips `v<N> ` prefix before matching.
+- **BookControllerTest ConcurrentModificationException** — Unicode book file test failed with `ConcurrentModificationException` in Spring Boot actuator's `HttpExchangesFilter`. Fixed by making `HttpExchangeConfiguration` conditional on `management.httpexchanges.recording.enabled` property and disabling it in test profile.
+- **Race condition: ChapterChecker reports false "new chapters"** — `countFilesystemChapters()` relied on reading `series.json` to find manga folders. When the download worker was writing `series.json` simultaneously, the file was briefly unreadable, causing the filesystem count to drop to 0. Now checks UUID folder name directly first (no file I/O needed), falling back to `series.json` scan only for non-UUID folders.
+- **Downloads processed even when all chapters exist** — Full gallery-dl process ran even when nothing to download. Now performs a lightweight pre-check: compares CBZ count on disk against MangaDex API chapter count, and skips the download immediately if all chapters are already present.
+- **BLACKLISTED_CHAPTER FK constraint violation** — `seriesId` was set to MangaDex UUID instead of Komga's internal SERIES.ID, causing every blacklist insert to crash. Now passes the correct Komga series ID from `findExistingMangaFolder`.
+- **Unnecessary ComicInfo.xml rewrites on every run** — `hasMismatchedDates()` decompressed and recompressed every CBZ to check dates, even when nothing changed. Replaced with `hasComicInfoXml()` that only checks file existence.
+- **gallery-dl compatibility with non-MangaDex sites** — `parseGalleryDlJson` only handled Queue messages (type 6) used by MangaDex extractors. Single-image sites like wallhaven.cc yield Directory (type 2) + Url (type 3) messages which were ignored. Now processes all three message types and uses a title fallback chain.
+- **Title "Unknown" crash for non-MangaDex URLs** — `getChapterInfo()` threw `GalleryDlException` when the extracted title was "Unknown". Now derives a fallback title from the URL.
+- **Downloads saved to "Unknown" folder when title not yet known** — `DownloadExecutor.processDownload()` used the queued title as the folder name before `getChapterInfo` resolved the real title. Now renames/moves files into the correct folder after download completes.
+- **Publisher hardcoded to "MangaDex" for all sites** — Now derives the publisher from the source URL domain.
+- **"Search Online Metadata" button not applying metadata** — Now calls `PATCH /api/v1/series/{id}/metadata` to apply metadata directly.
+- **Non-MangaDex multi-chapter sites only downloaded 1 CBZ** — Now extracts chapter info from Queue messages and downloads each chapter individually.
+- **MangaDex 429 rate limit crashes downloads** — Now retries up to 2 times with 5-second delays when rate-limited.
+- **Re-downloads when MangaDex title changes** — `findExistingMangaFolder()` now searches both folder names and `series.json` content for the MangaDex UUID.
+- **Bulk re-download when MangaDex chapter API returns empty** — Now returns early for MangaDex URLs when the chapter API returns empty.
+- **Paid/unavailable chapters retried indefinitely** — Now tracks failures in `.chapter-failures.json` per manga folder and auto-blacklists chapters after 3 failed attempts.
+
+### Changed
+- **UUID folder names for MangaDex downloads** — Download folders now use the MangaDex UUID as folder name instead of the manga title. Eliminates re-downloads caused by MangaDex title changes.
+- **No more CBZ file renaming** — gallery-dl's native filenames (e.g. `c005 [No Group Scanlation].cbz`) are kept as-is.
+- **Simplified MangaDex folder naming** — Download destination is always `<libraryPath>/<mangaDexId>` directly.
+- **Dockerfile fix** — Removed `dpkg-architecture` call that caused build failure (exit code 127), changed `WORKDIR app` to `WORKDIR /app`.
+- **Backup files removed from git** — `.before_*`, `.2025*`, `.2026*` patterns added to `.gitignore`, existing tracked backup files removed.
+
+### Performance
+- **Docker build ~50% faster** — Pre-built kepubify binary instead of Go compilation (~6 min saved), runtime libs instead of -dev packages, removed `apt-get upgrade`, dropped arm/v7 (32-bit ARM), added GitHub Actions Docker layer cache (`cache-from/cache-to: type=gha`)
+- **Sass 1.79 migration** — Bumped `sass` from `^1.32.13` to `~1.79.0` so `silenceDeprecations: ['slash-div']` takes effect, eliminating ~475 Vuetify SASS deprecation warnings during frontend build
+
+### Removed
+- `buildDesiredCbzName`, `sanitizeFsName`, `getEnglishTitleForFolderName`, `isUuidDerivedTitle` — dead code after removing CBZ rename logic
+- **CBZ filename matching** — Removed entirely from chapter filter in `GalleryDlWrapper`. Only URL-based matching and blacklist remain.
+- **arm/v7 (32-bit ARM) Docker platform** — barely used, extremely slow under QEMU emulation. arm64 and amd64 remain.
+- **Go toolchain from Docker build** — kepubify is now downloaded as pre-built binary from GitHub releases
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `Series.kt` | Added `mangaDexUuid: String? = null` field |
+| `SeriesRepository.kt` | Added `findByMangaDexUuid()` |
+| `SeriesDao.kt` | Implemented `findByMangaDexUuid`, `mangaDexUuid` in insert/update |
+| `V20260315000000__series_mangadex_uuid.sql` | Flyway migration: `MANGADEX_UUID` column + unique index |
+| `ChapterUrlImporter.kt` | Full implementation: reads ComicInfo.xml from CBZ files, imports chapter URLs into DB |
+| `ChapterChecker.kt` | `findSeriesForManga` with direct UUID DB lookup, `countDownloadedChapters` via `countBySeriesId`, `knownCount = maxOf(db, fs) + blacklisted` |
+| `DownloadExecutor.kt` | Sets `mangaDexUuid` after download, `findExistingMangaFolder` uses UUID DB lookup first |
+| `GalleryDlWrapper.kt` | Removed CBZ filename matching, fixed CBZ detection for volume-prefixed filenames |
+| `GuestAccessFilter.kt` | `request.requestURI` → `request.servletPath` |
+| `LibraryContentLifecycle.kt` | Pass `libraryId` to `scanAndImportLibrary` |
+| `.gitignore` | Added `*.before_*`, `*.2025*`, `*.2026*` patterns |
 ---
 
 ## [0.0.8] - 2026-02-28

@@ -260,7 +260,7 @@ class LibraryContentLifecycle(
 
       // Import chapter URLs from .chapter-urls.json files (for duplicate download prevention)
       try {
-        val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()))
+        val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
         if (importResults.isNotEmpty()) {
           val totalImported = importResults.sumOf { it.imported }
           val totalSkipped = importResults.sumOf { it.skippedDuplicates }

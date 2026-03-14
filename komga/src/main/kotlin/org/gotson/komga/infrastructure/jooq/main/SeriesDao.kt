@@ -38,6 +38,7 @@ class SeriesDao(
   private val d = Tables.SERIES_METADATA
   private val rs = Tables.READ_PROGRESS_SERIES
   private val bma = Tables.BOOK_METADATA_AGGREGATION
+  private val mangaDexUuidField = DSL.field("MANGADEX_UUID", String::class.java)
 
   override fun findAll(): Collection<Series> =
     dslRO
@@ -74,6 +75,13 @@ class SeriesDao(
         .map { it.toDomain() }
     }
   }
+
+  override fun findByMangaDexUuid(mangaDexUuid: String): Series? =
+    dslRO
+      .selectFrom(s)
+      .where(mangaDexUuidField.eq(mangaDexUuid))
+      .fetchOneInto(s)
+      ?.toDomain()
 
   override fun findNotDeletedByLibraryIdAndUrlOrNull(
     libraryId: String,
@@ -169,6 +177,7 @@ class SeriesDao(
       .set(s.LIBRARY_ID, series.libraryId)
       .set(s.DELETED_DATE, series.deletedDate)
       .set(s.ONESHOT, series.oneshot)
+      .apply { series.mangaDexUuid?.let { set(mangaDexUuidField, it) } }
       .execute()
   }
 
@@ -185,6 +194,7 @@ class SeriesDao(
       .set(s.BOOK_COUNT, series.bookCount)
       .set(s.DELETED_DATE, series.deletedDate)
       .set(s.ONESHOT, series.oneshot)
+      .apply { series.mangaDexUuid?.let { set(mangaDexUuidField, it) } }
       .apply { if (updateModifiedTime) set(s.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z"))) }
       .where(s.ID.eq(series.id))
       .execute()

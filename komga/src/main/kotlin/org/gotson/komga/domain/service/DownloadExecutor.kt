@@ -550,6 +550,18 @@ class DownloadExecutor(
           ),
         )
 
+        if (mangaDexId != null && komgaSeriesId != null && komgaSeriesId.isNotEmpty()) {
+          try {
+            val series = seriesRepository.findByIdOrNull(komgaSeriesId)
+            if (series != null && series.mangaDexUuid == null) {
+              seriesRepository.update(series.copy(mangaDexUuid = mangaDexId), updateModifiedTime = false)
+              logger.info { "Set mangaDexUuid=$mangaDexId on series $komgaSeriesId" }
+            }
+          } catch (e: Exception) {
+            logger.warn(e) { "Failed to set mangaDexUuid on series $komgaSeriesId" }
+          }
+        }
+
         if (library != null) {
           logger.info { "Download completed for library ${library.name}. Please manually trigger library scan." }
         }
@@ -655,6 +667,12 @@ class DownloadExecutor(
     libraryPath: java.nio.file.Path,
     mangaDexId: String,
   ): FolderLookupResult? {
+    val byUuid = seriesRepository.findByMangaDexUuid(mangaDexId)
+    if (byUuid != null && byUuid.libraryId == libraryId && byUuid.path.toFile().exists()) {
+      logger.info { "findExistingMangaFolder: found via mangaDexUuid DB column: ${byUuid.path}" }
+      return FolderLookupResult(byUuid.path.toFile(), byUuid.id)
+    }
+
     val uuidFolder = libraryPath.resolve(mangaDexId).toFile()
     if (uuidFolder.exists()) {
       val series =

@@ -24,6 +24,8 @@ interface SeriesRepository {
     urls: Collection<URL>,
   ): Collection<Series>
 
+  fun findByMangaDexUuid(mangaDexUuid: String): Series?
+
   fun findAllByTitleContaining(title: String): Collection<Series>
 
   fun findAll(
