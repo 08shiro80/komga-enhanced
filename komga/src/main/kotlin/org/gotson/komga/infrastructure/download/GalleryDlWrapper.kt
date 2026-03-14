@@ -871,8 +871,10 @@ class GalleryDlWrapper(
               val matchesChapterNum =
                 name == "c$chapterStr" ||
                   name == "c$chapterNumStr" ||
+                  name == "c$paddedNum" ||
                   name.startsWith("c$chapterStr ") ||
                   name.startsWith("c$chapterNumStr ") ||
+                  name.startsWith("c$paddedNum ") ||
                   name == "ch. $paddedNum" ||
                   name.startsWith("ch. $paddedNum -") ||
                   name.startsWith("ch. $paddedNum ") ||
@@ -887,14 +889,21 @@ class GalleryDlWrapper(
             }
 
           if (alreadyExists) {
-            logger.debug { "Skipping chapter $chapterStr - CBZ file already exists" }
+            logger.debug { "Skipping chapter $chapterStr [${chapter.scanlationGroup}] - CBZ file already exists" }
+          } else {
+            logger.info { "Chapter $chapterStr [${chapter.scanlationGroup}] not found on disk — will download (url: ${chapter.chapterUrl})" }
           }
           !alreadyExists
         }
 
+      val skippedByUrl = allChapters.count { it.chapterUrl in urlsFromCbz }
+      val skippedByBlacklist = allChapters.count { it.chapterUrl in blacklistedUrls }
       val skippedCount = allChapters.size - chapters.size
       if (skippedCount > 0) {
-        logger.info { "Skipping $skippedCount already downloaded chapters, ${chapters.size} remaining to download" }
+        logger.info {
+          "Skipping $skippedCount already downloaded chapters, ${chapters.size} remaining to download " +
+            "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist, by filename: ${skippedCount - skippedByUrl - skippedByBlacklist})"
+        }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Skipping $skippedCount already downloaded chapters")
 
         updateExistingCbzChapterUrls(destDir, allChapters, urlsFromCbz, mangaInfo)

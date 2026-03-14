@@ -38,21 +38,23 @@ module.exports = {
     },
   },
 
-  // custom rule for readium and r2d2bc css that needs to be made available, but untouched
-  configureWebpack: {
-    module: {
-      rules: [
-        {
-          test: [
-            /readium\/.*\.css.resource$/,
-            /r2d2bc\/.*\.css.resource$/,
-          ],
-          type: 'asset/resource',
-          generator: {
-            filename: 'css/[hash].css[query]',
-          },
-        },
+  configureWebpack: (config) => {
+    config.module.rules.push({
+      test: [
+        /readium\/.*\.css.resource$/,
+        /r2d2bc\/.*\.css.resource$/,
       ],
-    },
+      type: 'asset/resource',
+      generator: {
+        filename: 'css/[hash].css[query]',
+      },
+    })
+
+    const MiniCssExtractPlugin = config.plugins.find(
+      (p) => p.constructor.name === 'MiniCssExtractPlugin',
+    )
+    if (MiniCssExtractPlugin) {
+      MiniCssExtractPlugin.options.ignoreOrder = true
+    }
   },
 }

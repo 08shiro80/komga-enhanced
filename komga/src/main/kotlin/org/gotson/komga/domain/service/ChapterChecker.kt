@@ -55,6 +55,7 @@ class ChapterChecker(
   private val downloadQueueRepository: DownloadQueueRepository,
   private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
+  private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
   private val pluginConfigRepository: PluginConfigRepository,
   private val objectMapper: ObjectMapper,
 ) {
@@ -197,10 +198,7 @@ class ChapterChecker(
       val downloadedCount = countDownloadedChapters(url, mangaId)
       val filesystemCount = countFilesystemChapters(url)
 
-      val blacklistedCount =
-        blacklistedChapterRepository
-          .findAll()
-          .count { it.chapterUrl.contains(mangaId) }
+      val blacklistedCount = countBlacklistedChapters(mangaId)
       val knownCount = filesystemCount + blacklistedCount
 
       logger.info {
@@ -377,6 +375,23 @@ class ChapterChecker(
     }
 
     return totalCbzCount
+  }
+
+  private fun countBlacklistedChapters(mangaId: String): Int {
+    try {
+      libraryRepository.findAll().forEach { library ->
+        val folder = java.io.File(library.path.toFile(), mangaId)
+        if (folder.exists() && folder.isDirectory) {
+          val folderUrl = folder.toURI().toURL()
+          val series = seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, folderUrl)
+          if (series != null) {
+            return blacklistedChapterRepository.findBySeriesId(series.id).size
+          }
+        }
+      }
+    } catch (_: Exception) {
+    }
+    return 0
   }
 }
 
