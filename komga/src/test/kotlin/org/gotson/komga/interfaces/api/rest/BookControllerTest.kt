@@ -40,6 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.MockMvcResultMatchersDsl
 import org.springframework.test.web.servlet.delete
@@ -55,6 +56,7 @@ import kotlin.random.Random
 
 @SpringBootTest
 @AutoConfigureMockMvc(printOnlyOnFailure = false)
+@ActiveProfiles("test")
 class BookControllerTest(
   @Autowired private val seriesRepository: SeriesRepository,
   @Autowired private val seriesMetadataRepository: SeriesMetadataRepository,
