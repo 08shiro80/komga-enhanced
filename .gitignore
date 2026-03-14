@@ -15,6 +15,9 @@ node_modules
 ### Temporary files
 *.tmp
 *.bak
+*.before_*
+*.2025*
+*.2026*
 
 ### SQLite databases
 *.sqlite
