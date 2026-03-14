@@ -835,6 +835,15 @@ class GalleryDlWrapper(
         logger.info { "Multi-group chapters detected: ${multiGroupChapterNumbers.size} chapter numbers with multiple groups" }
       }
 
+      val multiVolumeChapterNumbers =
+        chaptersByNumber
+          .filter { (_, chaps) -> chaps.map { it.volume }.distinct().size > 1 }
+          .keys
+          .toSet()
+      if (multiVolumeChapterNumbers.isNotEmpty()) {
+        logger.info { "Multi-volume chapters detected: ${multiVolumeChapterNumbers.size} chapter numbers across multiple volumes" }
+      }
+
       val blacklistedUrls = blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
 
       val chapters =
@@ -866,24 +875,44 @@ class GalleryDlWrapper(
 
           val groupTag = chapter.scanlationGroup?.lowercase()
 
+          if (chapterNumStr in multiVolumeChapterNumbers) {
+            logger.debug { "Chapter $chapterStr vol=${chapter.volume} [${chapter.scanlationGroup}] — multi-volume, skipping filename match" }
+            return@filter true
+          }
+
+          val volumeTag = chapter.volume?.lowercase()
+
           val alreadyExists =
             existingCbzFiles.any { name ->
+              val chapterPart =
+                if (name.matches(Regex("^v\\d+ .+"))) {
+                  name.substringAfter(" ")
+                } else {
+                  name
+                }
+
               val matchesChapterNum =
-                name == "c$chapterStr" ||
-                  name == "c$chapterNumStr" ||
-                  name == "c$paddedNum" ||
-                  name.startsWith("c$chapterStr ") ||
-                  name.startsWith("c$chapterNumStr ") ||
-                  name.startsWith("c$paddedNum ") ||
-                  name == "ch. $paddedNum" ||
-                  name.startsWith("ch. $paddedNum -") ||
-                  name.startsWith("ch. $paddedNum ") ||
-                  name == "chapter$chapterStr" ||
-                  name == "chapter $chapterStr" ||
-                  name == "ch$chapterStr" ||
-                  name == "ch $chapterStr"
+                chapterPart == "c$chapterStr" ||
+                  chapterPart == "c$chapterNumStr" ||
+                  chapterPart == "c$paddedNum" ||
+                  chapterPart.startsWith("c$chapterStr ") ||
+                  chapterPart.startsWith("c$chapterNumStr ") ||
+                  chapterPart.startsWith("c$paddedNum ") ||
+                  chapterPart == "ch. $paddedNum" ||
+                  chapterPart.startsWith("ch. $paddedNum -") ||
+                  chapterPart.startsWith("ch. $paddedNum ") ||
+                  chapterPart == "chapter$chapterStr" ||
+                  chapterPart == "chapter $chapterStr" ||
+                  chapterPart == "ch$chapterStr" ||
+                  chapterPart == "ch $chapterStr"
 
               if (!matchesChapterNum) return@any false
+
+              if (volumeTag != null && name.matches(Regex("^v\\d+ .+"))) {
+                val fileVolume = name.substringBefore(" ").removePrefix("v")
+                if (fileVolume != volumeTag) return@any false
+              }
+
               if (groupTag == null) return@any true
               name.contains("[$groupTag]")
             }
@@ -1391,7 +1420,7 @@ class GalleryDlWrapper(
           "lang" to defaultLanguage,
           "api" to "api",
           "data-saver" to false,
-          "directory" to listOf("c{chapter:>03}{chapter_minor} [{group:J, }]"),
+          "directory" to listOf("{volume:?v/ /}c{chapter:>03}{chapter_minor} [{group:J, }]"),
           "filename" to "{page:>03}.{extension}",
         ),
       "mangahere" to

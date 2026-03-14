@@ -767,6 +767,7 @@ class DownloadExecutor(
     val chGroupOnly = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*\[([^\]]+)\]\.cbz$""")
     val chTitleOnly = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\s*-\s*.*\.cbz$""")
     val chPlain = Regex("""^Ch\.\s*(\d+(?:\.\d+)?)\.cbz$""")
+    val galleryDlNoVolume = Regex("""^c(\d+(?:\.\d+)?)(.*?)\.cbz$""")
     var renamed = 0
 
     val cbzFiles =
@@ -776,21 +777,39 @@ class DownloadExecutor(
         ?: return 0
 
     for (cbz in cbzFiles) {
+      if (cbz.name.lowercase().matches(Regex("""^v\d+ .+"""))) continue
+
       val match =
         chTitleGroup.find(cbz.name)
           ?: chGroupOnly.find(cbz.name)
           ?: chTitleOnly.find(cbz.name)
           ?: chPlain.find(cbz.name)
-          ?: continue
 
-      val num = match.groupValues[1]
-      val group = match.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }
+      val num: String
+      val group: String?
+
+      if (match != null) {
+        num = match.groupValues[1]
+        group = match.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }
+      } else if (galleryDlNoVolume.matches(cbz.name)) {
+        num = galleryDlNoVolume.find(cbz.name)!!.groupValues[1]
+        group = null
+      } else {
+        continue
+      }
+
+      val volume = extractVolumeFromCbz(cbz)
+      val volumePrefix = if (volume != null) "v$volume " else ""
 
       val newName =
-        if (group != null) {
-          "c$num [$group].cbz"
+        if (match != null) {
+          if (group != null) {
+            "${volumePrefix}c$num [$group].cbz"
+          } else {
+            "${volumePrefix}c$num.cbz"
+          }
         } else {
-          "c$num.cbz"
+          "${volumePrefix}${cbz.name}"
         }
 
       if (cbz.name == newName) continue
@@ -804,6 +823,17 @@ class DownloadExecutor(
 
     return renamed
   }
+
+  private fun extractVolumeFromCbz(cbzFile: java.io.File): String? =
+    try {
+      java.util.zip.ZipFile(cbzFile).use { zip ->
+        val entry = zip.getEntry("ComicInfo.xml") ?: return@use null
+        val content = zip.getInputStream(entry).bufferedReader().readText()
+        Regex("""<Volume>(\d+)</Volume>""").find(content)?.groupValues?.get(1)
+      }
+    } catch (_: Exception) {
+      null
+    }
 
   private fun extractMangaDexIdFromSeriesJson(content: String): String? {
     val comicIdMatch = Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""").find(content)

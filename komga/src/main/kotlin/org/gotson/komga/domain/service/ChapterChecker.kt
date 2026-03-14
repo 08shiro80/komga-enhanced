@@ -334,37 +334,31 @@ class ChapterChecker(
     }
 
   private fun countFilesystemChapters(url: String): Int {
-    val libraries = libraryRepository.findAll()
-    var totalCbzCount = 0
-
     val mangaId = GalleryDlWrapper.extractMangaDexId(url) ?: return 0
+    val folder = findMangaFolder(mangaId) ?: return 0
+    return folder
+      .listFiles()
+      ?.count { it.isFile && it.extension.lowercase() == "cbz" }
+      ?: 0
+  }
 
-    libraries.forEach { library ->
+  private fun findMangaFolder(mangaId: String): java.io.File? {
+    libraryRepository.findAll().forEach { library ->
       try {
         val libraryDir = library.path.toFile()
         if (!libraryDir.exists()) return@forEach
 
         val uuidFolder = java.io.File(libraryDir, mangaId)
         if (uuidFolder.exists() && uuidFolder.isDirectory) {
-          totalCbzCount +=
-            uuidFolder
-              .listFiles()
-              ?.count { it.isFile && it.extension.lowercase() == "cbz" }
-              ?: 0
-          return@forEach
+          return uuidFolder
         }
 
         libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { mangaDir ->
           val seriesJson = mangaDir.resolve("series.json")
           if (seriesJson.exists()) {
             try {
-              val content = seriesJson.readText()
-              if (content.contains(mangaId)) {
-                totalCbzCount +=
-                  mangaDir
-                    .listFiles()
-                    ?.count { it.isFile && it.extension.lowercase() == "cbz" }
-                    ?: 0
+              if (seriesJson.readText().contains(mangaId)) {
+                return mangaDir
               }
             } catch (_: Exception) {
             }
@@ -373,23 +367,26 @@ class ChapterChecker(
       } catch (_: Exception) {
       }
     }
-
-    return totalCbzCount
+    return null
   }
 
   private fun countBlacklistedChapters(mangaId: String): Int {
     try {
+      val folder = findMangaFolder(mangaId) ?: return 0
       libraryRepository.findAll().forEach { library ->
-        val folder = java.io.File(library.path.toFile(), mangaId)
-        if (folder.exists() && folder.isDirectory) {
+        if (folder.absolutePath.startsWith(library.path.toFile().absolutePath)) {
           val folderUrl = folder.toURI().toURL()
           val series = seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, folderUrl)
           if (series != null) {
-            return blacklistedChapterRepository.findBySeriesId(series.id).size
+            val count = blacklistedChapterRepository.findBySeriesId(series.id).size
+            logger.debug { "Blacklist for $mangaId: folder=${folder.name}, series=${series.id}, count=$count" }
+            return count
           }
+          logger.debug { "No series found for $mangaId at URL $folderUrl in library ${library.id}" }
         }
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug { "Error counting blacklisted chapters for $mangaId: ${e.message}" }
     }
     return 0
   }
