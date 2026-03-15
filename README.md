@@ -228,31 +228,6 @@ Never download the same chapter twice:
 
 ## Switching Between Official Komga and This Fork
 
-### Official Komga → Fork: Works
-
-The fork's database migrations run automatically on first startup. All existing data is preserved.
-
-### Fork → Official Komga: Works with One Step
-
-The fork adds extra tables and columns to the database, but these don't interfere with official Komga — it simply ignores them. The only blocker is Flyway: it sees the fork's migration entries in the database history and refuses to start.
-
-To switch back, remove the fork migration entries from the database before starting official Komga:
-
-```sql
-DELETE FROM flyway_schema_history WHERE version IN (
-  '20250930120000', '20251201000000', '20251201000001',
-  '20251201000002', '20251201000003', '20251204000000',
-  '20251211000000', '20260301000000', '20260315000000',
-  '20260315000001'
-);
-```
-
-After this, official Komga starts normally. The fork's extra tables and columns remain in the database but are never queried and cause no issues. Fork-specific data (downloads, blacklist, plugin config, MangaDex UUID mappings) stays in the database but is unused.
-
----
-
-## Switching Between Official Komga and This Fork
-
 Since version 0.1.0, the fork stores its database migrations in a separate history table (`flyway_fork_history`), completely independent from the official Komga migration history (`flyway_schema_history`). This means:
 
 - **Official Komga → Fork:** Works. Fork migrations run automatically on first startup.
