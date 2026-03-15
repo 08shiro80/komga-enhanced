@@ -216,6 +216,18 @@ class LibraryContentLifecycle(
         }
       }
 
+      // Import chapter URLs from ComicInfo.xml in CBZ files (must happen before tasks are emitted)
+      try {
+        val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
+        if (importResults.isNotEmpty()) {
+          val totalImported = importResults.sumOf { it.imported }
+          val totalSkipped = importResults.sumOf { it.skippedDuplicates }
+          logger.info { "Chapter URL import: $totalImported imported, $totalSkipped duplicates skipped from ${importResults.size} series" }
+        }
+      } catch (e: Exception) {
+        logger.warn(e) { "Failed to import chapter URLs for library ${library.name}" }
+      }
+
       // for all series where books have been removed or added, trigger a sort and refresh metadata
       seriesToSortAndRefresh.distinctBy { it.id }.forEach {
         seriesLifecycle.sortBooks(it)
@@ -256,18 +268,6 @@ class LibraryContentLifecycle(
           .let { sidecars ->
             sidecarRepository.deleteByLibraryIdAndUrls(library.id, sidecars.map { it.url })
           }
-      }
-
-      // Import chapter URLs from .chapter-urls.json files (for duplicate download prevention)
-      try {
-        val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
-        if (importResults.isNotEmpty()) {
-          val totalImported = importResults.sumOf { it.imported }
-          val totalSkipped = importResults.sumOf { it.skippedDuplicates }
-          logger.info { "Chapter URL import: $totalImported imported, $totalSkipped duplicates skipped from ${importResults.size} series" }
-        }
-      } catch (e: Exception) {
-        logger.warn(e) { "Failed to import chapter URLs for library ${library.name}" }
       }
 
       if (library.emptyTrashAfterScan)
