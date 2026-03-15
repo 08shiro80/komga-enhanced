@@ -260,6 +260,7 @@ val sqliteMigrationDirs =
     "main" to
       listOf(
         "$projectDir/src/flyway/resources/db/migration/sqlite",
+        "$projectDir/src/flyway/resources/db/migration/fork/sqlite",
         "$projectDir/src/flyway/kotlin/db/migration/sqlite",
       ),
     "tasks" to
@@ -272,7 +273,7 @@ val sqliteMigrationDirs =
 tasks.register("flywayMigrateMain", FlywayMigrateTask::class) {
   val id = "main"
   url = sqliteUrls[id]
-  locations = arrayOf("classpath:db/migration/sqlite")
+  locations = arrayOf("classpath:db/migration/sqlite", "classpath:db/migration/fork/sqlite")
   placeholders =
     mapOf(
       "library-file-hashing" to "true",

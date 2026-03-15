@@ -19,6 +19,9 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **Chapter URL import too late in library scan** — `scanAndImportLibrary()` ran at the very end of `scanRootFolder()`, after sidecars and trash cleanup. ChapterChecker saw stale DB counts because URLs hadn't been imported yet. Moved to right after series/book updates, before tasks are emitted.
 - **Orchesc/a/ns duplicate CBZ files** — Gallery-dl created both `[Orchesc a ns].cbz` and `[Orchesc_a_ns].cbz` because slashes in scanlation group names were sanitized inconsistently across runs. Added `path-restrict: auto` and `path-replace: _` to mangadex gallery-dl config for consistent filename sanitization.
 
+### Changed
+- **Fork migrations separated from upstream** — Fork database migrations now use a dedicated `flyway_fork_history` table instead of the shared `flyway_schema_history`. This allows seamless switching between official Komga and the fork without manual database cleanup. Existing fork entries are automatically moved from `flyway_schema_history` to `flyway_fork_history` on first startup.
+
 ### Removed
 - **Redundant download tables** — Dropped `DOWNLOAD_CHAPTER_HISTORY` and `DOWNLOAD_ITEM` tables (Flyway migration). Both were never used in code (repositories existed but were never injected). `CHAPTER_URL` is the single source of truth for downloaded chapter tracking. Also removed `DownloadChapterHistory.kt`, `DownloadChapterHistoryRepository.kt`, `DownloadChapterHistoryDao.kt`, `DownloadItemRepository.kt`, `DownloadItemDao.kt`, and `DownloadItem` from `DownloadQueue.kt`.
 
@@ -33,6 +36,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `SeriesController.kt` | New `POST /api/v1/series/{seriesId}/blacklist` for manual URL blacklisting |
 | `BlacklistDialog.vue` | Added URL input field for manual blacklist entries |
 | `komga-series.service.ts` | Added `addBlacklist()` method |
+| `FlywayForkMigrationInitializer.kt` | Separate fork migration history table, auto-migrates from `flyway_schema_history` |
 | `V20260315000001__drop_redundant_download_tables.sql` | Drop `DOWNLOAD_CHAPTER_HISTORY` and `DOWNLOAD_ITEM` |
 
 ---

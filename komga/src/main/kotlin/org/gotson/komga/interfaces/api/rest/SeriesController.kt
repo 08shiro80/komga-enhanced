@@ -1,5 +1,6 @@
 package org.gotson.komga.interfaces.api.rest
 
+import com.github.f4b6a3.tsid.TsidCreator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -903,7 +904,7 @@ class SeriesController(
 
     val chapter =
       BlacklistedChapter(
-        id = com.github.f4b6a3.tsid.TsidCreator.getTsid256().toString(),
+        id = TsidCreator.getTsid256().toString(),
         seriesId = seriesId,
         chapterUrl = chapterUrl,
         chapterNumber = body["chapterNumber"],

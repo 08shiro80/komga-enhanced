@@ -154,7 +154,7 @@ Permanently prevent unwanted chapters from being re-downloaded:
 
 #### Edge Case: Duplicate Uploads on MangaDex
 
-In rare cases, a scanlation group uploads the same chapter multiple times on MangaDex. For example, manga `cbce49c7` has 27 API entries for only 13 unique chapter numbers — all from the same group (Galaxy Degen Scans). These are duplicate uploads, not multi-group entries.
+In rare cases, a scanlation group uploads the same chapter multiple times on MangaDex. For example, manga [`cbce49c7-6311-4955-8b10-1005775d5cee`](https://mangadex.org/title/cbce49c7-6311-4955-8b10-1005775d5cee) has 27 API entries for only 13 unique chapter numbers — all from the same group (Galaxy Degen Scans). These are duplicate uploads, not multi-group entries.
 
 This causes permanent re-queuing: the MangaDex `/feed` API reports `total=27`, but since each chapter number only produces one CBZ file, the known count stays at 13. The ChapterChecker sees `api=27 > known=13` and keeps queuing the manga for download. Re-downloads and library rescans can inflate the DB count (e.g. to 22), but it can never reach 27.
 
@@ -223,6 +223,49 @@ Never download the same chapter twice:
 |--------|----------|-------------|
 | GET | `/api/v1/health` | Health check |
 | POST | `/api/v1/tachiyomi/import` | Import Tachiyomi backup |
+
+---
+
+## Switching Between Official Komga and This Fork
+
+### Official Komga → Fork: Works
+
+The fork's database migrations run automatically on first startup. All existing data is preserved.
+
+### Fork → Official Komga: Works with One Step
+
+The fork adds extra tables and columns to the database, but these don't interfere with official Komga — it simply ignores them. The only blocker is Flyway: it sees the fork's migration entries in the database history and refuses to start.
+
+To switch back, remove the fork migration entries from the database before starting official Komga:
+
+```sql
+DELETE FROM flyway_schema_history WHERE version IN (
+  '20250930120000', '20251201000000', '20251201000001',
+  '20251201000002', '20251201000003', '20251204000000',
+  '20251211000000', '20260301000000', '20260315000000',
+  '20260315000001'
+);
+```
+
+After this, official Komga starts normally. The fork's extra tables and columns remain in the database but are never queried and cause no issues. Fork-specific data (downloads, blacklist, plugin config, MangaDex UUID mappings) stays in the database but is unused.
+
+---
+
+## Switching Between Official Komga and This Fork
+
+Since version 0.1.0, the fork stores its database migrations in a separate history table (`flyway_fork_history`), completely independent from the official Komga migration history (`flyway_schema_history`). This means:
+
+- **Official Komga → Fork:** Works. Fork migrations run automatically on first startup.
+- **Fork → Official Komga:** Works. Official Komga only sees its own migration history and starts normally. The fork's extra tables and columns remain in the database but are ignored.
+- **Upgrading from fork 0.0.9 or earlier:** The fork automatically moves its entries from `flyway_schema_history` to `flyway_fork_history` on first startup. No manual steps needed.
+
+**If you are on fork version 0.0.9 or earlier** and want to switch back to official Komga without upgrading to 0.1.0 first, you need to remove the fork migration entries manually:
+
+```sql
+DELETE FROM flyway_schema_history WHERE version > '20250730173126';
+```
+
+After this, official Komga starts normally.
 
 ---
 
