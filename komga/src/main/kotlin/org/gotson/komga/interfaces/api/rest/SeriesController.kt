@@ -883,6 +883,36 @@ class SeriesController(
     return blacklistedChapterRepository.findBySeriesId(seriesId)
   }
 
+  @PostMapping("v1/series/{seriesId}/blacklist")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.CREATED)
+  fun addBlacklist(
+    @PathVariable seriesId: String,
+    @RequestBody body: Map<String, String?>,
+  ): BlacklistedChapter {
+    seriesRepository.findByIdOrNull(seriesId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    val chapterUrl =
+      body["chapterUrl"]?.takeIf { it.isNotBlank() }
+        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "chapterUrl is required")
+
+    if (blacklistedChapterRepository.existsByChapterUrl(chapterUrl)) {
+      throw ResponseStatusException(HttpStatus.CONFLICT, "URL already blacklisted")
+    }
+
+    val chapter =
+      BlacklistedChapter(
+        id = com.github.f4b6a3.tsid.TsidCreator.getTsid256().toString(),
+        seriesId = seriesId,
+        chapterUrl = chapterUrl,
+        chapterNumber = body["chapterNumber"],
+        chapterTitle = body["chapterTitle"],
+      )
+    blacklistedChapterRepository.insert(chapter)
+    return chapter
+  }
+
   @DeleteMapping("v1/series/{seriesId}/blacklist/{blacklistId}")
   @PreAuthorize("hasRole('ADMIN')")
   @ResponseStatus(HttpStatus.NO_CONTENT)

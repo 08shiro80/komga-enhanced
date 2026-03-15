@@ -147,9 +147,20 @@ Rich metadata from multiple sources:
 Permanently prevent unwanted chapters from being re-downloaded:
 
 - **Blacklist & Delete** via book 3-dot menu — blacklists the chapter URL and deletes the book file
-- **Manage Blacklist** via series 3-dot menu — view and remove blacklisted chapters
+- **Manage Blacklist** via series 3-dot menu — view, remove, and **manually add** blacklisted chapter URLs
+- **Manual URL entry** — paste MangaDex chapter URLs directly into the blacklist dialog for edge cases the automatic system can't handle
 - Persists even after book deletion (stored in separate database table)
 - Respected by both the downloader and chapter checker
+
+#### Edge Case: Duplicate Uploads on MangaDex
+
+In rare cases, a scanlation group uploads the same chapter multiple times on MangaDex. For example, manga `cbce49c7` has 27 API entries for only 13 unique chapter numbers — all from the same group (Galaxy Degen Scans). These are duplicate uploads, not multi-group entries.
+
+This causes permanent re-queuing: the MangaDex `/feed` API reports `total=27`, but since each chapter number only produces one CBZ file, the known count stays at 13. The ChapterChecker sees `api=27 > known=13` and keeps queuing the manga for download. Re-downloads and library rescans can inflate the DB count (e.g. to 22), but it can never reach 27.
+
+**Solution:** Open the series 3-dot menu → **Manage Blacklist** → paste the duplicate chapter URLs to blacklist them. The blacklisted count is included in the known count, so blacklisting the extra entries resolves the mismatch.
+
+To find the duplicate chapter URLs, open the manga page on [mangadex.org](https://mangadex.org) and look for chapters with the same number uploaded multiple times by the same group. Right-click the duplicate chapters → copy link, then paste into the Manage Blacklist dialog.
 
 ### Chapter URL Tracking
 
@@ -188,6 +199,7 @@ Never download the same chapter twice:
 | DELETE | `/api/v1/books/{bookId}/blacklist` | Remove from blacklist |
 | GET | `/api/v1/books/{bookId}/blacklist` | Check if blacklisted |
 | GET | `/api/v1/series/{seriesId}/blacklist` | List blacklisted chapters |
+| POST | `/api/v1/series/{seriesId}/blacklist` | Manually add URL to blacklist |
 | DELETE | `/api/v1/series/{seriesId}/blacklist/{id}` | Remove blacklist entry |
 
 ### Follow Configuration
@@ -267,6 +279,10 @@ docker exec komga pip install -U gallery-dl
 ```bash
 java -jar komga.jar
 ```
+
+### Important: Metadata Completeness
+
+Full metadata in ComicInfo.xml and series.json (title, authors, genres, cover art, publish dates, scanlation group, etc.) is only guaranteed when downloading from **MangaDex** or when using the **MangaDex/AniList metadata plugins**. Other sites supported by gallery-dl will download chapters correctly, but metadata may be incomplete or missing.
 
 ### Build from Source
 

@@ -223,6 +223,22 @@ export default class KomgaSeriesService {
     }
   }
 
+  async addBlacklist(seriesId: string, chapterUrl: string, chapterNumber?: string, chapterTitle?: string): Promise<any> {
+    try {
+      return (await this.http.post(`${API_SERIES}/${seriesId}/blacklist`, {
+        chapterUrl,
+        chapterNumber: chapterNumber || null,
+        chapterTitle: chapterTitle || null,
+      })).data
+    } catch (e) {
+      let msg = 'An error occurred while trying to add blacklist entry'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
   async removeBlacklist(seriesId: string, blacklistId: string) {
     try {
       await this.http.delete(`${API_SERIES}/${seriesId}/blacklist/${blacklistId}`)

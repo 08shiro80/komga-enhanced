@@ -8,11 +8,16 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ## [0.1.0] - 2026-03-15
 
+### New Features
+- **Manual blacklist URL entry** — Users can now manually paste MangaDex chapter URLs into the "Manage Blacklist" dialog. Useful for the rare edge case where MangaDex has duplicate uploads from the same scanlation group (e.g. manga cbce49c7 has 27 API entries for 11 unique chapters, all from the same group), causing permanent re-queuing since the API total can never match the DB/filesystem count. New `POST /api/v1/series/{seriesId}/blacklist` endpoint accepts `chapterUrl`, `chapterNumber`, and `chapterTitle`.
+
 ### Bug Fixes
 - **CHAPTER_URL entries deleted on soft-delete** — `BookLifecycle.softDeleteMany` deleted CHAPTER_URL entries when books were soft-deleted (e.g. during library scan when CBZ files were modified by ComicInfo.xml injection). This caused `countDownloadedChapters` to return decreasing values over time, making the ChapterChecker think chapters were missing and re-queue downloads. Fixed by removing the CHAPTER_URL deletion from soft-delete — only hard-delete (via FK CASCADE on SERIES) and explicit API delete should remove entries.
 - **mangaDexUuid overwritten with null on every series update** — `SeriesDao.toDomain()` can't read `MANGADEX_UUID` (jOOQ codegen not run), so every normal Komga series update (book count, metadata, etc.) wrote `mangaDexUuid = null` back to DB. Fixed by only writing `mangaDexUuid` in `insert()`/`update()` when the value is not null.
 - **syncMangaDexUuid ran for all ~300 series every library scan** — Because `mangaDexUuid` was always null in the Series object (see above), `syncMangaDexUuid` re-read `series.json` and re-set the UUID for every series on every scan. Fixed by checking via `findByMangaDexUuid` whether the UUID is already correctly assigned before reading `series.json`.
 - **CBZ file detection failed for volume-prefixed filenames** — After gallery-dl downloads a chapter, ComicInfo.xml injection couldn't find the CBZ because it only matched `c021`/`c21` but not `v4 c021 [Group]`. Fixed by stripping `v<N> ` prefix before matching.
+- **Chapter URL import too late in library scan** — `scanAndImportLibrary()` ran at the very end of `scanRootFolder()`, after sidecars and trash cleanup. ChapterChecker saw stale DB counts because URLs hadn't been imported yet. Moved to right after series/book updates, before tasks are emitted.
+- **Orchesc/a/ns duplicate CBZ files** — Gallery-dl created both `[Orchesc a ns].cbz` and `[Orchesc_a_ns].cbz` because slashes in scanlation group names were sanitized inconsistently across runs. Added `path-restrict: auto` and `path-replace: _` to mangadex gallery-dl config for consistent filename sanitization.
 
 ### Removed
 - **Redundant download tables** — Dropped `DOWNLOAD_CHAPTER_HISTORY` and `DOWNLOAD_ITEM` tables (Flyway migration). Both were never used in code (repositories existed but were never injected). `CHAPTER_URL` is the single source of truth for downloaded chapter tracking. Also removed `DownloadChapterHistory.kt`, `DownloadChapterHistoryRepository.kt`, `DownloadChapterHistoryDao.kt`, `DownloadItemRepository.kt`, `DownloadItemDao.kt`, and `DownloadItem` from `DownloadQueue.kt`.
@@ -23,7 +28,11 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `SeriesDao.kt` | `insert()`/`update()` only write `mangaDexUuid` when not null |
 | `ChapterUrlImporter.kt` | `syncMangaDexUuid` checks DB before reading series.json |
 | `BookLifecycle.kt` | Removed CHAPTER_URL deletion from `softDeleteMany` |
-| `GalleryDlWrapper.kt` | CBZ detection strips `v<N> ` prefix |
+| `GalleryDlWrapper.kt` | CBZ detection strips `v<N> ` prefix, added `path-restrict`/`path-replace` for consistent filename sanitization |
+| `LibraryContentLifecycle.kt` | Moved `scanAndImportLibrary()` earlier in scan, before task emission |
+| `SeriesController.kt` | New `POST /api/v1/series/{seriesId}/blacklist` for manual URL blacklisting |
+| `BlacklistDialog.vue` | Added URL input field for manual blacklist entries |
+| `komga-series.service.ts` | Added `addBlacklist()` method |
 | `V20260315000001__drop_redundant_download_tables.sql` | Drop `DOWNLOAD_CHAPTER_HISTORY` and `DOWNLOAD_ITEM` |
 
 ---

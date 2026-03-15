@@ -1325,6 +1325,8 @@ class GalleryDlWrapper(
           "lang" to defaultLanguage,
           "api" to "api",
           "data-saver" to false,
+          "path-restrict" to "auto",
+          "path-replace" to "_",
           "directory" to listOf("{volume:?v/ /}c{chapter:>03}{chapter_minor} [{group:J, }]"),
           "filename" to "{page:>03}.{extension}",
         ),

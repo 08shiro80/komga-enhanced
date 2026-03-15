@@ -8,6 +8,27 @@
 
       <v-card-text>
         <v-container fluid>
+          <v-row>
+            <v-col cols="12">
+              <v-text-field
+                v-model="newUrl"
+                label="MangaDex Chapter URL"
+                placeholder="https://mangadex.org/chapter/..."
+                outlined
+                dense
+                hide-details="auto"
+                :error-messages="urlError"
+                @keydown.enter="addUrl"
+              >
+                <template v-slot:append>
+                  <v-btn icon small color="primary" :disabled="!newUrl" @click="addUrl">
+                    <v-icon small>mdi-plus</v-icon>
+                  </v-btn>
+                </template>
+              </v-text-field>
+            </v-col>
+          </v-row>
+
           <v-row v-if="loading">
             <v-col class="text-center">
               <v-progress-circular indeterminate/>
@@ -67,6 +88,8 @@ export default Vue.extend({
       modal: false,
       loading: false,
       chapters: [] as any[],
+      newUrl: '',
+      urlError: '',
     }
   },
   props: {
@@ -99,6 +122,24 @@ export default Vue.extend({
         this.chapters = []
       } finally {
         this.loading = false
+      }
+    },
+    async addUrl () {
+      this.urlError = ''
+      const url = this.newUrl.trim()
+      if (!url) return
+
+      if (!url.includes('mangadex.org/chapter/')) {
+        this.urlError = 'Must be a MangaDex chapter URL'
+        return
+      }
+
+      try {
+        const added = await this.$komgaSeries.addBlacklist(this.seriesId, url)
+        this.chapters.push(added)
+        this.newUrl = ''
+      } catch (e) {
+        this.urlError = e.message
       }
     },
     async removeChapter (chapter: any) {
