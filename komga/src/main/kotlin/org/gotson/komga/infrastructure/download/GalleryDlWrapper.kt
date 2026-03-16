@@ -33,6 +33,8 @@ class GalleryDlWrapper(
   private val pluginId = "gallery-dl-downloader"
   private var lastMangaDexRequestTime = 0L
   private val mangaDexMinIntervalMs = 450L
+  private val chapterCache = java.util.concurrent.ConcurrentHashMap<String, Pair<List<ChapterDownloadInfo>, Long>>()
+  private val mangaInfoCache = java.util.concurrent.ConcurrentHashMap<String, Pair<MangaInfo, Long>>()
 
   private fun throttleMangaDexApi() {
     val now = System.currentTimeMillis()
@@ -42,6 +44,42 @@ class GalleryDlWrapper(
     }
     lastMangaDexRequestTime = System.currentTimeMillis()
   }
+
+  fun getChaptersForManga(
+    mangaId: String,
+    language: String? = null,
+  ): List<ChapterDownloadInfo> {
+    val lang = language ?: getDefaultLanguage()
+    val cacheKey = "$mangaId:$lang"
+    val cached = chapterCache[cacheKey]
+    if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
+      logger.debug { "Using cached chapter data for $mangaId" }
+      return cached.first
+    }
+    val chapters = fetchAllChaptersFromMangaDex(mangaId, lang)
+    chapterCache[cacheKey] = Pair(chapters, System.currentTimeMillis())
+    return chapters
+  }
+
+  fun getMangaMetadata(mangaId: String): MangaInfo? {
+    val cached = mangaInfoCache[mangaId]
+    if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
+      logger.debug { "Using cached manga metadata for $mangaId" }
+      return cached.first
+    }
+    val info = fetchMangaDexMetadata(mangaId)
+    if (info != null) mangaInfoCache[mangaId] = Pair(info, System.currentTimeMillis())
+    return info
+  }
+
+  private fun getDefaultLanguage(): String =
+    try {
+      pluginConfigRepository
+        .findByPluginIdAndKey(pluginId, "default_language")
+        ?.configValue ?: "en"
+    } catch (_: Exception) {
+      "en"
+    }
 
   fun getMangaDexChapterCount(mangaDexId: String): Int? =
     try {
@@ -98,7 +136,7 @@ class GalleryDlWrapper(
       val request =
         HttpRequest
           .newBuilder()
-          .uri(URI.create("https://api.mangadex.org/manga/$mangaId?includes[]=cover_art&includes[]=author&includes[]=artist"))
+          .uri(URI.create("https://api.mangadex.org/manga/$mangaId?includes[]=author&includes[]=artist&includes[]=cover_art"))
           .timeout(Duration.ofSeconds(10))
           .GET()
           .build()
@@ -267,6 +305,7 @@ class GalleryDlWrapper(
   }
 
   companion object {
+    private const val CACHE_TTL_MS = 30 * 60 * 1000L
     private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
 
     fun extractMangaDexId(url: String): String? = MANGADEX_ID_REGEX.find(url)?.groupValues?.get(1)
@@ -424,7 +463,7 @@ class GalleryDlWrapper(
   ): List<ChapterDownloadInfo> {
     val chapters = mutableListOf<ChapterDownloadInfo>()
     var offset = 0
-    val limit = 100
+    val limit = 500
 
     try {
       val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build()
@@ -739,8 +778,13 @@ class GalleryDlWrapper(
     val errorOutput = StringBuilder()
 
     try {
-      logger.info { "Fetching metadata for $url" }
-      var mangaInfo = getChapterInfo(url)
+      val mangaDexId = extractMangaDexId(url)
+      var mangaInfo =
+        if (mangaDexId != null) {
+          getMangaMetadata(mangaDexId) ?: getChapterInfo(url)
+        } else {
+          getChapterInfo(url)
+        }
 
       logger.info { "Using title: ${mangaInfo.title}" }
 
@@ -769,14 +813,13 @@ class GalleryDlWrapper(
           add(destinationPath.toString())
           add("--config")
           add(configFile.absolutePath)
-          if (extractMangaDexId(url) != null) {
+          if (mangaDexId != null) {
             add("-o")
             add("lang=$defaultLanguage")
           }
         }
 
       try {
-        val mangaDexId = extractMangaDexId(url)
         if (mangaDexId != null && mangaInfo.coverFilename != null) {
           val existingCoverFile =
             destDir.listFiles()?.find {
@@ -801,11 +844,10 @@ class GalleryDlWrapper(
         logger.warn(e) { "Failed to download cover image (non-fatal)" }
       }
 
-      val mangaDexId = extractMangaDexId(url)
       val allChapters =
         if (mangaDexId != null) {
-          logger.info { "Fetching chapter list from MangaDex API" }
-          fetchAllChaptersFromMangaDex(mangaDexId)
+          logger.info { "Fetching chapter list for $mangaDexId" }
+          getChaptersForManga(mangaDexId)
         } else {
           logger.warn { "Not a MangaDex URL, falling back to single download" }
           emptyList()
@@ -848,7 +890,7 @@ class GalleryDlWrapper(
       }
 
       var filesDownloaded = 0
-      val totalChapters = chapters.size
+      var totalChapters = chapters.size
 
       if (allChapters.isEmpty() && mangaDexId != null) {
         logger.warn { "MangaDex chapter API returned empty for $mangaDexId — skipping bulk download to prevent re-downloads" }
@@ -1020,17 +1062,19 @@ class GalleryDlWrapper(
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "All chapters already downloaded, skipping: $url")
         configFile.delete()
       } else {
-        logger.info { "Downloading $totalChapters chapters one by one" }
-        logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download of $totalChapters chapters: $url")
-
         val failuresFile = File(destDir, ".chapter-failures.json")
         val chapterFailures = loadChapterFailures(failuresFile)
         val mangaDexId = extractMangaDexId(url)
 
+        totalChapters = chapters.count { (chapterFailures[it.chapterUrl] ?: 0) < 3 }
+        logger.info { "Downloading $totalChapters chapters (${chapters.size - totalChapters} auto-blacklisted)" }
+        logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download of $totalChapters chapters: $url")
+
+        var downloadIndex = 0
         chapters.forEachIndexed { index, chapter ->
           if (isCancelled()) {
             saveChapterFailures(failuresFile, chapterFailures)
-            logger.info { "Download cancelled before chapter ${index + 1}/$totalChapters, stopping" }
+            logger.info { "Download cancelled before chapter ${downloadIndex + 1}/$totalChapters, stopping" }
             configFile.delete()
             return DownloadResult(
               success = true,
@@ -1065,7 +1109,8 @@ class GalleryDlWrapper(
             return@forEachIndexed
           }
 
-          logger.info { "Downloading chapter $chapterNum (${index + 1}/$totalChapters): ${chapter.chapterUrl}" }
+          downloadIndex++
+          logger.info { "Downloading chapter $chapterNum ($downloadIndex/$totalChapters): ${chapter.chapterUrl}" }
 
           val chapterCommand =
             getGalleryDlCommand().toMutableList().apply {
@@ -1162,7 +1207,7 @@ class GalleryDlWrapper(
                 }
               }
 
-              val progressPercent = ((index + 1) * 100) / totalChapters
+              val progressPercent = if (totalChapters > 0) (downloadIndex * 100) / totalChapters else 100
               onProgress(DownloadProgress(filesDownloaded, totalChapters, progressPercent, "Downloaded chapter $chapterNum"))
             } else {
               val exitCode = chapterProcess.exitValue()
@@ -1642,6 +1687,20 @@ class GalleryDlWrapper(
     }
   }
 
+  private fun generateZipComment(
+    mangaInfo: MangaInfo,
+    chapterInfo: ChapterInfo?,
+    chapterId: String? = null,
+  ): String {
+    val lines = mutableListOf<String>()
+    lines.add("Title: ${mangaInfo.title}")
+    if (mangaInfo.mangaDexId != null) lines.add("Title UUID: ${mangaInfo.mangaDexId}")
+    if (chapterId != null) lines.add("Chapter UUID: $chapterId")
+    if (chapterInfo?.chapterNumber != null) lines.add("Chapter: ${chapterInfo.chapterNumber}")
+    if (chapterInfo?.volume != null) lines.add("Volume: ${chapterInfo.volume}")
+    return lines.joinToString("\n")
+  }
+
   private fun generateComicInfoXml(
     mangaInfo: MangaInfo,
     chapterInfo: ChapterInfo?,
@@ -1726,6 +1785,7 @@ class GalleryDlWrapper(
 
       val chapterUrl = if (chapterId != null) "https://mangadex.org/chapter/$chapterId" else null
       val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
+      val zipComment = generateZipComment(mangaInfo, chapterInfo, chapterId)
       val tempFile =
         Files
           .createTempFile("cbz_temp_", ".cbz")
@@ -1766,6 +1826,8 @@ class GalleryDlWrapper(
         }
 
         ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
+          zipOut.setComment(zipComment)
+
           zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
           zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
           zipOut.closeEntry()
@@ -1811,6 +1873,13 @@ class GalleryDlWrapper(
     val maxRetries = 5
     val retryDelayMs = 1000L
 
+    val chapterId =
+      extractChapterId(cbzPath)
+        ?: chapterUrl
+          ?.substringAfterLast("/chapter/", "")
+          ?.takeIf { it.isNotEmpty() }
+    val zipComment = generateZipComment(mangaInfo, chapterInfo, chapterId)
+
     for (attempt in 1..maxRetries) {
       try {
         val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
@@ -1852,6 +1921,7 @@ class GalleryDlWrapper(
           }
 
           ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
+            zipOut.setComment(zipComment)
             val writtenEntries = mutableSetOf<String>()
 
             zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))

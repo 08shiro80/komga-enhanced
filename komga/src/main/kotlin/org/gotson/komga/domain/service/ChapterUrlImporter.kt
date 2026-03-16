@@ -19,6 +19,7 @@ private val logger = KotlinLogging.logger {}
 class ChapterUrlImporter(
   private val chapterUrlRepository: ChapterUrlRepository,
   private val seriesRepository: SeriesRepository,
+  private val seriesMetadataRepository: org.gotson.komga.domain.persistence.SeriesMetadataRepository,
   private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
 ) {
   companion object {
@@ -39,9 +40,14 @@ class ChapterUrlImporter(
 
     val allSeries = seriesRepository.findAllByLibraryId(libraryId)
     val results = mutableListOf<ChapterUrlImportResult>()
+    val total = allSeries.size
+    logger.info { "Chapter URL import: scanning $total series" }
 
-    for (series in allSeries) {
+    for ((index, series) in allSeries.withIndex()) {
       try {
+        if ((index + 1) % 25 == 0 || index == 0) {
+          logger.info { "Chapter URL import: ${index + 1}/$total — ${series.name}" }
+        }
         syncMangaDexUuid(series)
         val result = importFromSeriesPath(series.path, series.id)
         if (result.imported > 0 || result.totalInFile > 0) {
@@ -51,6 +57,7 @@ class ChapterUrlImporter(
         logger.warn(e) { "Failed to import chapter URLs for series ${series.name}" }
       }
     }
+    logger.info { "Chapter URL import: done ($total series, ${results.sumOf { it.imported }} imported)" }
 
     return results
   }
@@ -73,11 +80,13 @@ class ChapterUrlImporter(
     var totalFound = 0
     var imported = 0
     var skipped = 0
+    val cbzUrls = mutableSetOf<String>()
 
     for (cbzFile in cbzFiles) {
       val info = extractComicInfo(cbzFile) ?: continue
       if (info.url == null || !info.url.contains("mangadex.org/chapter/")) continue
 
+      cbzUrls.add(info.url)
       totalFound++
 
       if (info.url in existingUrls) {
@@ -104,6 +113,12 @@ class ChapterUrlImporter(
       } catch (e: Exception) {
         logger.debug { "Failed to insert chapter URL ${info.url} for series $resolvedSeriesId: ${e.message}" }
       }
+    }
+
+    val staleUrls = existingUrls - cbzUrls
+    if (staleUrls.isNotEmpty()) {
+      staleUrls.forEach { url -> chapterUrlRepository.deleteByUrl(url) }
+      logger.info { "Removed ${staleUrls.size} stale CHAPTER_URL entries for series $resolvedSeriesId (CBZ files deleted)" }
     }
 
     return ChapterUrlImportResult(
@@ -196,26 +211,55 @@ class ChapterUrlImporter(
       .replace("&quot;", "\"")
       .replace("&apos;", "'")
 
+  private val mangaDexTitleRegex = Regex("mangadex\\.org/title/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
+  private val uuidRegex = Regex("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+
   private fun syncMangaDexUuid(series: org.gotson.komga.domain.model.Series) {
+    val uuid =
+      extractUuidFromSeriesJson(series)
+        ?: extractUuidFromFolderName(series)
+        ?: extractUuidFromMetadataLinks(series)
+        ?: return
+
+    val existing = seriesRepository.findByMangaDexUuid(uuid)
+    if (existing?.id == series.id) return
+    if (existing != null) {
+      logger.debug { "mangaDexUuid $uuid already assigned to series ${existing.id}, skipping ${series.id}" }
+      return
+    }
+    seriesRepository.update(series.copy(mangaDexUuid = uuid), updateModifiedTime = false)
+    logger.info { "Set mangaDexUuid=$uuid on series ${series.id} (${series.name})" }
+  }
+
+  private fun extractUuidFromSeriesJson(series: org.gotson.komga.domain.model.Series): String? {
     val seriesJson = series.path.resolve("series.json").toFile()
-    if (!seriesJson.exists()) return
-    try {
+    if (!seriesJson.exists()) return null
+    return try {
       val json = objectMapper.readValue(seriesJson, Map::class.java)
-      val metadata = json["metadata"] as? Map<*, *> ?: return
-      val comicId = metadata["comicid"] as? String ?: return
-      if (comicId.isBlank()) return
-      val existing = seriesRepository.findByMangaDexUuid(comicId)
-      if (existing?.id == series.id) return
-      if (existing != null) {
-        logger.debug { "mangaDexUuid $comicId already assigned to series ${existing.id}, skipping ${series.id}" }
-        return
-      }
-      seriesRepository.update(series.copy(mangaDexUuid = comicId), updateModifiedTime = false)
-      logger.info { "Set mangaDexUuid=$comicId on series ${series.id} (${series.name}) from series.json" }
-    } catch (e: Exception) {
-      logger.debug { "Failed to read mangaDexUuid from series.json for ${series.name}: ${e.message}" }
+      val metadata = json["metadata"] as? Map<*, *> ?: return null
+      val comicId = metadata["comicid"] as? String
+      if (comicId.isNullOrBlank()) null else comicId
+    } catch (_: Exception) {
+      null
     }
   }
+
+  private fun extractUuidFromFolderName(series: org.gotson.komga.domain.model.Series): String? {
+    val folderName = series.path.toFile().name
+    return if (uuidRegex.matches(folderName)) folderName else null
+  }
+
+  private fun extractUuidFromMetadataLinks(series: org.gotson.komga.domain.model.Series): String? =
+    try {
+      val metadata = seriesMetadataRepository.findByIdOrNull(series.id)
+      metadata
+        ?.links
+        ?.firstNotNullOfOrNull { link ->
+          mangaDexTitleRegex.find(link.url.toString())?.groupValues?.get(1)
+        }
+    } catch (_: Exception) {
+      null
+    }
 
   private fun cleanupTrackerFiles(libraryPath: Path) {
     try {

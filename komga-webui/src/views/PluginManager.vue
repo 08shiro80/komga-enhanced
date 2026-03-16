@@ -155,16 +155,32 @@
           </v-alert>
 
           <v-form ref="configForm">
-            <v-text-field
-              v-for="(value, key) in pluginConfig"
-              :key="key"
-              v-model="pluginConfig[key]"
-              :label="formatConfigKey(key)"
-              :type="key.includes('password') || key.includes('secret') ? 'password' : 'text'"
-              outlined
-              dense
-              class="mb-2"
-            ></v-text-field>
+            <template v-for="(value, key) in pluginConfig">
+              <v-select
+                v-if="getSchemaField(key).enum"
+                :key="key"
+                v-model="pluginConfig[key]"
+                :items="getSchemaField(key).enum"
+                :label="getSchemaField(key).title || formatConfigKey(key)"
+                :hint="getSchemaField(key).description"
+                persistent-hint
+                outlined
+                dense
+                class="mb-2"
+              ></v-select>
+              <v-text-field
+                v-else
+                :key="key"
+                v-model="pluginConfig[key]"
+                :label="getSchemaField(key).title || formatConfigKey(key)"
+                :hint="getSchemaField(key).description"
+                :persistent-hint="!!getSchemaField(key).description"
+                :type="getSchemaField(key).format === 'password' || key.includes('password') || key.includes('secret') ? 'password' : 'text'"
+                outlined
+                dense
+                class="mb-2"
+              ></v-text-field>
+            </template>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -281,6 +297,7 @@ export default {
       pluginFile: null,
       pluginUrl: '',
       pluginConfig: {},
+      parsedSchema: null,
       savingConfig: false,
       pluginLogs: [],
       loadingLogs: false,
@@ -374,20 +391,21 @@ export default {
         const response = await this.$http.get(`/api/v1/plugins/${plugin.id}/config`)
         this.pluginConfig = response.data || {}
 
+        this.parsedSchema = null
         if (plugin.configSchema) {
           try {
-            const schema = JSON.parse(plugin.configSchema)
-            if (schema.properties) {
-              Object.keys(schema.properties).forEach(key => {
+            this.parsedSchema = JSON.parse(plugin.configSchema)
+            if (this.parsedSchema.properties) {
+              Object.keys(this.parsedSchema.properties).forEach(key => {
                 if (!(key in this.pluginConfig)) {
-                  this.pluginConfig[key] = schema.properties[key].default != null
-                    ? String(schema.properties[key].default)
+                  this.pluginConfig[key] = this.parsedSchema.properties[key].default != null
+                    ? String(this.parsedSchema.properties[key].default)
                     : ''
                 }
               })
             }
           } catch (e) {
-            // ignore schema parse errors
+            this.parsedSchema = null
           }
         }
 
@@ -438,6 +456,10 @@ export default {
       } finally {
         this.clearingLogs = false
       }
+    },
+    getSchemaField(key) {
+      if (this.parsedSchema?.properties?.[key]) return this.parsedSchema.properties[key]
+      return {}
     },
     formatConfigKey(key) {
       return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())

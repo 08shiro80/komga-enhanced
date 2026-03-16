@@ -144,14 +144,21 @@ class LibraryContentLifecycle(
       scannedSeries.forEach { (newSeries, newBooks) ->
         val existingSeries = seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, newSeries.url)
 
-        // if series does not exist, save it
+        // if series does not exist, try to restore by mangaDexUuid before creating new
         if (existingSeries == null) {
-          logger.info { "Adding new series: $newSeries" }
-          val createdSeries = seriesLifecycle.createSeries(newSeries)
-          seriesLifecycle.addBooks(createdSeries, newBooks)
-          tryRestoreSeries(createdSeries, newBooks)
-          tryRestoreBooks(newBooks)
-          seriesToSortAndRefresh.add(createdSeries)
+          val restored = tryRestoreByMangaDexUuid(newSeries, library.id)
+          if (restored != null) {
+            logger.info { "Restored series by mangaDexUuid: ${restored.id} (${restored.name}) → ${newSeries.url}" }
+            seriesLifecycle.addBooks(restored, newBooks)
+            seriesToSortAndRefresh.add(restored)
+          } else {
+            logger.info { "Adding new series: $newSeries" }
+            val createdSeries = seriesLifecycle.createSeries(newSeries)
+            seriesLifecycle.addBooks(createdSeries, newBooks)
+            tryRestoreSeries(createdSeries, newBooks)
+            tryRestoreBooks(newBooks)
+            seriesToSortAndRefresh.add(createdSeries)
+          }
         } else {
           // if series already exists, update it
           logger.debug { "Scanned series already exists. Scanned: $newSeries, Existing: $existingSeries" }
@@ -279,6 +286,57 @@ class LibraryContentLifecycle(
     eventPublisher.publishEvent(DomainEvent.LibraryScanned(library))
   }
 
+  fun scanSeriesFolder(
+    library: Library,
+    seriesPath: java.nio.file.Path,
+  ) {
+    logger.info { "Targeted scan for series folder: $seriesPath" }
+    val seriesUrl = seriesPath.toUri().toURL()
+    val existingSeries =
+      seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, seriesUrl)
+        ?: return logger.warn { "Series not found for path $seriesPath, skipping targeted scan" }
+
+    val existingBooks = bookRepository.findAllBySeriesId(existingSeries.id)
+    val existingBooksUrls = existingBooks.filterNot { it.deletedDate != null }.map { it.url }.toSet()
+
+    val newBooks =
+      seriesPath
+        .toFile()
+        .listFiles()
+        ?.filter { it.isFile && it.extension.lowercase() in setOf("cbz", "zip", "cbr", "rar") }
+        ?.map { fileSystemScanner.scanFile(it.toPath()) }
+        ?.filterNotNull()
+        ?.filter { it.url !in existingBooksUrls }
+        ?.map { it.copy(libraryId = library.id) }
+        ?: emptyList()
+
+    if (newBooks.isEmpty()) {
+      logger.info { "No new books found in $seriesPath" }
+      return
+    }
+
+    logger.info { "Adding ${newBooks.size} new books to series ${existingSeries.name}" }
+    seriesLifecycle.addBooks(existingSeries, newBooks)
+    seriesLifecycle.sortBooks(existingSeries)
+    taskEmitter.refreshSeriesMetadata(existingSeries.id)
+
+    newBooks.forEach { book ->
+      taskEmitter.analyzeBook(bookRepository.findByIdOrNull(book.id) ?: book)
+    }
+
+    try {
+      val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
+      if (importResults.isNotEmpty()) {
+        val totalImported = importResults.sumOf { it.imported }
+        if (totalImported > 0) {
+          logger.info { "Chapter URL import after targeted scan: $totalImported imported" }
+        }
+      }
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to import chapter URLs after targeted scan" }
+    }
+  }
+
   /**
    * This will try to match newSeries with a deleted series.
    * Series are matched if:
@@ -290,6 +348,52 @@ class LibraryContentLifecycle(
    * - Metadata. The metadata title will only be copied if locked. If not locked, the folder name is used.
    * - all books, via #tryRestoreBooks
    */
+  private fun tryRestoreByMangaDexUuid(
+    newSeries: Series,
+    libraryId: String,
+  ): Series? {
+    val mangaDexUuid = extractMangaDexUuidFromFolder(newSeries.path) ?: return null
+    val existing = seriesRepository.findByMangaDexUuid(mangaDexUuid) ?: return null
+    if (existing.libraryId != libraryId) return null
+    if (existing.deletedDate == null) return null
+
+    val restored =
+      existing.copy(
+        url = newSeries.url,
+        fileLastModified = newSeries.fileLastModified,
+        deletedDate = null,
+      )
+    seriesRepository.update(restored)
+
+    val deletedBooks = bookRepository.findAllBySeriesId(existing.id)
+    if (deletedBooks.isNotEmpty()) {
+      bookLifecycle.softDeleteMany(deletedBooks)
+    }
+
+    return seriesRepository.findByIdOrNull(existing.id)!!
+  }
+
+  private fun extractMangaDexUuidFromFolder(path: java.nio.file.Path): String? {
+    val seriesJson = path.resolve("series.json").toFile()
+    if (seriesJson.exists()) {
+      try {
+        val content = seriesJson.readText()
+        val uuid =
+          COMICID_REGEX
+            .find(content)
+            ?.groupValues
+            ?.get(1)
+            ?.takeIf { it.isNotBlank() }
+        if (uuid != null) return uuid
+      } catch (_: Exception) {
+      }
+    }
+
+    val folderName = path.fileName?.toString() ?: return null
+    if (folderName.matches(UUID_REGEX)) return folderName
+    return null
+  }
+
   private fun tryRestoreSeries(
     newSeries: Series,
     newBooks: List<Book>,
@@ -484,5 +588,10 @@ class LibraryContentLifecycle(
     if (komgaSettingsProvider.deleteEmptyReadLists) {
       readListLifecycle.deleteEmptyReadLists()
     }
+  }
+
+  companion object {
+    private val UUID_REGEX = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+    private val COMICID_REGEX = Regex(""""comicid"\s*:\s*"([^"]+)"""")
   }
 }

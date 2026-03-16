@@ -16,11 +16,15 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
 | Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
 | Title changes cause re-downloads | **UUID folder names** - MangaDex UUID as folder name, immune to title changes |
+| Folder renames break series | **Series survives folder rename** - detects same series via MangaDex UUID, preserves progress and metadata |
 | Unwanted chapters keep re-downloading | **Chapter blacklist** - permanently block chapters from being downloaded |
-| Syncing MangaDex subscriptions | **MangaDex Subscription Sync** auto-downloads from your feed |
+| Syncing MangaDex subscriptions | **MangaDex Subscription Sync** auto-downloads from your followed manga feed |
+| No guest browsing for family | **Guest/Kiosk mode** - read-only browsing without login, per-library access control |
 | Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
 | Long vertical webtoon pages | **Page splitting** like TachiyomiSY |
 | Missing metadata | **MangaDex & AniList plugins** for rich metadata |
+| No server logs in UI | **Web-based log viewer** - real-time auto-refresh, search, color-coded levels |
+| Bland default theme | **7 color themes** - AMOLED, Nord, Dracula, Solarized, Green, Red + Default |
 
 ---
 
@@ -79,10 +83,11 @@ Automatically sync new chapters from your MangaDex subscription feed — complet
 
 **How it works:**
 - Authenticates with MangaDex via OAuth2 (password grant through Keycloak)
-- Creates a dedicated CustomList (`Komga Sync`) for tracking
-- Periodically checks `GET /subscription/feed` for new chapters
+- Creates a dedicated CustomList (`Komga Subscriptions`) for tracking
+- Checks `GET /user/follows/manga` for newly followed manga → queues full download
+- Checks `GET /user/follows/manga/feed?publishAtSince=...` for new chapters of existing manga
+- Deduplicates against DB: checks mangaDexUuid → series → CHAPTER_URL IDs and blacklist before queuing
 - Filters by your configured language (default: `en`)
-- Queues new manga for download automatically
 - Resilient to temporary MangaDex API failures (retries on next scheduled check)
 
 **Configuration** (via Plugin Manager UI):
@@ -171,6 +176,49 @@ Never download the same chapter twice:
 - Tracks chapter metadata (volume, language, scanlation group)
 - Multi-group support — same chapter from different scanlation groups downloaded separately
 
+### Guest/Kiosk Mode
+
+Read-only browsing without login — perfect for family or shared setups:
+
+- Toggle in admin **Settings → UI**
+- "Als Gast durchsuchen" button on login page
+- Per-library guest access — admins select which libraries are visible
+- Security: GET-only access to series/books/libraries, admin routes blocked
+
+### Web Log Viewer
+
+Admin-only log viewer in **Settings → Logs**:
+
+- Color-coded log levels (ERROR=red, WARN=orange, DEBUG=grey)
+- Auto-refresh (5-second polling)
+- Client-side search/filter
+- Full log file download
+
+### Color Themes
+
+7 predefined theme presets in **Account → UI Settings**:
+
+- Default, AMOLED, Nord, Dracula, Solarized, Green, Red
+- Each preset defines both light and dark mode colors
+- Persistent selection via browser local storage
+
+### Configurable Folder Naming
+
+Choose how new manga folders are named:
+
+- `uuid` (default) — uses MangaDex UUID like `0c6fe779-...`
+- `title` — uses manga title like `Roman Club`
+- Set in **Plugin Manager → gallery-dl Downloader** settings
+- Only affects new manga — existing folders are never renamed
+
+### Auto-Scan After Download
+
+New chapters are automatically scanned after download completes:
+
+- Uses targeted `scanSeriesFolder()` — only processes the affected series folder
+- New books are added, analyzed, and chapter URLs imported automatically
+- No full library scan needed
+
 ---
 
 ## API Endpoints
@@ -217,37 +265,26 @@ Never download the same chapter twice:
 | POST | `/api/v1/media-management/oversized-pages/split/{bookId}` | Split book pages |
 | POST | `/api/v1/media-management/oversized-pages/split-all` | Split all oversized |
 
+### Page Hashes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| DELETE | `/api/v1/page-hashes/{pageHash}` | Remove known duplicate page hash |
+
+### Logs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/logs?lines=500` | Last N log lines (admin) |
+| GET | `/api/v1/logs/download` | Download full log file |
+
 ### System
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/v1/health` | Health check |
 | POST | `/api/v1/tachiyomi/import` | Import Tachiyomi backup |
-
----
-
-## Switching Between Official Komga and This Fork
-
-### Official Komga → Fork: Works
-
-The fork's database migrations run automatically on first startup. All existing data is preserved.
-
-### Fork → Official Komga: Works with One Step
-
-The fork adds extra tables and columns to the database, but these don't interfere with official Komga — it simply ignores them. The only blocker is Flyway: it sees the fork's migration entries in the database history and refuses to start.
-
-To switch back, remove the fork migration entries from the database before starting official Komga:
-
-```sql
-DELETE FROM flyway_schema_history WHERE version IN (
-  '20250930120000', '20251201000000', '20251201000001',
-  '20251201000002', '20251201000003', '20251204000000',
-  '20251211000000', '20260301000000', '20260315000000',
-  '20260315000001'
-);
-```
-
-After this, official Komga starts normally. The fork's extra tables and columns remain in the database but are never queried and cause no issues. Fork-specific data (downloads, blacklist, plugin config, MangaDex UUID mappings) stays in the database but is unused.
+| GET | `/api/v1/releases/fork` | Fork releases from GitHub |
 
 ---
 
@@ -380,12 +417,18 @@ komga:
 | Media Server | Yes | Yes |
 | Manga Downloads (250+ sites) | No | Yes |
 | Automatic Chapter Tracking | No | Yes |
+| MangaDex Subscription Sync | No | Yes |
+| Follow List Automation | No | Yes |
+| Chapter Blacklist | No | Yes |
+| Series survives folder rename | No | Yes |
+| Auto-scan after download | No | Yes |
+| Configurable folder naming | No | Yes (UUID/title) |
+| Guest/Kiosk Mode | No | Yes |
+| Web Log Viewer | No | Yes |
+| Color Themes | No | 7 presets |
 | Tachiyomi Import | No | Yes |
 | Page Splitting | No | Yes |
 | AniList Metadata | No | Yes |
-| Follow List Automation | No | Yes |
-| MangaDex Subscription Sync | No | Yes |
-| Chapter Blacklist | No | Yes |
 | Real-time Progress | No | Yes (SSE) |
 
 ---

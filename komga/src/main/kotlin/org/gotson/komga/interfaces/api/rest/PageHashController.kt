@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -115,6 +116,17 @@ class PageHashController(
     } catch (e: IllegalArgumentException) {
       throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
     }
+  }
+
+  @Operation(summary = "Remove known page hash entry")
+  @DeleteMapping("{pageHash}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun deleteKnownPageHash(
+    @PathVariable pageHash: String,
+  ) {
+    pageHashRepository.findKnown(pageHash)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    pageHashRepository.deleteKnown(pageHash)
   }
 
   @Operation(summary = "Delete all duplicate pages by hash")

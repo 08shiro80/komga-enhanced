@@ -6,6 +6,50 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.1] - 2026-03-16
+
+### New Features
+- **Series survives folder rename** — When a manga folder is renamed, Komga now detects the same series via `mangaDexUuid` (from `series.json` or UUID folder name) and restores it instead of creating a new one. Preserves browser URL, reading progress, collections, and metadata. Compatible with upstream Komga (no DB schema changes).
+- **Remove known duplicate page hashes** — New `DELETE /api/v1/page-hashes/{pageHash}` endpoint and WebUI button to permanently remove entries from the known duplicate pages list. Previously only IGNORE was available, causing the list to grow indefinitely.
+- **ZIP file comments in CBZ** — CBZ files now include metadata as ZIP file comments: `Title`, `Title UUID`, `Chapter UUID`, `Chapter`, `Volume`. Compatible with all manga downloaders (none use the ZIP comment field). Only Calibre's ComicBookInfo plugin uses this field, but with a different JSON format that doesn't conflict.
+- **Auto-scan after download** — New chapters are automatically scanned after download completes. Uses targeted `scanSeriesFolder()` that only processes the affected series folder — no full library scan. New books are added, analyzed, and chapter URLs imported automatically.
+- **Configurable folder naming** — New `folder_naming` plugin config for gallery-dl-downloader. Options: `uuid` (default, uses MangaDex UUID like `0c6fe779-...`) or `title` (uses manga title like `Roman Club`). Set in Plugin Manager → gallery-dl Downloader settings. Only affects new manga — existing folders are never renamed.
+- **MangaDex Subscription Feed** — New `mangadex-subscription` plugin that watches the MangaDex follow feed (`GET /user/follows/manga/feed?publishAtSince=...`) for new chapters and auto-queues downloads. Uses OAuth2 personal client auth, auto-creates and subscribes to a CustomList, and checks the feed at a configurable interval (default 30 min). Deduplicates against existing DB state: checks `mangaDexUuid` → series → CHAPTER_URL IDs, blacklisted chapter IDs, and URL existence before queuing. Groups new chapters by manga to avoid duplicate downloads when both follow.txt and subscription are active. When a manga is newly added to the follow list, all chapters are downloaded (not just new ones since last check) — detected by checking `GET /user/follows/manga` against existing series in DB via `mangaDexUuid`. Disabled by default — requires MangaDex API credentials in Plugin Manager.
+
+### Bug Fixes
+- **Deleted CBZ files not re-downloaded** — When CBZ files were manually deleted and the library rescanned, ChapterChecker still saw the old CHAPTER_URL entries in the DB and reported "Up to date". `ChapterUrlImporter` now removes stale CHAPTER_URL entries during library scan by comparing DB URLs against actual CBZ files on disk. Deleted chapters are correctly detected as missing on the next chapter check.
+- **Download progress counter includes auto-blacklisted chapters** — Progress showed e.g. "2/14" when 12 of 14 chapters were auto-blacklisted. Now excludes auto-blacklisted chapters from the total, showing "2/2" instead.
+
+### Improved
+- **Plugin config renders enum fields as dropdowns** — Plugin Manager config dialog now uses `v-select` for fields with `enum` in the JSON schema (e.g. `folder_naming`, `default_language`). Also uses schema `title` as label, `description` as hint, and `format: "password"` for password detection. Previously all fields were plain text inputs.
+- **Plugin configSchema auto-updates** — `PluginInitializer` now updates the `configSchema` on existing plugins when it changes, instead of skipping them. New config fields (like `folder_naming`) appear immediately after restart without requiring a DB reset.
+- **Chapter check uses ID comparison instead of count** — ChapterChecker now fetches all chapter IDs from the MangaDex feed and compares them directly against the DB (chapter_url + blacklist). Previously used inflated API total count which included duplicate uploads, causing permanent re-queuing for manga with duplicate entries.
+- **MangaDex API call caching** — GalleryDlWrapper caches `/manga/{id}` metadata and `/manga/{id}/feed` chapter data for 30 minutes. ChapterChecker and download share the same cache, eliminating duplicate API calls. Previously each check+download cycle made 9+ requests per manga, now 2 (one feed, one metadata).
+- **Feed pagination limit increased** — `fetchAllChaptersFromMangaDex` uses `limit=500` instead of `limit=100`, reducing pagination requests for large manga (e.g. 500 chapters: 1 request instead of 5).
+- **Removed redundant pre-check in DownloadExecutor** — `processDownload` no longer calls `getMangaDexChapterCount` before starting a download. The ID-based check in ChapterChecker is more accurate and already cached.
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `LibraryContentLifecycle.kt` | `tryRestoreByMangaDexUuid()` restores soft-deleted series on folder rename; `scanSeriesFolder()` for targeted post-download scan |
+| `PageHashRepository.kt` | Added `deleteKnown()` |
+| `PageHashDao.kt` | Implemented `deleteKnown()` — deletes from PAGE_HASH + PAGE_HASH_THUMBNAIL |
+| `PageHashController.kt` | New `DELETE /{pageHash}` endpoint |
+| `PageHashKnownCard.vue` | Remove button (mdi-close-circle) for known duplicate page hashes |
+| `DuplicatePagesKnown.vue` | `@removed` event handler reloads data after hash removal |
+| `komga-pagehashes.service.ts` | `removeKnownHash()` API method |
+| `en.json` | Added `action_remove` translation |
+| `ChapterChecker.kt` | ID-based comparison via `GalleryDlWrapper` cache instead of own API calls |
+| `GalleryDlWrapper.kt` | Added `getChaptersForManga()`/`getMangaMetadata()` with 30min cache, feed limit 100→500, ZIP comments via `generateZipComment()` |
+| `DownloadExecutor.kt` | Skip `getChapterInfo` when title known, removed `getMangaDexChapterCount` pre-check, auto-scan via `scanSeriesFolder()`, configurable folder naming via `folder_naming` plugin config |
+| `PluginInitializer.kt` | Added `folder_naming` config option (`uuid`/`title`) to gallery-dl-downloader plugin, auto-updates configSchema on existing plugins |
+| `PluginManager.vue` | `v-select` for enum fields, schema `title`/`description`/`format` support in config dialog |
+| `ChapterUrlImporter.kt` | Removes stale CHAPTER_URL entries when CBZ files are deleted from disk |
+| `GalleryDlWrapper.kt` (progress) | `totalChapters` excludes auto-blacklisted chapters, `downloadIndex` counter for accurate progress |
+| `MangaDexSubscriptionSyncer.kt` | Rewritten: feed-based sync via `GET /user/follows/manga/feed?publishAtSince=`, DB dedup using mangaDexUuid/CHAPTER_URL/blacklist, CustomList auto-setup, OAuth2 auth with token refresh |
+
+---
+
 ## [0.1.0] - 2026-03-15
 
 ### New Features
@@ -46,7 +90,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 ### New Features
 - **MangaDex UUID ↔ Komga Series ID mapping** — New `MANGADEX_UUID` column on the SERIES table (Flyway migration) enables direct DB lookup between MangaDex manga UUIDs and Komga series IDs. Eliminates filesystem scanning for series identification. `DownloadExecutor` sets `mangaDexUuid` on the series after successful download. `ChapterChecker` and `findExistingMangaFolder` use direct DB lookup as primary method, falling back to filesystem scan only when no DB mapping exists.
 - **ChapterUrlImporter imports from ComicInfo.xml** — During library scan, reads `<Web>` tags from ComicInfo.xml inside CBZ files and imports chapter URLs into the `CHAPTER_URL` table with the correct Komga series ID. Enables accurate `countDownloadedChapters` via DB instead of filesystem counting. Also extracts chapter number, volume, title, language, and scanlation group from ComicInfo.xml.
-- **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Uses the new CustomList-based subscription API instead of polling each manga individually. On first setup, creates a "Komga Subscriptions" CustomList and subscribes to it. Periodic feed checks (default every 30 min) query `GET /subscription/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
+- **MangaDex Subscription Feed Sync** — New plugin (`mangadex-subscription`) that watches your MangaDex follow feed for new chapters and auto-downloads them. Uses OAuth2 personal client auth, auto-creates and subscribes to a CustomList. Periodic feed checks (default every 30 min) query `GET /user/follows/manga/feed?publishAtSince=...` for new chapters and queue them for download. Requires a MangaDex personal API client (OAuth2 password grant). Completely independent from the existing follow.txt system. Disabled by default — configure credentials in Plugin Manager to enable.
 - **`gallery_dl_path` plugin config** — New config option to point Komga at a local gallery-dl source checkout (e.g. `/path/to/gallery-dl/`). Sets `PYTHONPATH` on all gallery-dl subprocess calls so `python -m gallery_dl` loads from the local source instead of the system-installed package. Useful for running the latest gallery-dl with new extractors (e.g. weebdex.py) without reinstalling.
 
 ### Bug Fixes

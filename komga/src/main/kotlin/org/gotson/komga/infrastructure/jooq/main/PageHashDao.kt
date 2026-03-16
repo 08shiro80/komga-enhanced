@@ -245,6 +245,12 @@ class PageHashDao(
       .where(ph.HASH.eq(pageHash.hash))
       .execute()
   }
+
+  @Transactional
+  override fun deleteKnown(pageHash: String) {
+    dslRW.deleteFrom(pht).where(pht.HASH.eq(pageHash)).execute()
+    dslRW.deleteFrom(ph).where(ph.HASH.eq(pageHash)).execute()
+  }
 }
 
 private fun PageHashRecord.toDomain(matchCount: Int = 0) =

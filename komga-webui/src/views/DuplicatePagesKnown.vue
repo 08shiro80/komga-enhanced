@@ -68,6 +68,7 @@
           @image-clicked="showDialogImage(element)"
           @matches-clicked="showDialogMatches(element)"
           @updated="pageHashUpdated"
+          @removed="pageHashRemoved"
         />
       </v-slide-x-transition>
 
@@ -229,6 +230,9 @@ export default Vue.extend({
           return false
         },
       )
+    },
+    pageHashRemoved() {
+      this.loadData()
     },
   },
 })

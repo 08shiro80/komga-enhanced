@@ -6,9 +6,12 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PreDestroy
 import org.gotson.komga.domain.model.PluginConfig
+import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
+import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.persistence.PluginRepository
+import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.service.DownloadExecutor
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
@@ -20,6 +23,8 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.ScheduledFuture
 
@@ -31,6 +36,9 @@ class MangaDexSubscriptionSyncer(
   private val pluginRepository: PluginRepository,
   private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
+  private val seriesRepository: SeriesRepository,
+  private val chapterUrlRepository: ChapterUrlRepository,
+  private val blacklistedChapterRepository: BlacklistedChapterRepository,
   private val taskScheduler: TaskScheduler,
 ) {
   private val pluginId = "mangadex-subscription"
@@ -43,6 +51,7 @@ class MangaDexSubscriptionSyncer(
 
   private val tokenEndpoint = "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token"
   private val apiBase = "https://api.mangadex.org"
+  private val chapterIdRegex = Regex("mangadex\\.org/chapter/([0-9a-f-]+)")
 
   private var accessToken: String? = null
   private var refreshToken: String? = null
@@ -142,7 +151,7 @@ class MangaDexSubscriptionSyncer(
       }
     }
 
-    logger.info { "Synced follow.txt to MangaDex: $followed/$mangaDexIds followed" }
+    logger.info { "Synced follow.txt to MangaDex: $followed/${mangaDexIds.size} followed" }
     return SyncResult(followed, mangaDexIds.size, null)
   }
 
@@ -313,51 +322,63 @@ class MangaDexSubscriptionSyncer(
 
       if (!hasRequiredCredentials(config)) return
 
+      checkForNewManga(config)
+      checkFeed(config)
+
       val listId = config["list_id"]
       if (listId.isNullOrBlank()) {
-        logger.info { "No CustomList configured, retrying setup" }
-        initializeList(config)
-        return
+        try {
+          initializeList(config)
+        } catch (e: MangaDexApiException) {
+          logger.warn { "CustomList setup failed (${e.message}), will retry next cycle" }
+        }
       }
-
-      checkFeed(config)
     } catch (e: MangaDexApiException) {
       logger.error(e) { "MangaDex feed check failed: ${e.message}" }
     }
   }
 
-  private fun checkFeed(config: Map<String, String?>) {
+  @Suppress("UNCHECKED_CAST")
+  private fun checkForNewManga(config: Map<String, String?>) {
     val token = getValidToken(config)
-
-    logger.info { "Checking MangaDex follows list for new manga to sync" }
+    val library = libraryRepository.findAll().firstOrNull()
 
     var offset = 0
     val limit = 100
-    var totalNew = 0
-    val library = libraryRepository.findAll().firstOrNull()
+    var queued = 0
 
     while (true) {
       val url = "$apiBase/user/follows/manga?limit=$limit&offset=$offset"
-
       val response = apiGet(url, token)
       if (response.statusCode() != 200) {
-        logger.warn { "Follows list request failed (HTTP ${response.statusCode()}): ${response.body()}" }
+        logger.warn { "Followed manga request failed (HTTP ${response.statusCode()})" }
         break
       }
 
-      val followsData: Map<String, Any> = objectMapper.readValue(response.body())
-
-      @Suppress("UNCHECKED_CAST")
-      val mangaList = followsData["data"] as? List<Map<String, Any>> ?: emptyList()
-      val total = (followsData["total"] as? Number)?.toInt() ?: 0
-
-      logger.debug { "Follows page: ${mangaList.size} manga (offset=$offset, total=$total)" }
+      val data: Map<String, Any> = objectMapper.readValue(response.body())
+      val mangaList = data["data"] as? List<Map<String, Any>> ?: emptyList()
+      val total = (data["total"] as? Number)?.toInt() ?: 0
 
       for (manga in mangaList) {
+        val mangaId = manga["id"] as? String ?: continue
+
+        if (seriesRepository.findByMangaDexUuid(mangaId) != null) continue
+
+        val mangaUrl = "https://mangadex.org/title/$mangaId"
+        if (downloadExecutor.isUrlAlreadyQueued(mangaUrl)) continue
+
         try {
-          totalNew += processManga(manga, library)
+          downloadExecutor.createDownload(
+            sourceUrl = mangaUrl,
+            libraryId = library?.id,
+            title = null,
+            createdBy = "mangadex-subscription",
+            priority = 5,
+          )
+          queued++
+          logger.info { "New followed manga, queued full download: $mangaId" }
         } catch (e: Exception) {
-          logger.warn { "Error processing manga: ${e.message}" }
+          logger.warn { "Failed to queue new manga $mangaId: ${e.message}" }
         }
       }
 
@@ -365,37 +386,153 @@ class MangaDexSubscriptionSyncer(
       if (offset >= total || mangaList.isEmpty()) break
     }
 
-    logger.info { "Follows check complete: $totalNew new manga queued for download" }
+    if (queued > 0) {
+      logger.info { "Followed manga check: queued $queued new manga for full download" }
+    }
   }
 
   @Suppress("UNCHECKED_CAST")
-  private fun processManga(
-    manga: Map<String, Any>,
-    library: org.gotson.komga.domain.model.Library?,
-  ): Int {
-    val mangaId = manga["id"] as? String ?: return 0
-    val mangaUrl = "https://mangadex.org/title/$mangaId"
+  private fun checkFeed(config: Map<String, String?>) {
+    val token = getValidToken(config)
+    val language = config["language"] ?: "en"
 
-    if (downloadExecutor.isUrlAlreadyQueued(mangaUrl)) {
-      return 0
+    val lastCheck =
+      config["last_check_time"]
+        ?: Instant
+          .now()
+          .minusSeconds(86400)
+          .atOffset(ZoneOffset.UTC)
+          .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+
+    logger.info { "Checking subscription feed since $lastCheck" }
+
+    var offset = 0
+    val limit = 100
+    val newChaptersByManga = mutableMapOf<String, MutableList<FeedChapter>>()
+
+    while (true) {
+      val url =
+        "$apiBase/user/follows/manga/feed" +
+          "?publishAtSince=${encode(lastCheck)}" +
+          "&translatedLanguage[]=$language" +
+          "&order[publishAt]=asc" +
+          "&limit=$limit&offset=$offset"
+
+      val response = apiGet(url, token)
+      if (response.statusCode() != 200) {
+        logger.warn { "Subscription feed request failed (HTTP ${response.statusCode()}): ${response.body()}" }
+        break
+      }
+
+      val feedData: Map<String, Any> = objectMapper.readValue(response.body())
+      val chapters = feedData["data"] as? List<Map<String, Any>> ?: emptyList()
+      val total = (feedData["total"] as? Number)?.toInt() ?: 0
+
+      logger.debug { "Feed page: ${chapters.size} chapters (offset=$offset, total=$total)" }
+
+      for (chapter in chapters) {
+        val chapterId = chapter["id"] as? String ?: continue
+        val attributes = chapter["attributes"] as? Map<String, Any> ?: continue
+        val relationships = chapter["relationships"] as? List<Map<String, Any>> ?: continue
+
+        val mangaId =
+          relationships
+            .firstOrNull { it["type"] == "manga" }
+            ?.get("id") as? String
+            ?: continue
+
+        val chapterUrl = "https://mangadex.org/chapter/$chapterId"
+
+        if (isChapterKnown(mangaId, chapterId, chapterUrl)) continue
+
+        val mangaUrl = "https://mangadex.org/title/$mangaId"
+        if (downloadExecutor.isUrlAlreadyQueued(mangaUrl)) continue
+
+        newChaptersByManga
+          .getOrPut(mangaId) { mutableListOf() }
+          .add(
+            FeedChapter(
+              chapterId = chapterId,
+              mangaId = mangaId,
+              chapter = attributes["chapter"] as? String,
+              volume = attributes["volume"] as? String,
+              title = attributes["title"] as? String,
+            ),
+          )
+      }
+
+      offset += chapters.size
+      if (offset >= total || chapters.isEmpty()) break
     }
 
-    val attributes = manga["attributes"] as? Map<String, Any>
-    val titleMap = attributes?.get("title") as? Map<String, String>
-    val title = titleMap?.get("en") ?: titleMap?.values?.firstOrNull() ?: mangaId
+    if (newChaptersByManga.isEmpty()) {
+      logger.info { "Subscription feed: no new chapters" }
+    } else {
+      val library = libraryRepository.findAll().firstOrNull()
+      var queued = 0
 
-    logger.info { "Queueing manga from follows list: $title ($mangaId)" }
+      for ((mangaId, chapters) in newChaptersByManga) {
+        val mangaUrl = "https://mangadex.org/title/$mangaId"
+        try {
+          downloadExecutor.createDownload(
+            sourceUrl = mangaUrl,
+            libraryId = library?.id,
+            title = null,
+            createdBy = "mangadex-subscription",
+            priority = 5,
+          )
+          queued++
+          logger.info { "Queued $mangaId: ${chapters.size} new chapters (${chapters.map { it.chapter }.joinToString(", ")})" }
+        } catch (e: Exception) {
+          logger.warn { "Failed to queue $mangaId: ${e.message}" }
+        }
+      }
 
-    downloadExecutor.createDownload(
-      sourceUrl = mangaUrl,
-      libraryId = library?.id,
-      title = null,
-      createdBy = "mangadex-subscription",
-      priority = 5,
+      logger.info { "Subscription feed: queued $queued manga with new chapters" }
+    }
+
+    saveConfigValue(
+      "last_check_time",
+      Instant.now().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
     )
-
-    return 1
   }
+
+  private fun isChapterKnown(
+    mangaId: String,
+    chapterId: String,
+    chapterUrl: String,
+  ): Boolean {
+    val series = seriesRepository.findByMangaDexUuid(mangaId)
+    if (series != null) {
+      val existingUrls = chapterUrlRepository.findUrlsBySeriesId(series.id)
+      val existingIds =
+        existingUrls
+          .mapNotNull { url ->
+            chapterIdRegex.find(url)?.groupValues?.get(1)
+          }.toSet()
+      if (chapterId in existingIds) return true
+
+      val blacklisted = blacklistedChapterRepository.findUrlsBySeriesId(series.id)
+      val blacklistedIds =
+        blacklisted
+          .mapNotNull { url ->
+            chapterIdRegex.find(url)?.groupValues?.get(1)
+          }.toSet()
+      if (chapterId in blacklistedIds) return true
+    }
+
+    if (chapterUrlRepository.existsByUrl(chapterUrl)) return true
+
+    return false
+  }
+
+  private data class FeedChapter(
+    val chapterId: String,
+    val mangaId: String,
+    val chapter: String?,
+    val volume: String?,
+    val title: String?,
+  )
 
   private fun apiGet(
     url: String,

@@ -88,6 +88,10 @@
       <v-btn v-if="hash.action !== PageHashAction.DELETE_AUTO" text @click="deleteAuto" :disabled="!hash.size">
         {{ $t('duplicate_pages.action_delete_auto') }}
       </v-btn>
+      <v-spacer />
+      <v-btn icon color="error" @click="removeHash" :title="$t('duplicate_pages.action_remove')">
+        <v-icon>mdi-close-circle</v-icon>
+      </v-btn>
     </v-card-actions>
   </v-card>
 </template>
@@ -149,6 +153,13 @@ export default Vue.extend({
     },
     deleteAuto() {
       this.updatePageHash(PageHashAction.DELETE_AUTO)
+    },
+    async removeHash() {
+      try {
+        await this.$komgaPageHashes.removeKnownHash(this.hash)
+        this.$emit('removed', this.hash)
+      } catch (e) {
+      }
     },
     async updatePageHash(action: PageHashAction) {
       try {

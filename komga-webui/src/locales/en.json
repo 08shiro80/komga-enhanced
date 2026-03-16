@@ -656,6 +656,7 @@
     "action_delete_manual": "Manual delete",
     "action_delete_matches": "Delete matches",
     "action_ignore": "Ignore",
+    "action_remove": "Remove from list",
     "action_ignore_remaining": "Ignore remaining ({count})",
     "action_manual_delete_remaining": "Manual delete remaining ({count})",
     "confirm_auto_delete_remaining": "All of the remaining page hashes on this page ({count}) will be marked for automatic deletion.",

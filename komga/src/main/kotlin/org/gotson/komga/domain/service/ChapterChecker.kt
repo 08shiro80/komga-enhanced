@@ -1,7 +1,5 @@
 package org.gotson.komga.domain.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.DownloadStatus
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
@@ -9,14 +7,8 @@ import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
-import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.springframework.stereotype.Service
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
@@ -56,15 +48,8 @@ class ChapterChecker(
   private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
   private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
-  private val pluginConfigRepository: PluginConfigRepository,
-  private val objectMapper: ObjectMapper,
+  private val galleryDlWrapper: GalleryDlWrapper,
 ) {
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .connectTimeout(Duration.ofSeconds(15))
-      .build()
-
   private val concurrencyLimit = Semaphore(5)
 
   fun checkAll(): ChapterCheckSummary {
@@ -191,37 +176,40 @@ class ChapterChecker(
     }
 
     try {
-      val feedResult = fetchMangaDexFeedTotal(mangaId)
-      val apiChapterCount = feedResult.chapterCount
-      val title = feedResult.title
+      val chapters = galleryDlWrapper.getChaptersForManga(mangaId)
+      val apiChapterIds = chapters.map { it.chapterId }.toSet()
+      val mangaInfo = galleryDlWrapper.getMangaMetadata(mangaId)
+      val title = mangaInfo?.title
 
-      val downloadedCount = countDownloadedChapters(mangaId)
+      val series = findSeriesForManga(mangaId)
+      val knownChapterIds = getKnownChapterIds(series)
+      val blacklistedChapterIds = getBlacklistedChapterIds(series)
+      val allKnownIds = knownChapterIds + blacklistedChapterIds
+      val missingIds = apiChapterIds - allKnownIds
       val filesystemCount = countFilesystemChapters(url)
-      val blacklistedCount = countBlacklistedChapters(mangaId)
-      val knownCount = maxOf(downloadedCount, filesystemCount) + blacklistedCount
 
       logger.info {
-        "Chapter check for ${title ?: mangaId}: api=$apiChapterCount, " +
-          "db=$downloadedCount, fs=$filesystemCount, blacklisted=$blacklistedCount, known=$knownCount"
+        "Chapter check for ${title ?: mangaId}: api=${apiChapterIds.size}, " +
+          "db=${knownChapterIds.size}, blacklisted=${blacklistedChapterIds.size}, " +
+          "fs=$filesystemCount, missing=${missingIds.size}"
       }
 
-      val newChaptersEstimate = maxOf(0, apiChapterCount - knownCount)
-      val needsDownload = newChaptersEstimate > 0
+      val needsDownload = missingIds.isNotEmpty()
 
       if (needsDownload) {
-        logger.info { "New chapters detected for ${title ?: mangaId}: $apiChapterCount available, $knownCount known ($newChaptersEstimate new)" }
+        logger.info { "New chapters detected for ${title ?: mangaId}: ${missingIds.size} unknown chapter IDs" }
       } else {
-        logger.info { "Up to date: ${title ?: mangaId} ($knownCount/$apiChapterCount)" }
+        logger.info { "Up to date: ${title ?: mangaId} (${allKnownIds.size}/${apiChapterIds.size})" }
       }
 
       return ChapterCheckResult(
         url = url,
         mangaId = mangaId,
         title = title,
-        apiChapterCount = apiChapterCount,
-        downloadedChapterCount = downloadedCount,
+        apiChapterCount = apiChapterIds.size,
+        downloadedChapterCount = knownChapterIds.size,
         filesystemChapterCount = filesystemCount,
-        newChaptersEstimate = newChaptersEstimate,
+        newChaptersEstimate = missingIds.size,
         needsDownload = needsDownload,
       )
     } catch (e: Exception) {
@@ -240,84 +228,6 @@ class ChapterChecker(
     }
   }
 
-  private data class FeedResult(
-    val chapterCount: Int,
-    val title: String?,
-  )
-
-  private fun getDownloadLanguage(): String =
-    try {
-      pluginConfigRepository
-        .findByPluginIdAndKey("gallery-dl-downloader", "default_language")
-        ?.configValue ?: "en"
-    } catch (_: Exception) {
-      "en"
-    }
-
-  private fun fetchMangaDexFeedTotal(mangaId: String): FeedResult {
-    val language = getDownloadLanguage()
-    val feedUrl =
-      "https://api.mangadex.org/manga/$mangaId/feed?translatedLanguage[]=$language&limit=0"
-
-    val request =
-      HttpRequest
-        .newBuilder()
-        .uri(URI.create(feedUrl))
-        .timeout(Duration.ofSeconds(15))
-        .GET()
-        .build()
-
-    val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-    if (response.statusCode() != 200) {
-      throw GalleryDlAggregateFetchException(
-        "MangaDex feed API returned ${response.statusCode()} for manga $mangaId",
-      )
-    }
-
-    val json = objectMapper.readValue<Map<String, Any?>>(response.body())
-    val chapterCount = (json["total"] as? Number)?.toInt() ?: 0
-    val title = fetchMangaTitle(mangaId)
-
-    return FeedResult(chapterCount = chapterCount, title = title)
-  }
-
-  private fun fetchMangaTitle(mangaId: String): String? {
-    try {
-      val request =
-        HttpRequest
-          .newBuilder()
-          .uri(URI.create("https://api.mangadex.org/manga/$mangaId"))
-          .timeout(Duration.ofSeconds(10))
-          .GET()
-          .build()
-
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-      if (response.statusCode() != 200) return null
-
-      val json = objectMapper.readValue<Map<String, Any?>>(response.body())
-      val data = json["data"] as? Map<*, *> ?: return null
-      val attributes = data["attributes"] as? Map<*, *> ?: return null
-      val titleMap = attributes["title"] as? Map<*, *> ?: return null
-
-      val altTitles = attributes["altTitles"] as? List<*> ?: emptyList<Any>()
-      var altEnglishTitle: String? = null
-      altTitles.forEach { entry ->
-        if (entry is Map<*, *>) {
-          val enTitle = entry["en"] as? String
-          if (enTitle != null && altEnglishTitle == null) {
-            altEnglishTitle = enTitle
-          }
-        }
-      }
-
-      return altEnglishTitle ?: titleMap["en"] as? String ?: titleMap.values.firstOrNull() as? String
-    } catch (e: Exception) {
-      logger.debug { "Failed to fetch title for manga $mangaId: ${e.message}" }
-      return null
-    }
-  }
-
   private fun findSeriesForManga(mangaId: String): org.gotson.komga.domain.model.Series? {
     val byUuid = seriesRepository.findByMangaDexUuid(mangaId)
     if (byUuid != null) return byUuid
@@ -332,9 +242,22 @@ class ChapterChecker(
     return null
   }
 
-  private fun countDownloadedChapters(mangaId: String): Int {
-    val series = findSeriesForManga(mangaId) ?: return 0
-    return chapterUrlRepository.countBySeriesId(series.id).toInt()
+  private fun extractChapterIdFromUrl(url: String): String? = CHAPTER_ID_REGEX.find(url)?.groupValues?.get(1)
+
+  private fun getKnownChapterIds(series: org.gotson.komga.domain.model.Series?): Set<String> {
+    if (series == null) return emptySet()
+    val chapterUrls = chapterUrlRepository.findBySeriesId(series.id)
+    return chapterUrls
+      .mapNotNull { it.chapterId ?: extractChapterIdFromUrl(it.url) }
+      .toSet()
+  }
+
+  private fun getBlacklistedChapterIds(series: org.gotson.komga.domain.model.Series?): Set<String> {
+    if (series == null) return emptySet()
+    val blacklisted = blacklistedChapterRepository.findUrlsBySeriesId(series.id)
+    return blacklisted
+      .mapNotNull { extractChapterIdFromUrl(it) }
+      .toSet()
   }
 
   private fun countFilesystemChapters(url: String): Int {
@@ -374,9 +297,8 @@ class ChapterChecker(
     return null
   }
 
-  private fun countBlacklistedChapters(mangaId: String): Int {
-    val series = findSeriesForManga(mangaId) ?: return 0
-    return blacklistedChapterRepository.findBySeriesId(series.id).size
+  companion object {
+    private val CHAPTER_ID_REGEX = Regex("mangadex\\.org/chapter/([0-9a-f-]+)")
   }
 }
 

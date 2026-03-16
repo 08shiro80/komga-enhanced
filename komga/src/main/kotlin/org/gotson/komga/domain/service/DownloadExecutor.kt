@@ -1,18 +1,21 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.DownloadQueue
 import org.gotson.komga.domain.model.DownloadStatus
 import org.gotson.komga.domain.model.SourceType
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.interfaces.api.websocket.DownloadProgressDto
 import org.gotson.komga.interfaces.api.websocket.DownloadProgressHandler
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import java.nio.file.Files
 import java.nio.file.Paths
 import java.time.LocalDateTime
 import java.util.UUID
@@ -33,8 +36,11 @@ class DownloadExecutor(
   private val libraryRepository: LibraryRepository,
   private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
   private val seriesMetadataRepository: org.gotson.komga.domain.persistence.SeriesMetadataRepository,
+  private val pluginConfigRepository: PluginConfigRepository,
   private val galleryDlWrapper: GalleryDlWrapper,
   private val libraryLifecycle: LibraryLifecycle,
+  private val libraryContentLifecycle: LibraryContentLifecycle,
+  private val taskEmitter: TaskEmitter,
   private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
   private val downloadProgressHandler: DownloadProgressHandler,
   private val eventPublisher: ApplicationEventPublisher,
@@ -163,11 +169,16 @@ class DownloadExecutor(
     }
 
     val mangaInfo =
-      try {
-        galleryDlWrapper.getChapterInfo(sourceUrl)
-      } catch (e: Exception) {
-        logger.warn(e) { "Could not fetch manga info for $sourceUrl" }
-        null
+      if (title != null) {
+        val mangaDexId = GalleryDlWrapper.extractMangaDexId(sourceUrl)
+        if (mangaDexId != null) galleryDlWrapper.getMangaMetadata(mangaDexId) else null
+      } else {
+        try {
+          galleryDlWrapper.getChapterInfo(sourceUrl)
+        } catch (e: Exception) {
+          logger.warn(e) { "Could not fetch manga info for $sourceUrl" }
+          null
+        }
       }
 
     val download =
@@ -404,13 +415,23 @@ class DownloadExecutor(
       val komgaSeriesId: String?
 
       if (mangaDexId != null) {
-        destinationPath = libraryPath.resolve(mangaDexId)
-        komgaSeriesId =
+        val existingFolder =
           if (download.libraryId != null) {
-            findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)?.komgaSeriesId
+            findExistingMangaFolder(download.libraryId, libraryPath, mangaDexId)
           } else {
             null
           }
+        val newFolderPath =
+          if (getFolderNamingConfig() == "title") {
+            val title = download.title ?: "Unknown"
+            libraryPath.resolve(sanitizeFileName(title))
+          } else {
+            libraryPath.resolve(mangaDexId)
+          }
+        destinationPath =
+          existingFolder?.folder?.toPath()
+            ?: newFolderPath
+        komgaSeriesId = existingFolder?.komgaSeriesId
       } else {
         destinationPath = libraryPath.resolve(sanitizeFileName(download.title ?: "Unknown"))
         komgaSeriesId = null
@@ -422,42 +443,6 @@ class DownloadExecutor(
       }
 
       logger.info { "Starting download to: $destinationPath" }
-
-      if (mangaDexId != null) {
-        val existingCbzCount =
-          destinationPath
-            .toFile()
-            .listFiles()
-            ?.count { it.isFile && it.extension.lowercase() == "cbz" }
-            ?: 0
-        val apiChapterCount = galleryDlWrapper.getMangaDexChapterCount(mangaDexId)
-        if (apiChapterCount != null && apiChapterCount > 0 && existingCbzCount >= apiChapterCount) {
-          logger.info { "Pre-check: ${download.title} has $existingCbzCount CBZs, API reports $apiChapterCount chapters — skipping download" }
-          updateDownloadStatus(
-            download,
-            DownloadStatus.COMPLETED,
-            completedDate = LocalDateTime.now(),
-            progressPercent = 100,
-            destinationPath = destinationPath.toString(),
-          )
-          downloadProgressHandler.broadcastProgress(
-            DownloadProgressDto(
-              type = "completed",
-              downloadId = download.id,
-              mangaTitle = download.title,
-              url = download.sourceUrl,
-              status = "COMPLETED",
-              currentChapter = null,
-              totalChapters = apiChapterCount,
-              completedChapters = apiChapterCount,
-              filesDownloaded = 0,
-              percentage = 100,
-              error = null,
-            ),
-          )
-          return
-        }
-      }
 
       val isCancelled = { cancelledIds.contains(download.id) }
 
@@ -562,8 +547,28 @@ class DownloadExecutor(
           }
         }
 
-        if (library != null) {
-          logger.info { "Download completed for library ${library.name}. Please manually trigger library scan." }
+        if (library != null && result.filesDownloaded > 0) {
+          val seriesFolder =
+            try {
+              finalPath
+                .toFile()
+                .listFiles { f -> f.isDirectory }
+                ?.maxByOrNull { it.lastModified() }
+                ?.toPath()
+            } catch (e: Exception) {
+              null
+            }
+          if (seriesFolder != null && Files.isDirectory(seriesFolder)) {
+            logger.info { "Scanning new chapters in: $seriesFolder" }
+            try {
+              libraryContentLifecycle.scanSeriesFolder(library, seriesFolder)
+            } catch (e: Exception) {
+              logger.warn(e) { "Targeted scan failed, falling back to full library scan" }
+              taskEmitter.scanLibrary(library.id)
+            }
+          } else {
+            taskEmitter.scanLibrary(library.id)
+          }
         }
 
         logger.info { "Download completed: ${download.id} - ${result.filesDownloaded} files" }
@@ -864,6 +869,16 @@ class DownloadExecutor(
     val foldersRenamed: Int,
     val cbzRenamed: Int,
   )
+
+  private fun getFolderNamingConfig(): String =
+    try {
+      pluginConfigRepository
+        .findByPluginIdAndKey("gallery-dl-downloader", "folder_naming")
+        ?.configValue
+        ?: "uuid"
+    } catch (_: Exception) {
+      "uuid"
+    }
 
   private fun sanitizeFileName(name: String): String =
     name

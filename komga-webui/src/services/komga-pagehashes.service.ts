@@ -89,6 +89,18 @@ export default class KomgaPageHashesService {
     }
   }
 
+  async removeKnownHash(pageHash: PageHashDto) {
+    try {
+      await this.http.delete(`${API_PAGE_HASH}/${pageHash.hash}`)
+    } catch (e) {
+      let msg = `An error occurred while trying to remove known page hash ${pageHash.hash}`
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
   async deleteSingleMatch(pageHash: PageHashDto, match: PageHashMatchDto) {
     try {
       await this.http.post(`${API_PAGE_HASH}/${pageHash.hash}/delete-match`, match)

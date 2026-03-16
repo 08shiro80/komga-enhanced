@@ -55,6 +55,13 @@ class PluginInitializer(
                   "description": "Preferred language for downloads (ISO 639-1 code)",
                   "default": "en",
                   "enum": ["en", "ja", "de", "fr", "es", "it", "pt", "ru", "zh", "ko"]
+                },
+                "folder_naming": {
+                  "type": "string",
+                  "title": "Folder Naming for New Manga",
+                  "description": "How new manga folders are named on first download. 'uuid' uses the MangaDex UUID (e.g. 0c6fe779-...), 'title' uses the manga title (e.g. Roman Club). Existing folders are never renamed.",
+                  "default": "uuid",
+                  "enum": ["uuid", "title"]
                 }
               },
               "required": ["mangadex_username", "mangadex_password"]
@@ -150,14 +157,15 @@ class PluginInitializer(
         ),
       )
 
-    // Insert missing plugins only (upsert behavior)
     defaultPlugins.forEach { plugin ->
       try {
-        if (pluginRepository.findByIdOrNull(plugin.id) == null) {
+        val existing = pluginRepository.findByIdOrNull(plugin.id)
+        if (existing == null) {
           pluginRepository.insert(plugin)
           logger.info("Installed default plugin: ${plugin.name}")
-        } else {
-          logger.debug("Plugin already exists: ${plugin.name}")
+        } else if (existing.configSchema != plugin.configSchema) {
+          pluginRepository.update(existing.copy(configSchema = plugin.configSchema))
+          logger.info("Updated configSchema for plugin: ${plugin.name}")
         }
       } catch (e: Exception) {
         logger.error("Failed to install default plugin: ${plugin.name}", e)
