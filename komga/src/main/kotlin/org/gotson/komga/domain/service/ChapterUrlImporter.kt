@@ -11,6 +11,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDateTime
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 private val logger = KotlinLogging.logger {}
@@ -77,19 +78,29 @@ class ChapterUrlImporter(
     val cbzFiles =
       dir.listFiles()?.filter { it.isFile && it.extension.lowercase() == "cbz" } ?: emptyList()
 
+    if (existingUrls.isNotEmpty() && existingUrls.size >= cbzFiles.size) {
+      return ChapterUrlImportResult(
+        seriesId = resolvedSeriesId,
+        totalInFile = existingUrls.size,
+        imported = 0,
+        skippedDuplicates = existingUrls.size,
+      )
+    }
+
     var totalFound = 0
     var imported = 0
     var skipped = 0
-    val cbzUrls = mutableSetOf<String>()
 
     for (cbzFile in cbzFiles) {
-      val info = extractComicInfo(cbzFile) ?: continue
-      if (info.url == null || !info.url.contains("mangadex.org/chapter/")) continue
-
-      cbzUrls.add(info.url)
+      val zipComment = extractZipCommentData(cbzFile)
+      val comicInfo = if (zipComment == null) extractComicInfo(cbzFile) else null
+      val url =
+        zipComment?.url
+          ?: comicInfo?.url?.takeIf { it.contains("mangadex.org/chapter/") }
+          ?: continue
       totalFound++
 
-      if (info.url in existingUrls) {
+      if (url in existingUrls) {
         skipped++
         continue
       }
@@ -99,26 +110,20 @@ class ChapterUrlImporter(
           ChapterUrl(
             id = TsidCreator.getTsid256().toString(),
             seriesId = resolvedSeriesId,
-            url = info.url,
-            chapter = info.chapterNumber ?: 0.0,
-            volume = info.volume,
-            title = info.title,
-            lang = info.language ?: "en",
+            url = url,
+            chapter = zipComment?.chapter ?: comicInfo?.chapterNumber ?: 0.0,
+            volume = zipComment?.volume ?: comicInfo?.volume,
+            title = comicInfo?.title,
+            lang = comicInfo?.language ?: "en",
             downloadedAt = LocalDateTime.now(),
             source = "comicinfo-import",
-            scanlationGroup = info.scanlationGroup,
+            scanlationGroup = comicInfo?.scanlationGroup,
           )
         chapterUrlRepository.insert(chapterUrl)
         imported++
       } catch (e: Exception) {
-        logger.debug { "Failed to insert chapter URL ${info.url} for series $resolvedSeriesId: ${e.message}" }
+        logger.debug { "Failed to insert chapter URL $url for series $resolvedSeriesId: ${e.message}" }
       }
-    }
-
-    val staleUrls = existingUrls - cbzUrls
-    if (staleUrls.isNotEmpty()) {
-      staleUrls.forEach { url -> chapterUrlRepository.deleteByUrl(url) }
-      logger.info { "Removed ${staleUrls.size} stale CHAPTER_URL entries for series $resolvedSeriesId (CBZ files deleted)" }
     }
 
     return ChapterUrlImportResult(
@@ -137,6 +142,43 @@ class ChapterUrlImporter(
     val language: String?,
     val scanlationGroup: String?,
   )
+
+  private data class ZipCommentData(
+    val url: String,
+    val chapter: Double?,
+    val volume: Int?,
+  )
+
+  private val chapterUuidRegex = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
+  private val chapterNumberCommentRegex = Regex("Chapter:\\s*([\\d.]+)")
+  private val volumeCommentRegex = Regex("Volume:\\s*(\\d+)")
+
+  private fun extractZipCommentData(cbzFile: File): ZipCommentData? {
+    try {
+      ZipFile(cbzFile).use { zf ->
+        val comment = zf.comment ?: return null
+        val chapterUuid =
+          chapterUuidRegex.find(comment)?.groupValues?.get(1) ?: return null
+        return ZipCommentData(
+          url = "https://mangadex.org/chapter/$chapterUuid",
+          chapter =
+            chapterNumberCommentRegex
+              .find(comment)
+              ?.groupValues
+              ?.get(1)
+              ?.toDoubleOrNull(),
+          volume =
+            volumeCommentRegex
+              .find(comment)
+              ?.groupValues
+              ?.get(1)
+              ?.toIntOrNull(),
+        )
+      }
+    } catch (_: Exception) {
+      return null
+    }
+  }
 
   private fun extractComicInfo(cbzFile: File): ComicInfoData? {
     try {
@@ -213,6 +255,8 @@ class ChapterUrlImporter(
 
   private val mangaDexTitleRegex = Regex("mangadex\\.org/title/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
   private val uuidRegex = Regex("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+
+  fun syncMangaDexUuidForSeries(series: org.gotson.komga.domain.model.Series) = syncMangaDexUuid(series)
 
   private fun syncMangaDexUuid(series: org.gotson.komga.domain.model.Series) {
     val uuid =

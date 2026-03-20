@@ -292,11 +292,33 @@ class LibraryContentLifecycle(
   ) {
     logger.info { "Targeted scan for series folder: $seriesPath" }
     val seriesUrl = seriesPath.toUri().toURL()
-    val existingSeries =
-      seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, seriesUrl)
-        ?: return logger.warn { "Series not found for path $seriesPath, skipping targeted scan" }
 
-    val existingBooks = bookRepository.findAllBySeriesId(existingSeries.id)
+    val series =
+      seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, seriesUrl)
+        ?: run {
+          val dir = seriesPath.toFile()
+          if (!dir.isDirectory) return logger.warn { "Path is not a directory: $seriesPath" }
+          val attrs =
+            java.nio.file.Files
+              .readAttributes(seriesPath, java.nio.file.attribute.BasicFileAttributes::class.java)
+          val newSeries =
+            Series(
+              name = dir.name.ifBlank { seriesPath.toString() },
+              url = seriesUrl,
+              fileLastModified = LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), java.time.ZoneId.systemDefault()),
+              libraryId = library.id,
+            )
+          val restored = tryRestoreByMangaDexUuid(newSeries, library.id)
+          if (restored != null) {
+            logger.info { "Restored series by mangaDexUuid: ${restored.id} (${restored.name})" }
+            restored
+          } else {
+            logger.info { "Creating new series for download: ${newSeries.name}" }
+            seriesLifecycle.createSeries(newSeries)
+          }
+        }
+
+    val existingBooks = bookRepository.findAllBySeriesId(series.id)
     val existingBooksUrls = existingBooks.filterNot { it.deletedDate != null }.map { it.url }.toSet()
 
     val newBooks =
@@ -310,30 +332,27 @@ class LibraryContentLifecycle(
         ?.map { it.copy(libraryId = library.id) }
         ?: emptyList()
 
-    if (newBooks.isEmpty()) {
-      logger.info { "No new books found in $seriesPath" }
-      return
-    }
+    if (newBooks.isNotEmpty()) {
+      logger.info { "Adding ${newBooks.size} new books to series ${series.name}" }
+      seriesLifecycle.addBooks(series, newBooks)
+      seriesLifecycle.sortBooks(series)
+      taskEmitter.refreshSeriesMetadata(series.id)
 
-    logger.info { "Adding ${newBooks.size} new books to series ${existingSeries.name}" }
-    seriesLifecycle.addBooks(existingSeries, newBooks)
-    seriesLifecycle.sortBooks(existingSeries)
-    taskEmitter.refreshSeriesMetadata(existingSeries.id)
-
-    newBooks.forEach { book ->
-      taskEmitter.analyzeBook(bookRepository.findByIdOrNull(book.id) ?: book)
+      newBooks.forEach { book ->
+        taskEmitter.analyzeBook(bookRepository.findByIdOrNull(book.id) ?: book)
+      }
+    } else {
+      logger.info { "No new books in $seriesPath, checking chapter URLs" }
     }
 
     try {
-      val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
-      if (importResults.isNotEmpty()) {
-        val totalImported = importResults.sumOf { it.imported }
-        if (totalImported > 0) {
-          logger.info { "Chapter URL import after targeted scan: $totalImported imported" }
-        }
+      chapterUrlImporter.syncMangaDexUuidForSeries(series)
+      val result = chapterUrlImporter.importFromSeriesPath(seriesPath, series.id)
+      if (result.imported > 0) {
+        logger.info { "Chapter URL import after download: ${result.imported} imported for ${series.name}" }
       }
     } catch (e: Exception) {
-      logger.warn(e) { "Failed to import chapter URLs after targeted scan" }
+      logger.warn(e) { "Failed to import chapter URLs for ${series.name}" }
     }
   }
 

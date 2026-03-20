@@ -44,7 +44,7 @@ class SeriesMetadataLifecycle(
     seriesMetadataFromBookProviders.forEach { provider ->
       when {
         !(provider.shouldLibraryHandlePatch(library, MetadataPatchTarget.SERIES) || provider.shouldLibraryHandlePatch(library, MetadataPatchTarget.COLLECTION)) ->
-          logger.info { "Library is not set to import series or collection metadata for this provider, skipping: ${provider.javaClass.simpleName}" }
+          logger.debug { "Library is not set to import series or collection metadata for this provider, skipping: ${provider.javaClass.simpleName}" }
 
         else -> {
           logger.debug { "Provider: ${provider.javaClass.simpleName}" }

@@ -21,6 +21,7 @@ import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.zip.Deflater
+import java.util.zip.ZipFile
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.extension
@@ -101,6 +102,13 @@ class PageSplitter(
     val backupPath = book.path.parent.resolve("${book.path.nameWithoutExtension}_backup.${book.path.extension}")
     val tempPath = book.path.parent.resolve("${book.path.nameWithoutExtension}_split.${book.path.extension}")
 
+    val originalComment =
+      try {
+        ZipFile(book.path.toFile()).use { it.comment }
+      } catch (_: Exception) {
+        null
+      }
+
     try {
       // Create backup
       Files.copy(book.path, backupPath, StandardCopyOption.REPLACE_EXISTING)
@@ -112,6 +120,7 @@ class PageSplitter(
       ZipArchiveOutputStream(tempPath.outputStream()).use { zipStream ->
         zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
         zipStream.setLevel(Deflater.NO_COMPRESSION)
+        if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
 
         var newPageNumber = 1
 

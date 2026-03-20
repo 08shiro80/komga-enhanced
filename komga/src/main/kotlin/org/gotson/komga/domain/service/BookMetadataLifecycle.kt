@@ -39,10 +39,10 @@ class BookMetadataLifecycle(
     bookMetadataProviders.forEach { provider ->
       when {
         capabilities.intersect(provider.capabilities).isEmpty() ->
-          logger.info { "Provider does not support requested capabilities, skipping: ${provider.javaClass.simpleName}" }
+          logger.debug { "Provider does not support requested capabilities, skipping: ${provider.javaClass.simpleName}" }
 
         !(provider.shouldLibraryHandlePatch(library, MetadataPatchTarget.BOOK) || provider.shouldLibraryHandlePatch(library, MetadataPatchTarget.READLIST)) ->
-          logger.info { "Library is not set to import book or read lists metadata for this provider, skipping: ${provider.javaClass.simpleName}" }
+          logger.debug { "Library is not set to import book or read lists metadata for this provider, skipping: ${provider.javaClass.simpleName}" }
 
         else -> {
           logger.debug { "Provider: ${provider.javaClass.simpleName}" }

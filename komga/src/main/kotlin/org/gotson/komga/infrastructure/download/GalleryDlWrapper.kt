@@ -18,6 +18,7 @@ import java.nio.file.Paths
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
@@ -28,6 +29,7 @@ class GalleryDlWrapper(
   private val pluginConfigRepository: org.gotson.komga.domain.persistence.PluginConfigRepository,
   private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
   private val blacklistedChapterRepository: org.gotson.komga.domain.persistence.BlacklistedChapterRepository,
+  private val chapterUrlRepository: org.gotson.komga.domain.persistence.ChapterUrlRepository,
 ) {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
@@ -195,12 +197,12 @@ class GalleryDlWrapper(
         when {
           altEnglishTitle != null -> altEnglishTitle
           mainEnglishTitle != null -> {
-            logger.warn { "Using main title.en (may be romaji): $mainEnglishTitle" }
+            logger.debug { "Using main title.en (may be romaji): $mainEnglishTitle" }
             mainEnglishTitle
           }
           else -> {
             val fallback = titleMap.values.firstOrNull() as? String
-            logger.warn { "No English title found, using first available: $fallback" }
+            logger.debug { "No English title found, using first available: $fallback" }
             fallback
           }
         }
@@ -307,6 +309,10 @@ class GalleryDlWrapper(
   companion object {
     private const val CACHE_TTL_MS = 30 * 60 * 1000L
     private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
+    private val ZIP_COMMENT_UUID_REGEX = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
+    private val COMICINFO_WEB_REGEX = Regex("<Web>(.+?)</Web>")
+    private val VOLUME_PREFIX_REGEX = Regex("^v\\d+ .+")
+    private val BRACKET_GROUP_REGEX = Regex("\\[(.+?)]$")
 
     fun extractMangaDexId(url: String): String? = MANGADEX_ID_REGEX.find(url)?.groupValues?.get(1)
   }
@@ -855,8 +861,20 @@ class GalleryDlWrapper(
 
       normalizeDoubleBracketFilenames(destDir)
 
-      val urlsFromCbz = extractChapterUrlsFromCbzFiles(destDir)
-      logger.info { "CBZ ComicInfo check: Found ${urlsFromCbz.size} chapter URLs in existing CBZ files" }
+      val dbUrls =
+        if (komgaSeriesId != null) {
+          chapterUrlRepository.findUrlsBySeriesId(komgaSeriesId).toSet()
+        } else {
+          emptySet()
+        }
+      val cbzUrls =
+        if (dbUrls.isEmpty()) {
+          extractChapterUrlsFromCbzFiles(destDir)
+        } else {
+          emptySet()
+        }
+      val knownUrls = dbUrls + cbzUrls
+      logger.info { "Known chapter URLs: ${knownUrls.size} (db: ${dbUrls.size}, cbz: ${cbzUrls.size})" }
 
       val blacklistedUrls = blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
 
@@ -867,30 +885,56 @@ class GalleryDlWrapper(
             return@filter false
           }
 
-          if (chapter.chapterUrl in urlsFromCbz) {
+          if (chapter.chapterUrl in knownUrls) {
             return@filter false
           }
 
           true
         }
 
-      val skippedByUrl = allChapters.count { it.chapterUrl in urlsFromCbz }
+      val sameGroupDuplicates = findSameGroupDuplicates(allChapters)
+      val sameGroupDuplicateUrls = sameGroupDuplicates.map { it.chapterUrl }.toSet()
+      if (sameGroupDuplicates.isNotEmpty() && komgaSeriesId != null) {
+        for (old in sameGroupDuplicates) {
+          if (old.chapterUrl !in knownUrls &&
+            old.chapterUrl !in blacklistedUrls &&
+            !blacklistedChapterRepository.existsByChapterUrl(old.chapterUrl)
+          ) {
+            blacklistedChapterRepository.insert(
+              org.gotson.komga.domain.model.BlacklistedChapter(
+                id =
+                  java.util.UUID
+                    .randomUUID()
+                    .toString(),
+                seriesId = komgaSeriesId,
+                chapterUrl = old.chapterUrl,
+                chapterNumber = old.chapterNumber,
+                chapterTitle = old.chapterTitle,
+              ),
+            )
+            logger.info { "Auto-blacklisted same-group duplicate: ch.${old.chapterNumber} [${old.scanlationGroup}] ${old.chapterUrl}" }
+          }
+        }
+      }
+      val filteredChapters = chapters.filter { it.chapterUrl !in sameGroupDuplicateUrls }
+
+      val skippedByUrl = allChapters.count { it.chapterUrl in knownUrls }
       val skippedByBlacklist = allChapters.count { it.chapterUrl in blacklistedUrls }
-      val skippedCount = allChapters.size - chapters.size
+      val skippedCount = allChapters.size - filteredChapters.size
       if (skippedCount > 0) {
         logger.info {
-          "Skipping $skippedCount already downloaded chapters, ${chapters.size} remaining to download " +
-            "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist)"
+          "Skipping $skippedCount already downloaded chapters, ${filteredChapters.size} remaining to download " +
+            "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist, same-group duplicates: ${sameGroupDuplicates.size})"
         }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Skipping $skippedCount already downloaded chapters")
 
-        updateExistingCbzChapterUrls(destDir, allChapters, urlsFromCbz, mangaInfo)
+        updateExistingCbzChapterUrls(destDir, allChapters, knownUrls, mangaInfo)
       } else {
         logger.info { "No existing chapters found, downloading all ${allChapters.size} chapters" }
       }
 
       var filesDownloaded = 0
-      var totalChapters = chapters.size
+      var totalChapters = filteredChapters.size
 
       if (allChapters.isEmpty() && mangaDexId != null) {
         logger.warn { "MangaDex chapter API returned empty for $mangaDexId — skipping bulk download to prevent re-downloads" }
@@ -1056,8 +1100,7 @@ class GalleryDlWrapper(
         }
 
         normalizeDoubleBracketFilenames(destDir)
-      } else if (chapters.isEmpty()) {
-        // All chapters already downloaded - skip
+      } else if (filteredChapters.isEmpty()) {
         logger.info { "All ${allChapters.size} chapters already downloaded, nothing to do" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "All chapters already downloaded, skipping: $url")
         configFile.delete()
@@ -1066,12 +1109,12 @@ class GalleryDlWrapper(
         val chapterFailures = loadChapterFailures(failuresFile)
         val mangaDexId = extractMangaDexId(url)
 
-        totalChapters = chapters.count { (chapterFailures[it.chapterUrl] ?: 0) < 3 }
-        logger.info { "Downloading $totalChapters chapters (${chapters.size - totalChapters} auto-blacklisted)" }
+        totalChapters = filteredChapters.count { (chapterFailures[it.chapterUrl] ?: 0) < 3 }
+        logger.info { "Downloading $totalChapters chapters (${filteredChapters.size - totalChapters} auto-blacklisted)" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download of $totalChapters chapters: $url")
 
         var downloadIndex = 0
-        chapters.forEachIndexed { index, chapter ->
+        filteredChapters.forEachIndexed { index, chapter ->
           if (isCancelled()) {
             saveChapterFailures(failuresFile, chapterFailures)
             logger.info { "Download cancelled before chapter ${downloadIndex + 1}/$totalChapters, stopping" }
@@ -1174,17 +1217,33 @@ class GalleryDlWrapper(
                   .filter { System.currentTimeMillis() - it.lastModified() < 120_000 }
                   .sortedByDescending { it.lastModified() }
 
-              fun matchesChapter(name: String): Boolean {
+              val groupName = chapter.scanlationGroup?.lowercase()
+
+              fun matchesChapterNumber(name: String): Boolean {
                 val chapterPart =
-                  if (name.matches(Regex("^v\\d+ .+"))) name.substringAfter(" ") else name
+                  if (VOLUME_PREFIX_REGEX.matches(name)) name.substringAfter(" ") else name
                 return chapterPart.startsWith("c$paddedChapter ") || chapterPart == "c$paddedChapter" ||
                   chapterPart.startsWith("c$chapterStr ") || chapterPart == "c$chapterStr" ||
                   chapterPart.startsWith("ch. $paddedChapter ") || chapterPart.startsWith("ch. $paddedChapter-") || chapterPart == "ch. $paddedChapter"
               }
 
+              fun matchesChapterAndGroup(name: String): Boolean {
+                if (!matchesChapterNumber(name)) return false
+                if (groupName == null) return true
+                val bracketGroup =
+                  BRACKET_GROUP_REGEX
+                    .find(name)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.lowercase()
+                return bracketGroup != null && bracketGroup == groupName
+              }
+
               val targetCbz =
-                recentCbzFiles.find { matchesChapter(it.nameWithoutExtension.lowercase()) }
-                  ?: cbzFiles.find { matchesChapter(it.nameWithoutExtension.lowercase()) }
+                recentCbzFiles.find { matchesChapterAndGroup(it.nameWithoutExtension.lowercase()) }
+                  ?: cbzFiles.find { matchesChapterAndGroup(it.nameWithoutExtension.lowercase()) }
+                  ?: recentCbzFiles.find { matchesChapterNumber(it.nameWithoutExtension.lowercase()) }
+                  ?: cbzFiles.find { matchesChapterNumber(it.nameWithoutExtension.lowercase()) }
 
               if (targetCbz == null) {
                 logger.warn { "Could not find CBZ file for chapter $chapterNum (expected c$paddedChapter or c$chapterStr)" }
@@ -1201,6 +1260,30 @@ class GalleryDlWrapper(
                       language = chapter.language,
                     )
                   addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+                  if (komgaSeriesId != null && !chapterUrlRepository.existsByUrl(chapter.chapterUrl)) {
+                    val chapterNum =
+                      chapter.chapterNumber
+                        ?.toDoubleOrNull()
+                        ?: (index + 1).toDouble()
+                    chapterUrlRepository.insert(
+                      org.gotson.komga.domain.model.ChapterUrl(
+                        id =
+                          java.util.UUID
+                            .randomUUID()
+                            .toString(),
+                        seriesId = komgaSeriesId,
+                        url = chapter.chapterUrl,
+                        chapter = chapterNum,
+                        volume = chapter.volume?.toIntOrNull(),
+                        title = chapter.chapterTitle,
+                        lang = chapter.language ?: "en",
+                        downloadedAt = java.time.LocalDateTime.now(),
+                        chapterId = chapter.chapterId,
+                        scanlationGroup = chapter.scanlationGroup,
+                      ),
+                    )
+                    logger.info { "Registered chapter URL in DB: ch.$chapterNum ${chapter.chapterUrl}" }
+                  }
                   logger.info { "Processed ${targetCbz.name}" }
                 } catch (e: Exception) {
                   logger.warn(e) { "Failed to process CBZ ${targetCbz.name}" }
@@ -1664,9 +1747,9 @@ class GalleryDlWrapper(
 
       val fileSizeKb = fileSize / 1024.0
       if (fileSize < 5120) {
-        logger.warn { "series.json is only $fileSizeKb KB (expected >5 KB). May lack proper metadata." }
+        logger.debug { "series.json is only $fileSizeKb KB (expected >5 KB). May lack proper metadata." }
         logToDatabase(
-          org.gotson.komga.domain.model.LogLevel.WARN,
+          org.gotson.komga.domain.model.LogLevel.INFO,
           "series.json is only $fileSizeKb KB (expected >5 KB). May lack proper metadata.",
         )
       }
@@ -1693,12 +1776,26 @@ class GalleryDlWrapper(
     chapterId: String? = null,
   ): String {
     val lines = mutableListOf<String>()
-    lines.add("Title: ${mangaInfo.title}")
     if (mangaInfo.mangaDexId != null) lines.add("Title UUID: ${mangaInfo.mangaDexId}")
     if (chapterId != null) lines.add("Chapter UUID: $chapterId")
     if (chapterInfo?.chapterNumber != null) lines.add("Chapter: ${chapterInfo.chapterNumber}")
     if (chapterInfo?.volume != null) lines.add("Volume: ${chapterInfo.volume}")
     return lines.joinToString("\n")
+  }
+
+  private fun verifyZipComment(cbzPath: Path) {
+    try {
+      ZipFile(cbzPath.toFile()).use { zf ->
+        val comment = zf.comment
+        if (comment.isNullOrBlank()) {
+          logger.warn { "ZIP comment MISSING after write: ${cbzPath.fileName}" }
+        } else {
+          logger.info { "ZIP comment verified (${comment.length} chars): ${cbzPath.fileName}" }
+        }
+      }
+    } catch (e: Exception) {
+      logger.warn { "Could not verify ZIP comment for ${cbzPath.fileName}: ${e.message}" }
+    }
   }
 
   private fun generateComicInfoXml(
@@ -1786,12 +1883,9 @@ class GalleryDlWrapper(
       val chapterUrl = if (chapterId != null) "https://mangadex.org/chapter/$chapterId" else null
       val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
       val zipComment = generateZipComment(mangaInfo, chapterInfo, chapterId)
-      val tempFile =
-        Files
-          .createTempFile("cbz_temp_", ".cbz")
+      val tempFile = cbzPath.resolveSibling("${cbzPath.fileName}.comicinfo.tmp")
 
       try {
-        val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "avif")
         val allEntries = mutableListOf<Pair<ZipEntry, ByteArray>>()
 
         ZipInputStream(Files.newInputStream(cbzPath)).use { zipIn ->
@@ -1804,27 +1898,6 @@ class GalleryDlWrapper(
           }
         }
 
-        val duplicatePages = mutableSetOf<String>()
-        val imagesByPage =
-          allEntries
-            .filter { (e, _) ->
-              val ext = e.name.substringAfterLast('.', "").lowercase()
-              ext in imageExtensions
-            }.groupBy { (e, _) ->
-              e.name.substringBeforeLast('.').substringAfterLast('/')
-            }
-
-        for ((_, variants) in imagesByPage) {
-          if (variants.size > 1) {
-            val keep = variants.maxByOrNull { (_, data) -> data.size }
-            variants.filter { it != keep }.forEach { (e, _) -> duplicatePages.add(e.name) }
-          }
-        }
-
-        if (duplicatePages.isNotEmpty()) {
-          logger.info { "Removing ${duplicatePages.size} duplicate images from ${cbzPath.fileName}" }
-        }
-
         ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
           zipOut.setComment(zipComment)
 
@@ -1833,11 +1906,9 @@ class GalleryDlWrapper(
           zipOut.closeEntry()
 
           for ((entry, data) in allEntries) {
-            if (entry.name !in duplicatePages) {
-              zipOut.putNextEntry(ZipEntry(entry.name))
-              zipOut.write(data)
-              zipOut.closeEntry()
-            }
+            zipOut.putNextEntry(ZipEntry(entry.name))
+            zipOut.write(data)
+            zipOut.closeEntry()
           }
         }
 
@@ -1845,6 +1916,8 @@ class GalleryDlWrapper(
       } finally {
         Files.deleteIfExists(tempFile)
       }
+
+      verifyZipComment(cbzPath)
 
       logToDatabase(
         org.gotson.komga.domain.model.LogLevel.INFO,
@@ -1886,7 +1959,6 @@ class GalleryDlWrapper(
         val tempFile = cbzPath.resolveSibling("${cbzPath.fileName}.tmp")
 
         try {
-          val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "avif")
           val allEntries = mutableListOf<Pair<ZipEntry, ByteArray>>()
 
           ZipInputStream(Files.newInputStream(cbzPath)).use { zipIn ->
@@ -1899,27 +1971,6 @@ class GalleryDlWrapper(
             }
           }
 
-          val duplicatePages = mutableSetOf<String>()
-          val imagesByPage =
-            allEntries
-              .filter { (e, _) ->
-                val ext = e.name.substringAfterLast('.', "").lowercase()
-                ext in imageExtensions
-              }.groupBy { (e, _) ->
-                e.name.substringBeforeLast('.').substringAfterLast('/')
-              }
-
-          for ((_, variants) in imagesByPage) {
-            if (variants.size > 1) {
-              val keep = variants.maxByOrNull { (_, data) -> data.size }
-              variants.filter { it != keep }.forEach { (e, _) -> duplicatePages.add(e.name) }
-            }
-          }
-
-          if (duplicatePages.isNotEmpty()) {
-            logger.info { "Removing ${duplicatePages.size} duplicate images from ${cbzPath.fileName}" }
-          }
-
           ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
             zipOut.setComment(zipComment)
             val writtenEntries = mutableSetOf<String>()
@@ -1930,7 +1981,7 @@ class GalleryDlWrapper(
             writtenEntries.add("ComicInfo.xml")
 
             for ((entry, data) in allEntries) {
-              if (entry.name !in writtenEntries && entry.name !in duplicatePages) {
+              if (entry.name !in writtenEntries) {
                 writtenEntries.add(entry.name)
                 zipOut.putNextEntry(ZipEntry(entry.name))
                 zipOut.write(data)
@@ -1941,6 +1992,8 @@ class GalleryDlWrapper(
 
           Files
             .move(tempFile, cbzPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+
+          verifyZipComment(cbzPath)
 
           logToDatabase(
             org.gotson.komga.domain.model.LogLevel.INFO,
@@ -1978,6 +2031,37 @@ class GalleryDlWrapper(
     }
   }
 
+  private fun extractUrlFromZipComment(cbzFile: File): String? {
+    return try {
+      java.util.zip.ZipFile(cbzFile).use { zip ->
+        val comment = zip.comment ?: return null
+        val uuid =
+          ZIP_COMMENT_UUID_REGEX
+            .find(comment)
+            ?.groupValues
+            ?.get(1)
+            ?: return null
+        "https://mangadex.org/chapter/$uuid"
+      }
+    } catch (_: Exception) {
+      null
+    }
+  }
+
+  private fun findSameGroupDuplicates(chapters: List<ChapterDownloadInfo>): List<ChapterDownloadInfo> {
+    val duplicates = mutableListOf<ChapterDownloadInfo>()
+    chapters
+      .filter { it.scanlationGroup != null }
+      .groupBy { Pair(it.chapterNumber, it.scanlationGroup) }
+      .values
+      .filter { it.size > 1 }
+      .forEach { group ->
+        val newest = group.maxByOrNull { it.publishDate ?: "" }
+        group.filter { it !== newest }.forEach { duplicates.add(it) }
+      }
+    return duplicates
+  }
+
   private fun extractChapterUrlsFromCbzFiles(destDir: File): Set<String> {
     val urls = mutableSetOf<String>()
     val cbzFiles =
@@ -1988,12 +2072,17 @@ class GalleryDlWrapper(
 
     for (cbzFile in cbzFiles) {
       try {
+        val urlFromComment = extractUrlFromZipComment(cbzFile)
+        if (urlFromComment != null) {
+          urls.add(urlFromComment)
+          continue
+        }
         ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
           var entry = zipIn.nextEntry
           while (entry != null) {
             if (entry.name == "ComicInfo.xml") {
               val xml = zipIn.readBytes().toString(Charsets.UTF_8)
-              val match = Regex("<Web>(.+?)</Web>").find(xml)
+              val match = COMICINFO_WEB_REGEX.find(xml)
               if (match != null) {
                 val url =
                   match.groupValues[1]
@@ -2012,7 +2101,7 @@ class GalleryDlWrapper(
           }
         }
       } catch (e: Exception) {
-        logger.debug { "Failed to read ComicInfo.xml from ${cbzFile.name}: ${e.message}" }
+        logger.debug { "Failed to read chapter URL from ${cbzFile.name}: ${e.message}" }
       }
     }
     return urls

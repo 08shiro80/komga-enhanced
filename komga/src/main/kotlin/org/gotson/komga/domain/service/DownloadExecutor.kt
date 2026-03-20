@@ -48,6 +48,7 @@ class DownloadExecutor(
   private val processing = AtomicBoolean(false)
   private val activeDownloads = ConcurrentHashMap<String, ActiveDownload>()
   private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
+  private val pendingScans = ConcurrentHashMap<String, MutableSet<java.nio.file.Path>>()
   private val downloadThread =
     Executors.newSingleThreadExecutor { r ->
       Thread(r, "download-worker").apply { isDaemon = true }
@@ -548,26 +549,15 @@ class DownloadExecutor(
         }
 
         if (library != null && result.filesDownloaded > 0) {
-          val seriesFolder =
-            try {
-              finalPath
-                .toFile()
-                .listFiles { f -> f.isDirectory }
-                ?.maxByOrNull { it.lastModified() }
-                ?.toPath()
-            } catch (e: Exception) {
-              null
-            }
-          if (seriesFolder != null && Files.isDirectory(seriesFolder)) {
-            logger.info { "Scanning new chapters in: $seriesFolder" }
-            try {
-              libraryContentLifecycle.scanSeriesFolder(library, seriesFolder)
-            } catch (e: Exception) {
-              logger.warn(e) { "Targeted scan failed, falling back to full library scan" }
-              taskEmitter.scanLibrary(library.id)
-            }
+          pendingScans
+            .getOrPut(library.id) { java.util.Collections.synchronizedSet(mutableSetOf()) }
+            .add(finalPath)
+
+          val remaining = downloadQueueRepository.findPendingOrdered()
+          if (remaining.isEmpty()) {
+            scanPendingFolders()
           } else {
-            taskEmitter.scanLibrary(library.id)
+            logger.info { "Deferring scan, ${remaining.size} downloads still pending" }
           }
         }
 
@@ -660,6 +650,23 @@ class DownloadExecutor(
         lastModifiedDate = LocalDateTime.now(),
       ),
     )
+  }
+
+  private fun scanPendingFolders() {
+    val folders = pendingScans.toMap()
+    pendingScans.clear()
+
+    for ((libraryId, paths) in folders) {
+      val library = libraryRepository.findByIdOrNull(libraryId) ?: continue
+      logger.info { "Scanning ${paths.size} downloaded manga folders" }
+      for (path in paths) {
+        try {
+          libraryContentLifecycle.scanSeriesFolder(library, path)
+        } catch (e: Exception) {
+          logger.warn(e) { "Targeted scan failed for $path" }
+        }
+      }
+    }
   }
 
   private data class FolderLookupResult(

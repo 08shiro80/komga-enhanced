@@ -28,6 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.zip.Deflater
+import java.util.zip.ZipFile
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.moveTo
 import kotlin.io.path.outputStream
@@ -97,11 +98,19 @@ class BookPageEditor(
     logger.debug { "Pages to delete: $pagesToDelete" }
     logger.debug { "Pages to keep: $pagesToKeep" }
 
+    val originalComment =
+      try {
+        ZipFile(book.path.toFile()).use { it.comment }
+      } catch (_: Exception) {
+        null
+      }
+
     val tempFile = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, book.path.parent.toFile()).toPath()
     logger.info { "Creating new file: $tempFile" }
     ZipArchiveOutputStream(tempFile.outputStream()).use { zipStream ->
       zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
       zipStream.setLevel(Deflater.NO_COMPRESSION)
+      if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
 
       pagesToKeep
         .map { it.fileName }
