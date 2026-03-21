@@ -178,7 +178,7 @@ class GalleryDlWrapper(
               alternativeTitlesList.add(title)
               if (altEnglishTitle == null && lang == "en") {
                 altEnglishTitle = title
-                logger.info { "Found English title in altTitles: $title" }
+                logger.debug { "Found English title in altTitles: $title" }
               }
             }
           }
@@ -220,7 +220,7 @@ class GalleryDlWrapper(
           }
           val shortest = allEnglishTitles.minByOrNull { it.length }
           if (shortest != null && shortest.length < englishTitle.length) {
-            logger.info { "Title too long (${englishTitle.length} chars), using shortest EN title: $shortest" }
+            logger.debug { "Title too long (${englishTitle.length} chars), using shortest EN title: $shortest" }
             shortest
           } else {
             englishTitle
@@ -283,7 +283,7 @@ class GalleryDlWrapper(
         }
       }
 
-      logger.info { "Successfully fetched MangaDex metadata for $mangaId: title='$finalTitle', author='$authorArtist', cover='$coverFilename'" }
+      logger.debug { "Successfully fetched MangaDex metadata for $mangaId: title='$finalTitle', author='$authorArtist', cover='$coverFilename'" }
 
       return MangaInfo(
         title = finalTitle ?: "Unknown",
@@ -558,7 +558,7 @@ class GalleryDlWrapper(
         if (offset >= total) break
       }
 
-      logger.info { "Fetched ${chapters.size} chapters from MangaDex for manga $mangaId" }
+      logger.debug { "Fetched ${chapters.size} chapters from MangaDex for manga $mangaId" }
     } catch (e: Exception) {
       logger.warn(e) { "Failed to fetch chapter list from MangaDex" }
     }
@@ -1049,7 +1049,7 @@ class GalleryDlWrapper(
           if (mangaDexId != null) {
             try {
               fetchAllChaptersFromMangaDex(mangaDexId).also {
-                if (it.isNotEmpty()) logger.info { "Fetched ${it.size} chapters from MangaDex API" }
+                if (it.isNotEmpty()) logger.debug { "Fetched ${it.size} chapters from MangaDex API" }
               }
             } catch (_: Exception) {
               emptyList()

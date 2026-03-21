@@ -188,18 +188,18 @@ class ChapterChecker(
       val missingIds = apiChapterIds - allKnownIds
       val filesystemCount = countFilesystemChapters(url)
 
-      logger.info {
-        "Chapter check for ${title ?: mangaId}: api=${apiChapterIds.size}, " +
-          "db=${knownChapterIds.size}, blacklisted=${blacklistedChapterIds.size}, " +
-          "fs=$filesystemCount, missing=${missingIds.size}"
-      }
-
       val needsDownload = missingIds.isNotEmpty()
 
       if (needsDownload) {
-        logger.info { "New chapters detected for ${title ?: mangaId}: ${missingIds.size} unknown chapter IDs" }
+        logger.info {
+          "Chapter check for ${title ?: mangaId}: api=${apiChapterIds.size}, " +
+            "db=${knownChapterIds.size}, blacklisted=${blacklistedChapterIds.size}, " +
+            "fs=$filesystemCount, missing=${missingIds.size}"
+        }
       } else {
-        logger.info { "Up to date: ${title ?: mangaId} (${allKnownIds.size}/${apiChapterIds.size})" }
+        logger.debug {
+          "Up to date: ${title ?: mangaId} (${allKnownIds.size}/${apiChapterIds.size})"
+        }
       }
 
       return ChapterCheckResult(

@@ -25,6 +25,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ### Improved
 - **Disabled metadata provider log spam suppressed** — `BookMetadataLifecycle` and `SeriesMetadataLifecycle` logged "skipping" messages at INFO level for every disabled provider (e.g. EpubMetadataProvider) on every book/series scan. Changed to DEBUG level.
+- **Chapter check log spam reduced** — `ChapterChecker` and `GalleryDlWrapper` logged ~2000 lines per follow.txt check (5-6 lines per manga × 297 manga). Demoted to DEBUG: per-manga fetch counts, title resolution, metadata details, and "Up to date" confirmations. Only manga with missing chapters now appear at INFO level.
 - **Chapter URL check uses DB → ZIP comment → ComicInfo.xml** — `GalleryDlWrapper` now queries the `CHAPTER_URL` database table first, then falls back to ZIP comment extraction, then ComicInfo.xml parsing. Previously opened every CBZ file to read ComicInfo.xml before each download.
 - **Pre-compiled regex constants** — Moved `<Web>` regex, volume prefix regex, and bracket group regex from inline creation (per-file/per-match) to companion object constants, avoiding repeated compilation in loops.
 - **Plugin config renders enum fields as dropdowns** — Plugin Manager config dialog now uses `v-select` for fields with `enum` in the JSON schema (e.g. `folder_naming`, `default_language`). Also uses schema `title` as label, `description` as hint, and `format: "password"` for password detection. Previously all fields were plain text inputs.
@@ -35,9 +36,13 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **Removed redundant pre-check in DownloadExecutor** — `processDownload` no longer calls `getMangaDexChapterCount` before starting a download. The ID-based check in ChapterChecker is more accurate and already cached.
 - **Chapter URL import skips unchanged series** — `importFromSeriesPath` compares CBZ file count against DB URL count. If they match, the series is skipped entirely without opening any CBZ files. Previously every library scan re-read ComicInfo.xml from all ~16,000 CBZ files (15 min), now only series with changes are scanned.
 
+### Security
+- **Spring Boot 3.5.11 → 3.5.12** — Fixes CVE-2026-22732 (Spring Security Web 6.5.8 → 6.5.9, severity 9.1) and CVE-2026-22737 / CVE-2026-22735 (Spring WebFlux 6.2.16 → 6.2.17).
+
 ### Modified Files
 | File | Changes |
 |------|---------|
+| `libs.versions.toml` | Spring Boot 3.5.11 → 3.5.12 |
 | `LibraryContentLifecycle.kt` | `tryRestoreByMangaDexUuid()` restores soft-deleted series on folder rename; `scanSeriesFolder()` creates series if needed, imports chapter URLs per-series only |
 | `PageHashRepository.kt` | Added `deleteKnown()` |
 | `PageHashDao.kt` | Implemented `deleteKnown()` — deletes from PAGE_HASH + PAGE_HASH_THUMBNAIL |
