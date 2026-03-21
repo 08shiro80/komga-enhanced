@@ -18,6 +18,7 @@ import java.nio.file.Paths
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -127,7 +128,10 @@ class GalleryDlWrapper(
           .associate { it.configKey to it.configValue }
       val language = pluginConfig["default_language"] ?: "en"
       val feedUrl =
-        "https://api.mangadex.org/manga/$mangaDexId/feed?translatedLanguage[]=$language&limit=0"
+        "https://api.mangadex.org/manga/$mangaDexId/feed?" +
+          "translatedLanguage[]=$language&" +
+          "$CONTENT_RATING_PARAMS&" +
+          "limit=0"
       val request =
         HttpRequest
           .newBuilder()
@@ -338,6 +342,8 @@ class GalleryDlWrapper(
   companion object {
     private const val CACHE_TTL_MS = 30 * 60 * 1000L
     private const val MAX_OUTPUT_SIZE = 512 * 1024
+    private const val CONTENT_RATING_PARAMS =
+      "contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic"
     private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
     private val ZIP_COMMENT_UUID_REGEX = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
     private val COMICINFO_WEB_REGEX = Regex("<Web>(.+?)</Web>")
@@ -505,6 +511,7 @@ class GalleryDlWrapper(
         val apiUrl =
           "https://api.mangadex.org/manga/$mangaId/feed?" +
             "translatedLanguage[]=$language&" +
+            "$CONTENT_RATING_PARAMS&" +
             "includes[]=scanlation_group&" +
             "order[chapter]=asc&" +
             "limit=$limit&" +
@@ -809,6 +816,7 @@ class GalleryDlWrapper(
   ): DownloadResult {
     val output = StringBuilder()
     val errorOutput = StringBuilder()
+    var configFileForCleanup: File? = null
 
     try {
       val mangaDexId = extractMangaDexId(url)
@@ -841,6 +849,7 @@ class GalleryDlWrapper(
           .toMap()
       val defaultLanguage = pluginConfig["default_language"] ?: "en"
       val configFile = createTempConfigFile(pluginConfig)
+      configFileForCleanup = configFile
 
       val command =
         getGalleryDlCommand().toMutableList().apply {
@@ -930,19 +939,23 @@ class GalleryDlWrapper(
             old.chapterUrl !in blacklistedUrls &&
             !blacklistedChapterRepository.existsByChapterUrl(old.chapterUrl)
           ) {
-            blacklistedChapterRepository.insert(
-              org.gotson.komga.domain.model.BlacklistedChapter(
-                id =
-                  java.util.UUID
-                    .randomUUID()
-                    .toString(),
-                seriesId = komgaSeriesId,
-                chapterUrl = old.chapterUrl,
-                chapterNumber = old.chapterNumber,
-                chapterTitle = old.chapterTitle,
-              ),
-            )
-            logger.info { "Auto-blacklisted same-group duplicate: ch.${old.chapterNumber} [${old.scanlationGroup}] ${old.chapterUrl}" }
+            try {
+              blacklistedChapterRepository.insert(
+                org.gotson.komga.domain.model.BlacklistedChapter(
+                  id =
+                    java.util.UUID
+                      .randomUUID()
+                      .toString(),
+                  seriesId = komgaSeriesId,
+                  chapterUrl = old.chapterUrl,
+                  chapterNumber = old.chapterNumber,
+                  chapterTitle = old.chapterTitle,
+                ),
+              )
+              logger.info { "Auto-blacklisted same-group duplicate: ch.${old.chapterNumber} [${old.scanlationGroup}] ${old.chapterUrl}" }
+            } catch (e: Exception) {
+              logger.debug(e) { "Blacklist insert failed (likely duplicate): ${old.chapterUrl}" }
+            }
           }
         }
       }
@@ -963,7 +976,7 @@ class GalleryDlWrapper(
         logger.info { "No existing chapters found, downloading all ${allChapters.size} chapters" }
       }
 
-      var filesDownloaded = 0
+      val filesDownloaded = AtomicInteger(0)
       var totalChapters = filteredChapters.size
 
       if (allChapters.isEmpty() && mangaDexId != null) {
@@ -1009,39 +1022,47 @@ class GalleryDlWrapper(
         onProcessStarted(process)
         var lastProgress = 0
 
-        Thread {
-          BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-            reader.lines().forEach { line ->
-              appendBounded(output, line)
-              logger.debug { "gallery-dl: $line" }
+        val stdoutThread =
+          Thread {
+            BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+              reader.lines().forEach { line ->
+                appendBounded(output, line)
+                logger.debug { "gallery-dl: $line" }
 
-              if (line.contains("✔") || line.contains("*")) {
-                filesDownloaded++
+                if (line.contains("✔") || line.contains("*")) {
+                  filesDownloaded.incrementAndGet()
+                }
               }
             }
           }
-        }.start()
+        stdoutThread.start()
 
-        Thread {
-          BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
-            reader.lines().forEach { line ->
-              appendBounded(errorOutput, line)
-              logger.debug { "gallery-dl stderr: $line" }
+        val stderrThread =
+          Thread {
+            BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
+              reader.lines().forEach { line ->
+                appendBounded(errorOutput, line)
+                logger.debug { "gallery-dl stderr: $line" }
 
-              val progress = parseGalleryDlProgress(line, filesDownloaded)
-              if (progress != null && progress.percent > lastProgress) {
-                lastProgress = progress.percent
-                onProgress(progress)
+                val progress = parseGalleryDlProgress(line, filesDownloaded.get())
+                if (progress != null && progress.percent > lastProgress) {
+                  lastProgress = progress.percent
+                  onProgress(progress)
+                }
               }
             }
           }
-        }.start()
+        stderrThread.start()
 
         if (!process.waitFor(2, TimeUnit.HOURS)) {
           process.destroyForcibly()
+          stdoutThread.join(5000)
+          stderrThread.join(5000)
           deleteQuietly(configFile)
           throw GalleryDlException("Timeout downloading $url")
         }
+        stdoutThread.join(5000)
+        stderrThread.join(5000)
 
         val exitCode = process.exitValue()
         deleteQuietly(configFile)
@@ -1152,7 +1173,7 @@ class GalleryDlWrapper(
             deleteQuietly(configFile)
             return DownloadResult(
               success = true,
-              filesDownloaded = filesDownloaded,
+              filesDownloaded = filesDownloaded.get(),
               downloadedFiles = emptyList(),
               totalChapters = totalChapters,
               errorMessage = null,
@@ -1164,19 +1185,23 @@ class GalleryDlWrapper(
           val failCount = chapterFailures[chapter.chapterUrl] ?: 0
           if (failCount >= 3) {
             if (komgaSeriesId != null && !blacklistedChapterRepository.existsByChapterUrl(chapter.chapterUrl)) {
-              blacklistedChapterRepository.insert(
-                org.gotson.komga.domain.model.BlacklistedChapter(
-                  id =
-                    java.util.UUID
-                      .randomUUID()
-                      .toString(),
-                  seriesId = komgaSeriesId,
-                  chapterUrl = chapter.chapterUrl,
-                  chapterNumber = chapter.chapterNumber,
-                  chapterTitle = chapter.chapterTitle,
-                ),
-              )
-              logger.info { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
+              try {
+                blacklistedChapterRepository.insert(
+                  org.gotson.komga.domain.model.BlacklistedChapter(
+                    id =
+                      java.util.UUID
+                        .randomUUID()
+                        .toString(),
+                    seriesId = komgaSeriesId,
+                    chapterUrl = chapter.chapterUrl,
+                    chapterNumber = chapter.chapterNumber,
+                    chapterTitle = chapter.chapterTitle,
+                  ),
+                )
+                logger.info { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
+              } catch (e: Exception) {
+                logger.debug(e) { "Blacklist insert failed (likely duplicate): ${chapter.chapterUrl}" }
+              }
             } else if (komgaSeriesId == null) {
               logger.warn { "Cannot blacklist chapter $chapterNum: series not yet in database" }
             }
@@ -1207,33 +1232,38 @@ class GalleryDlWrapper(
             val chapterOutput = StringBuilder()
             val chapterError = StringBuilder()
 
-            Thread {
-              BufferedReader(InputStreamReader(chapterProcess.inputStream)).use { reader ->
-                reader.lines().forEach { line ->
-                  appendBounded(chapterOutput, line)
-                  appendBounded(output, line)
-                  logger.debug { "gallery-dl [ch$chapterNum]: $line" }
+            val chStdoutThread =
+              Thread {
+                BufferedReader(InputStreamReader(chapterProcess.inputStream)).use { reader ->
+                  reader.lines().forEach { line ->
+                    appendBounded(chapterOutput, line)
+                    appendBounded(output, line)
+                    logger.debug { "gallery-dl [ch$chapterNum]: $line" }
+                  }
                 }
               }
-            }.start()
+            chStdoutThread.start()
 
-            Thread {
-              BufferedReader(InputStreamReader(chapterProcess.errorStream)).use { reader ->
-                reader.lines().forEach { line ->
-                  appendBounded(chapterError, line)
-                  appendBounded(errorOutput, line)
-                  logger.debug { "gallery-dl [ch$chapterNum] stderr: $line" }
+            val chStderrThread =
+              Thread {
+                BufferedReader(InputStreamReader(chapterProcess.errorStream)).use { reader ->
+                  reader.lines().forEach { line ->
+                    appendBounded(chapterError, line)
+                    appendBounded(errorOutput, line)
+                    logger.debug { "gallery-dl [ch$chapterNum] stderr: $line" }
+                  }
                 }
               }
-            }.start()
+            chStderrThread.start()
 
-            // Wait for this chapter to complete (max 10 minutes per chapter)
             val completed = chapterProcess.waitFor(10, TimeUnit.MINUTES)
+            chStdoutThread.join(5000)
+            chStderrThread.join(5000)
             if (!completed) {
               chapterProcess.destroyForcibly()
               logger.warn { "Chapter $chapterNum download timed out" }
             } else if (chapterProcess.exitValue() == 0) {
-              filesDownloaded++
+              filesDownloaded.incrementAndGet()
 
               val chapterStr = chapter.chapterNumber ?: "${index + 1}"
               val paddedChapter = padChapterNumber(chapterStr)
@@ -1322,7 +1352,7 @@ class GalleryDlWrapper(
               }
 
               val progressPercent = if (totalChapters > 0) (downloadIndex * 100) / totalChapters else 100
-              onProgress(DownloadProgress(filesDownloaded, totalChapters, progressPercent, "Downloaded chapter $chapterNum"))
+              onProgress(DownloadProgress(filesDownloaded.get(), totalChapters, progressPercent, "Downloaded chapter $chapterNum"))
             } else {
               val exitCode = chapterProcess.exitValue()
               chapterFailures[chapter.chapterUrl] = failCount + 1
@@ -1380,6 +1410,7 @@ class GalleryDlWrapper(
         mangaTitle = mangaInfo.title,
       )
     } catch (e: GalleryDlException) {
+      configFileForCleanup?.let { deleteQuietly(it) }
       logger.error(e) { "Download failed: $url" }
       logToDatabase(org.gotson.komga.domain.model.LogLevel.ERROR, "Download failed for $url: ${e.message}", e.stackTraceToString())
       return DownloadResult(
@@ -1390,6 +1421,7 @@ class GalleryDlWrapper(
         errorMessage = e.message ?: "Unknown error",
       )
     } catch (e: Exception) {
+      configFileForCleanup?.let { deleteQuietly(it) }
       logger.error(e) { "Unexpected error downloading: $url" }
       logToDatabase(org.gotson.komga.domain.model.LogLevel.ERROR, "Unexpected error downloading from $url: ${e.message}", e.stackTraceToString())
       return DownloadResult(
@@ -1868,7 +1900,7 @@ class GalleryDlWrapper(
   ${if (volume != null) "<Volume>$volume</Volume>" else ""}
   ${if (description.isNotBlank()) "<Summary>$description</Summary>" else ""}
   ${
-      if (publishDate != null) {
+      if (publishDate != null && publishDate.length >= 4) {
         "<Year>${publishDate.substring(0, 4)}</Year>"
       } else if (mangaInfo.year != null) {
         "<Year>${mangaInfo.year}</Year>"
@@ -1876,8 +1908,8 @@ class GalleryDlWrapper(
         ""
       }
     }
-  ${if (publishDate != null) "<Month>${publishDate.substring(5, 7)}</Month>" else ""}
-  ${if (publishDate != null) "<Day>${publishDate.substring(8, 10)}</Day>" else ""}
+  ${if (publishDate != null && publishDate.length >= 7) "<Month>${publishDate.substring(5, 7)}</Month>" else ""}
+  ${if (publishDate != null && publishDate.length >= 10) "<Day>${publishDate.substring(8, 10)}</Day>" else ""}
   <Writer>$author</Writer>
   <Translator>$scanlationGroup</Translator>
   <Publisher>${mangaInfo.publisher.escapeXml()}</Publisher>

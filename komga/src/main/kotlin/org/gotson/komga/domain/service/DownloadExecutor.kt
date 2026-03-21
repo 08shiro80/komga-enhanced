@@ -102,9 +102,10 @@ class DownloadExecutor(
           processDownload(download)
         } catch (e: Exception) {
           logger.error(e) { "Error processing download queue" }
+        } finally {
+          processing.set(false)
         }
       }
-      processing.set(false)
     } catch (e: Exception) {
       logger.error(e) { "Error processing download queue" }
       processing.set(false)
@@ -459,6 +460,7 @@ class DownloadExecutor(
       logger.info { "Starting download to: $destinationPath" }
 
       val isCancelled = { cancelledIds.contains(download.id) }
+      var lastProgressDbWrite = 0L
 
       val result =
         galleryDlWrapper.download(
@@ -474,14 +476,18 @@ class DownloadExecutor(
             cancelledIds.remove(download.id)
             throw InterruptedException("Download cancelled: ${download.id}")
           }
-          downloadQueueRepository.update(
-            download.copy(
-              progressPercent = progress.percent,
-              currentChapter = progress.currentChapter,
-              totalChapters = if (progress.totalChapters > 0) progress.totalChapters else download.totalChapters,
-              lastModifiedDate = LocalDateTime.now(),
-            ),
-          )
+          val now = System.currentTimeMillis()
+          if (now - lastProgressDbWrite >= 5000) {
+            lastProgressDbWrite = now
+            downloadQueueRepository.update(
+              download.copy(
+                progressPercent = progress.percent,
+                currentChapter = progress.currentChapter,
+                totalChapters = if (progress.totalChapters > 0) progress.totalChapters else download.totalChapters,
+                lastModifiedDate = LocalDateTime.now(),
+              ),
+            )
+          }
 
           downloadProgressHandler.broadcastProgress(
             DownloadProgressDto(
@@ -707,8 +713,7 @@ class DownloadExecutor(
     if (uuidFolder.exists()) {
       val series =
         seriesRepository
-          .findAllByLibraryId(libraryId)
-          .firstOrNull { it.path.toFile() == uuidFolder }
+          .findNotDeletedByLibraryIdAndUrlOrNull(libraryId, uuidFolder.toURI().toURL())
       return FolderLookupResult(uuidFolder, series?.id ?: "")
     }
 
@@ -751,7 +756,9 @@ class DownloadExecutor(
               }
           }
       if (match != null) {
-        val series = allSeries.firstOrNull { it.path.toFile() == match }
+        val series =
+          seriesRepository
+            .findNotDeletedByLibraryIdAndUrlOrNull(libraryId, match.toURI().toURL())
         logger.info { "findExistingMangaFolder: found by series.json scan: ${match.absolutePath}" }
         return FolderLookupResult(match, series?.id ?: "")
       }

@@ -294,7 +294,7 @@ class ChapterChecker(
         if (seriesJson.exists()) {
           try {
             val content = seriesJson.readText()
-            uuidRegex.find(content)?.value?.let { uuid -> index[uuid] = dir }
+            uuidRegex.find(content)?.value?.let { uuid -> index.putIfAbsent(uuid, dir) }
           } catch (e: Exception) {
             logger.debug(e) { "Failed to read series.json in ${dir.name}" }
           }

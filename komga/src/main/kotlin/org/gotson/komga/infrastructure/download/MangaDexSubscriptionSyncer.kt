@@ -56,6 +56,8 @@ class MangaDexSubscriptionSyncer(
   private var accessToken: String? = null
   private var refreshToken: String? = null
   private var expiresAt: Instant? = null
+
+  @Volatile
   private var scheduledTask: ScheduledFuture<*>? = null
 
   @EventListener(ApplicationReadyEvent::class)
@@ -245,6 +247,7 @@ class MangaDexSubscriptionSyncer(
     logger.debug { "MangaDex token refreshed (expires in ${expiresIn}s)" }
   }
 
+  @Synchronized
   private fun getValidToken(config: Map<String, String?>): String {
     val token = accessToken
     val expiry = expiresAt
@@ -323,6 +326,10 @@ class MangaDexSubscriptionSyncer(
       if (!hasRequiredCredentials(config)) return
 
       val library = libraryRepository.findAll().firstOrNull()
+      if (library == null) {
+        logger.warn { "No library found — MangaDex subscription sync skipped" }
+        return
+      }
       checkForNewManga(config, library)
       checkFeed(config, library)
 
@@ -443,6 +450,7 @@ class MangaDexSubscriptionSyncer(
         "$apiBase/user/follows/manga/feed" +
           "?publishAtSince=${encode(lastCheck)}" +
           "&translatedLanguage[]=$language" +
+          "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic" +
           "&order[publishAt]=asc" +
           "&limit=$limit&offset=$offset"
 
