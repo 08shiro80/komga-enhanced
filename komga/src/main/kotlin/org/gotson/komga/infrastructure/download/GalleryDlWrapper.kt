@@ -16,7 +16,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
@@ -33,24 +35,55 @@ class GalleryDlWrapper(
 ) {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
-  private var lastMangaDexRequestTime = 0L
+  private val lastMangaDexRequestTime = AtomicLong(0)
   private val mangaDexMinIntervalMs = 450L
-  private val chapterCache = java.util.concurrent.ConcurrentHashMap<String, Pair<List<ChapterDownloadInfo>, Long>>()
-  private val mangaInfoCache = java.util.concurrent.ConcurrentHashMap<String, Pair<MangaInfo, Long>>()
+  private val chapterCache = ConcurrentHashMap<String, Pair<List<ChapterDownloadInfo>, Long>>()
+  private val mangaInfoCache = ConcurrentHashMap<String, Pair<MangaInfo, Long>>()
+  private val httpClient: HttpClient =
+    HttpClient
+      .newBuilder()
+      .connectTimeout(Duration.ofSeconds(10))
+      .followRedirects(HttpClient.Redirect.NORMAL)
+      .build()
 
+  @Synchronized
   private fun throttleMangaDexApi() {
     val now = System.currentTimeMillis()
-    val elapsed = now - lastMangaDexRequestTime
+    val elapsed = now - lastMangaDexRequestTime.get()
     if (elapsed < mangaDexMinIntervalMs) {
       Thread.sleep(mangaDexMinIntervalMs - elapsed)
     }
-    lastMangaDexRequestTime = System.currentTimeMillis()
+    lastMangaDexRequestTime.set(System.currentTimeMillis())
+  }
+
+  private fun deleteQuietly(file: File) {
+    if (!file.delete()) {
+      logger.debug { "Failed to delete: ${file.absolutePath}" }
+    }
+  }
+
+  private fun appendBounded(
+    sb: StringBuilder,
+    line: String,
+  ) {
+    if (sb.length > MAX_OUTPUT_SIZE) {
+      val dropIndex = sb.indexOf("\n", sb.length / 2)
+      if (dropIndex > 0) sb.delete(0, dropIndex + 1)
+    }
+    sb.appendLine(line)
+  }
+
+  private fun evictExpiredCacheEntries() {
+    val now = System.currentTimeMillis()
+    chapterCache.entries.removeIf { now - it.value.second > CACHE_TTL_MS }
+    mangaInfoCache.entries.removeIf { now - it.value.second > CACHE_TTL_MS }
   }
 
   fun getChaptersForManga(
     mangaId: String,
     language: String? = null,
   ): List<ChapterDownloadInfo> {
+    evictExpiredCacheEntries()
     val lang = language ?: getDefaultLanguage()
     val cacheKey = "$mangaId:$lang"
     val cached = chapterCache[cacheKey]
@@ -64,6 +97,7 @@ class GalleryDlWrapper(
   }
 
   fun getMangaMetadata(mangaId: String): MangaInfo? {
+    evictExpiredCacheEntries()
     val cached = mangaInfoCache[mangaId]
     if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
       logger.debug { "Using cached manga metadata for $mangaId" }
@@ -79,7 +113,8 @@ class GalleryDlWrapper(
       pluginConfigRepository
         .findByPluginIdAndKey(pluginId, "default_language")
         ?.configValue ?: "en"
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to load default language" }
       "en"
     }
 
@@ -93,11 +128,6 @@ class GalleryDlWrapper(
       val language = pluginConfig["default_language"] ?: "en"
       val feedUrl =
         "https://api.mangadex.org/manga/$mangaDexId/feed?translatedLanguage[]=$language&limit=0"
-      val httpClient =
-        HttpClient
-          .newBuilder()
-          .connectTimeout(Duration.ofSeconds(10))
-          .build()
       val request =
         HttpRequest
           .newBuilder()
@@ -134,7 +164,6 @@ class GalleryDlWrapper(
 
   private fun fetchMangaDexMetadata(mangaId: String): MangaInfo? {
     try {
-      val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
       val request =
         HttpRequest
           .newBuilder()
@@ -308,6 +337,7 @@ class GalleryDlWrapper(
 
   companion object {
     private const val CACHE_TTL_MS = 30 * 60 * 1000L
+    private const val MAX_OUTPUT_SIZE = 512 * 1024
     private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
     private val ZIP_COMMENT_UUID_REGEX = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
     private val COMICINFO_WEB_REGEX = Regex("<Web>(.+?)</Web>")
@@ -326,7 +356,6 @@ class GalleryDlWrapper(
       val coverUrl = "https://uploads.mangadex.org/covers/$mangaId/$coverFilename"
       logger.info { "Downloading cover from: $coverUrl" }
 
-      val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build()
       val request =
         HttpRequest
           .newBuilder()
@@ -350,7 +379,7 @@ class GalleryDlWrapper(
       val coverFile = destinationPath.resolve("cover.$extension").toFile()
       coverFile.writeBytes(response.body())
 
-      logger.info { "Cover downloaded successfully: ${coverFile.absolutePath} (${response.body().size} bytes)" }
+      logger.debug { "Cover downloaded successfully: ${coverFile.absolutePath} (${response.body().size} bytes)" }
       logToDatabase(
         org.gotson.komga.domain.model.LogLevel.INFO,
         "Downloaded cover image: ${coverFile.name} (${response.body().size} bytes)",
@@ -379,14 +408,14 @@ class GalleryDlWrapper(
     return try {
       val num = raw.toDouble()
       if (num == num.toLong().toDouble()) num.toLong().toString() else raw
-    } catch (_: NumberFormatException) {
+    } catch (e: NumberFormatException) {
+      logger.debug(e) { "Could not parse chapter number: $raw" }
       raw
     }
   }
 
   private fun fetchChapterMetadata(chapterId: String): ChapterInfo? {
     try {
-      val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
       val request =
         HttpRequest
           .newBuilder()
@@ -434,7 +463,7 @@ class GalleryDlWrapper(
         }
       }
 
-      logger.info { "Fetched chapter metadata: chapter=$chapterNumber, title='$chapterTitle', volume=$volume, pages=$pages" }
+      logger.debug { "Fetched chapter metadata: chapter=$chapterNumber, title='$chapterTitle', volume=$volume, pages=$pages" }
 
       return ChapterInfo(
         chapterNumber = chapterNumber,
@@ -472,8 +501,6 @@ class GalleryDlWrapper(
     val limit = 500
 
     try {
-      val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build()
-
       while (true) {
         val apiUrl =
           "https://api.mangadex.org/manga/$mangaId/feed?" +
@@ -592,7 +619,7 @@ class GalleryDlWrapper(
           add(configFile.absolutePath)
         }
 
-      logger.info { "Executing getChapterInfo: ${command.joinToString(" ")}" }
+      logger.debug { "Executing getChapterInfo: ${command.joinToString(" ")}" }
 
       val process =
         applyGalleryDlEnv(ProcessBuilder())
@@ -602,7 +629,7 @@ class GalleryDlWrapper(
       // Read stdout
       BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
         reader.lines().forEach { line ->
-          output.appendLine(line)
+          appendBounded(output, line)
           logger.debug { "gallery-dl info: $line" }
         }
       }
@@ -610,19 +637,19 @@ class GalleryDlWrapper(
       // Read stderr
       BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
         reader.lines().forEach { line ->
-          errorOutput.appendLine(line)
+          appendBounded(errorOutput, line)
           logger.debug { "gallery-dl error: $line" }
         }
       }
 
       if (!process.waitFor(60, TimeUnit.SECONDS)) {
         process.destroyForcibly()
-        configFile.delete()
+        deleteQuietly(configFile)
         throw GalleryDlException("Timeout getting chapter info for $url")
       }
 
       val exitValue = process.exitValue()
-      configFile.delete()
+      deleteQuietly(configFile)
 
       if (exitValue != 0) {
         val errorMsg = "gallery-dl failed with exit code $exitValue: ${errorOutput.toString().trim()}"
@@ -646,7 +673,7 @@ class GalleryDlWrapper(
         throw GalleryDlException(errorMsg)
       }
 
-      logger.info { "Successfully extracted title: ${mangaInfo.title}" }
+      logger.debug { "Successfully extracted title: ${mangaInfo.title}" }
       return mangaInfo
     } catch (e: GalleryDlException) {
       throw e
@@ -682,7 +709,7 @@ class GalleryDlWrapper(
           .start()
 
       BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-        reader.lines().forEach { line -> output.appendLine(line) }
+        reader.lines().forEach { line -> appendBounded(output, line) }
       }
       BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
         reader.lines().forEach { _ -> }
@@ -690,10 +717,10 @@ class GalleryDlWrapper(
 
       if (!process.waitFor(60, TimeUnit.SECONDS)) {
         process.destroyForcibly()
-        configFile.delete()
+        deleteQuietly(configFile)
         return emptyMap()
       }
-      configFile.delete()
+      deleteQuietly(configFile)
       if (process.exitValue() != 0) return emptyMap()
 
       val mapping = mutableMapOf<String, ChapterDownloadInfo>()
@@ -733,11 +760,11 @@ class GalleryDlWrapper(
           )
       }
 
-      logger.info { "Parsed ${mapping.size} chapters from gallery-dl simulate output" }
+      logger.debug { "Parsed ${mapping.size} chapters from gallery-dl simulate output" }
       return mapping
     } catch (e: Exception) {
       logger.warn(e) { "Failed to parse gallery-dl chapter mapping" }
-      configFile.delete()
+      deleteQuietly(configFile)
       return emptyMap()
     }
   }
@@ -792,14 +819,14 @@ class GalleryDlWrapper(
           getChapterInfo(url)
         }
 
-      logger.info { "Using title: ${mangaInfo.title}" }
+      logger.debug { "Using title: ${mangaInfo.title}" }
 
       val destDir = destinationPath.toFile()
       if (!destDir.exists()) {
         destDir.mkdirs()
       }
 
-      logger.info { "Creating series.json" }
+      logger.debug { "Creating series.json" }
       try {
         createSeriesJson(mangaInfo, destinationPath)
       } catch (e: Exception) {
@@ -807,10 +834,13 @@ class GalleryDlWrapper(
       }
 
       val seriesJson = readSeriesJson(destinationPath)
-      val configFile = createTempConfigFile()
-
-      val pluginConfig = pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
+      val pluginConfig =
+        pluginConfigRepository
+          .findByPluginId(pluginId)
+          .mapNotNull { c -> c.configValue?.let { c.configKey to it } }
+          .toMap()
       val defaultLanguage = pluginConfig["default_language"] ?: "en"
+      val configFile = createTempConfigFile(pluginConfig)
 
       val command =
         getGalleryDlCommand().toMutableList().apply {
@@ -942,7 +972,7 @@ class GalleryDlWrapper(
           org.gotson.komga.domain.model.LogLevel.WARN,
           "MangaDex chapter API returned empty for $mangaDexId, skipping download",
         )
-        configFile.delete()
+        deleteQuietly(configFile)
 
         val downloadedFiles =
           destDir
@@ -982,8 +1012,8 @@ class GalleryDlWrapper(
         Thread {
           BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
             reader.lines().forEach { line ->
-              output.appendLine(line)
-              logger.info { "gallery-dl: $line" }
+              appendBounded(output, line)
+              logger.debug { "gallery-dl: $line" }
 
               if (line.contains("✔") || line.contains("*")) {
                 filesDownloaded++
@@ -995,8 +1025,8 @@ class GalleryDlWrapper(
         Thread {
           BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
             reader.lines().forEach { line ->
-              errorOutput.appendLine(line)
-              logger.info { "gallery-dl stderr: $line" }
+              appendBounded(errorOutput, line)
+              logger.debug { "gallery-dl stderr: $line" }
 
               val progress = parseGalleryDlProgress(line, filesDownloaded)
               if (progress != null && progress.percent > lastProgress) {
@@ -1009,12 +1039,12 @@ class GalleryDlWrapper(
 
         if (!process.waitFor(2, TimeUnit.HOURS)) {
           process.destroyForcibly()
-          configFile.delete()
+          deleteQuietly(configFile)
           throw GalleryDlException("Timeout downloading $url")
         }
 
         val exitCode = process.exitValue()
-        configFile.delete()
+        deleteQuietly(configFile)
 
         if (exitCode != 0) {
           throw GalleryDlException("Download failed with exit code $exitCode: ${errorOutput.toString().trim()}")
@@ -1026,15 +1056,15 @@ class GalleryDlWrapper(
             .filter { it.isFile && it.extension.lowercase() == "cbz" && it.parentFile != destDir }
             .toList()
         if (cbzFilesInSubdirs.isNotEmpty()) {
-          logger.info { "Found ${cbzFilesInSubdirs.size} CBZ files in subdirectories, moving to root" }
+          logger.debug { "Found ${cbzFilesInSubdirs.size} CBZ files in subdirectories, moving to root" }
           cbzFilesInSubdirs.forEach { cbzFile ->
             val target = File(destDir, cbzFile.name)
             if (!target.exists()) {
-              cbzFile.renameTo(target)
-              logger.info { "Moved ${cbzFile.relativeTo(destDir).path} -> ${target.name}" }
+              Files.move(cbzFile.toPath(), target.toPath())
+              logger.debug { "Moved ${cbzFile.relativeTo(destDir).path} -> ${target.name}" }
             }
           }
-          destDir.walkTopDown().filter { it.isDirectory && it != destDir && it.listFiles()?.isEmpty() == true }.forEach { it.delete() }
+          destDir.walkTopDown().filter { it.isDirectory && it != destDir && it.listFiles()?.isEmpty() == true }.forEach { deleteQuietly(it) }
         }
 
         val downloadedCbzFiles =
@@ -1043,7 +1073,7 @@ class GalleryDlWrapper(
             ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
             ?: emptyList()
 
-        logger.info { "Found ${downloadedCbzFiles.size} CBZ files, processing metadata" }
+        logger.debug { "Found ${downloadedCbzFiles.size} CBZ files, processing metadata" }
 
         val retryChapters =
           if (mangaDexId != null) {
@@ -1051,7 +1081,8 @@ class GalleryDlWrapper(
               fetchAllChaptersFromMangaDex(mangaDexId).also {
                 if (it.isNotEmpty()) logger.debug { "Fetched ${it.size} chapters from MangaDex API" }
               }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+              logger.debug(e) { "Failed to fetch chapters from MangaDex API" }
               emptyList()
             }
           } else {
@@ -1103,7 +1134,7 @@ class GalleryDlWrapper(
       } else if (filteredChapters.isEmpty()) {
         logger.info { "All ${allChapters.size} chapters already downloaded, nothing to do" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "All chapters already downloaded, skipping: $url")
-        configFile.delete()
+        deleteQuietly(configFile)
       } else {
         val failuresFile = File(destDir, ".chapter-failures.json")
         val chapterFailures = loadChapterFailures(failuresFile)
@@ -1118,7 +1149,7 @@ class GalleryDlWrapper(
           if (isCancelled()) {
             saveChapterFailures(failuresFile, chapterFailures)
             logger.info { "Download cancelled before chapter ${downloadIndex + 1}/$totalChapters, stopping" }
-            configFile.delete()
+            deleteQuietly(configFile)
             return DownloadResult(
               success = true,
               filesDownloaded = filesDownloaded,
@@ -1179,8 +1210,8 @@ class GalleryDlWrapper(
             Thread {
               BufferedReader(InputStreamReader(chapterProcess.inputStream)).use { reader ->
                 reader.lines().forEach { line ->
-                  chapterOutput.appendLine(line)
-                  output.appendLine(line)
+                  appendBounded(chapterOutput, line)
+                  appendBounded(output, line)
                   logger.debug { "gallery-dl [ch$chapterNum]: $line" }
                 }
               }
@@ -1189,8 +1220,8 @@ class GalleryDlWrapper(
             Thread {
               BufferedReader(InputStreamReader(chapterProcess.errorStream)).use { reader ->
                 reader.lines().forEach { line ->
-                  chapterError.appendLine(line)
-                  errorOutput.appendLine(line)
+                  appendBounded(chapterError, line)
+                  appendBounded(errorOutput, line)
                   logger.debug { "gallery-dl [ch$chapterNum] stderr: $line" }
                 }
               }
@@ -1282,9 +1313,9 @@ class GalleryDlWrapper(
                         scanlationGroup = chapter.scanlationGroup,
                       ),
                     )
-                    logger.info { "Registered chapter URL in DB: ch.$chapterNum ${chapter.chapterUrl}" }
+                    logger.debug { "Registered chapter URL in DB: ch.$chapterNum ${chapter.chapterUrl}" }
                   }
-                  logger.info { "Processed ${targetCbz.name}" }
+                  logger.debug { "Processed ${targetCbz.name}" }
                 } catch (e: Exception) {
                   logger.warn(e) { "Failed to process CBZ ${targetCbz.name}" }
                 }
@@ -1305,7 +1336,7 @@ class GalleryDlWrapper(
 
         saveChapterFailures(failuresFile, chapterFailures)
         normalizeDoubleBracketFilenames(destDir)
-        configFile.delete()
+        deleteQuietly(configFile)
       }
 
       val downloadedFiles =
@@ -1388,7 +1419,8 @@ class GalleryDlWrapper(
           .replace("_", " ")
           .trim()
       "$siteName - $decoded"
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to derive title from URL" }
       null
     }
 
@@ -1536,10 +1568,15 @@ class GalleryDlWrapper(
         ),
     )
 
-  private fun createTempConfigFile(): File {
+  private fun createTempConfigFile(
+    pluginConfig: Map<String, String> =
+      pluginConfigRepository
+        .findByPluginId(pluginId)
+        .mapNotNull { c -> c.configValue?.let { c.configKey to it } }
+        .toMap(),
+  ): File {
     val tempFile = File.createTempFile("gallery-dl-", ".json")
 
-    val pluginConfig = pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
     val mangadexUsername = pluginConfig["mangadex_username"]
     val mangadexPassword = pluginConfig["mangadex_password"]
     val defaultLanguage = pluginConfig["default_language"] ?: "en"
@@ -1581,10 +1618,15 @@ class GalleryDlWrapper(
     return tempFile
   }
 
-  private fun createCoverConfigFile(): File {
+  private fun createCoverConfigFile(
+    pluginConfig: Map<String, String> =
+      pluginConfigRepository
+        .findByPluginId(pluginId)
+        .mapNotNull { c -> c.configValue?.let { c.configKey to it } }
+        .toMap(),
+  ): File {
     val tempFile = File.createTempFile("gallery-dl-cover-", ".json")
 
-    val pluginConfig = pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
     val mangadexUsername = pluginConfig["mangadex_username"]
     val mangadexPassword = pluginConfig["mangadex_password"]
 
@@ -1629,7 +1671,7 @@ class GalleryDlWrapper(
         }
 
       logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Downloading cover from: $coverUrl")
-      logger.info { "Starting cover download: ${command.joinToString(" ")}" }
+      logger.debug { "Starting cover download: ${command.joinToString(" ")}" }
 
       val process =
         applyGalleryDlEnv(ProcessBuilder())
@@ -1638,16 +1680,16 @@ class GalleryDlWrapper(
 
       if (!process.waitFor(2, TimeUnit.MINUTES)) {
         process.destroyForcibly()
-        configFile.delete()
+        deleteQuietly(configFile)
         throw java.util.concurrent.TimeoutException("Cover download timeout")
       }
 
       val exitCode = process.exitValue()
-      configFile.delete()
+      deleteQuietly(configFile)
 
       if (exitCode == 0) {
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Cover download completed")
-        logger.info { "Cover download completed successfully" }
+        logger.debug { "Cover download completed successfully" }
       } else {
         logToDatabase(
           org.gotson.komga.domain.model.LogLevel.WARN,
@@ -1733,7 +1775,7 @@ class GalleryDlWrapper(
         }
       }
 
-      logger.info { "Writing series.json to: ${seriesJsonFile.absolutePath}" }
+      logger.debug { "Writing series.json to: ${seriesJsonFile.absolutePath}" }
       seriesJsonFile.writeText(newContent)
 
       if (!seriesJsonFile.exists()) {
@@ -1758,7 +1800,7 @@ class GalleryDlWrapper(
         org.gotson.komga.domain.model.LogLevel.INFO,
         "Created series.json with ${alternateTitles.size} alternative titles ($fileSizeKb KB)",
       )
-      logger.info { "series.json created successfully: ${seriesJsonFile.absolutePath} ($fileSizeKb KB)" }
+      logger.debug { "series.json created successfully: ${seriesJsonFile.absolutePath} ($fileSizeKb KB)" }
     } catch (e: Exception) {
       val errorMsg = "Failed to create series.json: ${e.message}"
       logToDatabase(
@@ -1790,7 +1832,7 @@ class GalleryDlWrapper(
         if (comment.isNullOrBlank()) {
           logger.warn { "ZIP comment MISSING after write: ${cbzPath.fileName}" }
         } else {
-          logger.info { "ZIP comment verified (${comment.length} chars): ${cbzPath.fileName}" }
+          logger.debug { "ZIP comment verified (${comment.length} chars): ${cbzPath.fileName}" }
         }
       }
     } catch (e: Exception) {
@@ -1873,7 +1915,7 @@ class GalleryDlWrapper(
       val chapterId = extractChapterId(cbzPath)
       val chapterInfo =
         if (chapterId != null) {
-          logger.info { "Fetching chapter metadata for ${cbzPath.fileName} (chapter ID: $chapterId)" }
+          logger.debug { "Fetching chapter metadata for ${cbzPath.fileName} (chapter ID: $chapterId)" }
           fetchChapterMetadata(chapterId)
         } else {
           logger.warn { "Could not extract chapter ID from ${cbzPath.fileName}, using series metadata only" }
@@ -1924,7 +1966,7 @@ class GalleryDlWrapper(
         "Injected ComicInfo.xml into ${cbzPath.fileName}" +
           if (chapterInfo != null) " (chapter ${chapterInfo.chapterNumber})" else "",
       )
-      logger.info {
+      logger.debug {
         "Added ComicInfo.xml to ${cbzPath.fileName}" +
           if (chapterInfo != null) " with chapter metadata (ch. ${chapterInfo.chapterNumber})" else ""
       }
@@ -2000,7 +2042,7 @@ class GalleryDlWrapper(
             "Injected ComicInfo.xml into ${cbzPath.fileName}" +
               if (chapterInfo != null) " (chapter ${chapterInfo.chapterNumber})" else "",
           )
-          logger.info {
+          logger.debug {
             "Added ComicInfo.xml to ${cbzPath.fileName}" +
               if (chapterInfo != null) " with chapter metadata (ch. ${chapterInfo.chapterNumber})" else ""
           }
@@ -2043,7 +2085,8 @@ class GalleryDlWrapper(
             ?: return null
         "https://mangadex.org/chapter/$uuid"
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to extract URL from ZIP comment: ${cbzFile.name}" }
       null
     }
   }
@@ -2145,7 +2188,8 @@ class GalleryDlWrapper(
             try {
               val n = chNum.toDouble()
               if (n == n.toLong().toDouble()) n.toLong().toString() else chNum
-            } catch (_: NumberFormatException) {
+            } catch (e: NumberFormatException) {
+              logger.debug(e) { "Could not parse chapter number: $chNum" }
               chNum
             }
           val numMatch = chapterNum == padded || chapterNum == plain
@@ -2171,14 +2215,14 @@ class GalleryDlWrapper(
         addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
         alreadyUpdated.add(cbzFile.absolutePath)
         updated++
-        logger.info { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
+        logger.debug { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
       } catch (e: Exception) {
         logger.debug { "Failed to update ComicInfo.xml in ${cbzFile.name}: ${e.message}" }
       }
     }
 
     if (updated > 0) {
-      logger.info { "Existing CBZ update: $updated ComicInfo injected" }
+      logger.debug { "Existing CBZ update: $updated ComicInfo injected" }
     }
   }
 
@@ -2191,7 +2235,8 @@ class GalleryDlWrapper(
           entry = zipIn.nextEntry
         }
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to check ComicInfo.xml in ${cbzFile.name}" }
       return false
     }
     return false
@@ -2397,7 +2442,8 @@ class GalleryDlWrapper(
         val decimalPart = chapterNumStr.substringAfter(".", "")
         String.format("%03d.%s", intPart, decimalPart)
       }
-    } catch (_: NumberFormatException) {
+    } catch (e: NumberFormatException) {
+      logger.debug(e) { "Could not pad chapter number: $chapterNumStr" }
       chapterNumStr
     }
 
@@ -2410,7 +2456,8 @@ class GalleryDlWrapper(
       } else {
         mutableMapOf()
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to load chapter failures from ${file.name}" }
       mutableMapOf()
     }
 
@@ -2420,7 +2467,7 @@ class GalleryDlWrapper(
   ) {
     try {
       if (failures.isEmpty()) {
-        if (file.exists()) file.delete()
+        if (file.exists()) deleteQuietly(file)
       } else {
         objectMapper.writeValue(file, failures)
       }
@@ -2445,8 +2492,8 @@ class GalleryDlWrapper(
             .replace(Regex("""'?\]\]"""), "]")
         val newFile = File(dir, "$normalized.cbz")
         if (!newFile.exists() && normalized != name) {
-          file.renameTo(newFile)
-          logger.info { "Normalized filename: ${file.name} -> $normalized.cbz" }
+          Files.move(file.toPath(), newFile.toPath())
+          logger.debug { "Normalized filename: ${file.name} -> $normalized.cbz" }
         }
       }
     }

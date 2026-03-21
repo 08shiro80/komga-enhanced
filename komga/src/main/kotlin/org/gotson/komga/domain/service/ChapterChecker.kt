@@ -66,6 +66,8 @@ class ChapterChecker(
     val startTime = System.currentTimeMillis()
     logger.info { "Starting chapter check for ${urls.size} manga URLs" }
 
+    val folderIndex = buildFolderIndex()
+
     val executor = Executors.newFixedThreadPool(5)
     val futures =
       urls.map { url ->
@@ -74,7 +76,7 @@ class ChapterChecker(
             try {
               concurrencyLimit.acquire()
               try {
-                checkSingleUrl(url)
+                checkSingleUrl(url, folderIndex)
               } finally {
                 concurrencyLimit.release()
               }
@@ -99,7 +101,10 @@ class ChapterChecker(
 
     val results = futures.map { it.join() }
     executor.shutdown()
-    executor.awaitTermination(10, TimeUnit.MINUTES)
+    if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
+      logger.warn { "Chapter check executor timed out, forcing shutdown" }
+      executor.shutdownNow()
+    }
 
     val durationMs = System.currentTimeMillis() - startTime
     val needsDownload = results.filter { it.needsDownload }
@@ -159,7 +164,10 @@ class ChapterChecker(
     return summary
   }
 
-  private fun checkSingleUrl(url: String): ChapterCheckResult {
+  private fun checkSingleUrl(
+    url: String,
+    folderIndex: Map<String, java.io.File>,
+  ): ChapterCheckResult {
     val mangaId = GalleryDlWrapper.extractMangaDexId(url)
     if (mangaId == null) {
       return ChapterCheckResult(
@@ -181,12 +189,13 @@ class ChapterChecker(
       val mangaInfo = galleryDlWrapper.getMangaMetadata(mangaId)
       val title = mangaInfo?.title
 
-      val series = findSeriesForManga(mangaId)
+      val mangaFolder = folderIndex[mangaId]
+      val series = findSeriesForManga(mangaId, mangaFolder)
       val knownChapterIds = getKnownChapterIds(series)
       val blacklistedChapterIds = getBlacklistedChapterIds(series)
       val allKnownIds = knownChapterIds + blacklistedChapterIds
       val missingIds = apiChapterIds - allKnownIds
-      val filesystemCount = countFilesystemChapters(url)
+      val filesystemCount = countFilesystemChapters(mangaFolder)
 
       val needsDownload = missingIds.isNotEmpty()
 
@@ -228,11 +237,14 @@ class ChapterChecker(
     }
   }
 
-  private fun findSeriesForManga(mangaId: String): org.gotson.komga.domain.model.Series? {
+  private fun findSeriesForManga(
+    mangaId: String,
+    folder: java.io.File?,
+  ): org.gotson.komga.domain.model.Series? {
     val byUuid = seriesRepository.findByMangaDexUuid(mangaId)
     if (byUuid != null) return byUuid
 
-    val folder = findMangaFolder(mangaId) ?: return null
+    if (folder == null) return null
     libraryRepository.findAll().forEach { library ->
       if (folder.absolutePath.startsWith(library.path.toFile().absolutePath)) {
         val folderUrl = folder.toURI().toURL()
@@ -260,41 +272,37 @@ class ChapterChecker(
       .toSet()
   }
 
-  private fun countFilesystemChapters(url: String): Int {
-    val mangaId = GalleryDlWrapper.extractMangaDexId(url) ?: return 0
-    val folder = findMangaFolder(mangaId) ?: return 0
+  private fun countFilesystemChapters(folder: java.io.File?): Int {
+    if (folder == null) return 0
     return folder
       .listFiles()
       ?.count { it.isFile && it.extension.lowercase() == "cbz" }
       ?: 0
   }
 
-  private fun findMangaFolder(mangaId: String): java.io.File? {
+  private fun buildFolderIndex(): Map<String, java.io.File> {
+    val index = mutableMapOf<String, java.io.File>()
+    val uuidRegex = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
     libraryRepository.findAll().forEach { library ->
-      try {
-        val libraryDir = library.path.toFile()
-        if (!libraryDir.exists()) return@forEach
-
-        val uuidFolder = java.io.File(libraryDir, mangaId)
-        if (uuidFolder.exists() && uuidFolder.isDirectory) {
-          return uuidFolder
+      val libraryDir = library.path.toFile()
+      if (!libraryDir.exists()) return@forEach
+      libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { dir ->
+        if (uuidRegex.matches(dir.name)) {
+          index[dir.name] = dir
         }
-
-        libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { mangaDir ->
-          val seriesJson = mangaDir.resolve("series.json")
-          if (seriesJson.exists()) {
-            try {
-              if (seriesJson.readText().contains(mangaId)) {
-                return mangaDir
-              }
-            } catch (_: Exception) {
-            }
+        val seriesJson = dir.resolve("series.json")
+        if (seriesJson.exists()) {
+          try {
+            val content = seriesJson.readText()
+            uuidRegex.find(content)?.value?.let { uuid -> index[uuid] = dir }
+          } catch (e: Exception) {
+            logger.debug(e) { "Failed to read series.json in ${dir.name}" }
           }
         }
-      } catch (_: Exception) {
       }
     }
-    return null
+    logger.debug { "Built folder index with ${index.size} entries" }
+    return index
   }
 
   companion object {

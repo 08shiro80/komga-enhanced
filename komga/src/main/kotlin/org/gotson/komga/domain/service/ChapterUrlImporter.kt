@@ -199,49 +199,30 @@ class ChapterUrlImporter(
   }
 
   private fun parseComicInfoXml(xml: String): ComicInfoData {
-    val url =
-      WEB_REGEX
-        .find(xml)
-        ?.groupValues
-        ?.get(1)
-        ?.unescapeXml()
-    val chapterNumber =
-      NUMBER_REGEX
-        .find(xml)
-        ?.groupValues
-        ?.get(1)
-        ?.toDoubleOrNull()
-    val volume =
-      VOLUME_REGEX
-        .find(xml)
-        ?.groupValues
-        ?.get(1)
-        ?.toIntOrNull()
-    val title =
-      TITLE_REGEX
-        .find(xml)
-        ?.groupValues
-        ?.get(1)
-        ?.unescapeXml()
-    val language =
-      LANGUAGE_REGEX
-        .find(xml)
-        ?.groupValues
-        ?.get(1)
-    val scanlationGroup =
-      TRANSLATOR_REGEX
-        .find(xml)
-        ?.groupValues
-        ?.get(1)
-        ?.unescapeXml()
+    var web: String? = null
+    var number: String? = null
+    var volume: String? = null
+    var title: String? = null
+    var language: String? = null
+    var translator: String? = null
+
+    for (line in xml.lineSequence()) {
+      if (web == null) WEB_REGEX.find(line)?.let { web = it.groupValues[1].unescapeXml() }
+      if (number == null) NUMBER_REGEX.find(line)?.let { number = it.groupValues[1] }
+      if (volume == null) VOLUME_REGEX.find(line)?.let { volume = it.groupValues[1] }
+      if (title == null) TITLE_REGEX.find(line)?.let { title = it.groupValues[1].unescapeXml() }
+      if (language == null) LANGUAGE_REGEX.find(line)?.let { language = it.groupValues[1] }
+      if (translator == null) TRANSLATOR_REGEX.find(line)?.let { translator = it.groupValues[1].unescapeXml() }
+      if (web != null && number != null && volume != null && title != null && language != null && translator != null) break
+    }
 
     return ComicInfoData(
-      url = url,
-      chapterNumber = chapterNumber,
-      volume = volume,
+      url = web,
+      chapterNumber = number?.toDoubleOrNull(),
+      volume = volume?.toIntOrNull(),
       title = title,
       language = language,
-      scanlationGroup = scanlationGroup,
+      scanlationGroup = translator,
     )
   }
 

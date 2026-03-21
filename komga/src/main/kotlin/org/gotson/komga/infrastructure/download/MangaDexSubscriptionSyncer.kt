@@ -322,8 +322,9 @@ class MangaDexSubscriptionSyncer(
 
       if (!hasRequiredCredentials(config)) return
 
-      checkForNewManga(config)
-      checkFeed(config)
+      val library = libraryRepository.findAll().firstOrNull()
+      checkForNewManga(config, library)
+      checkFeed(config, library)
 
       val listId = config["list_id"]
       if (listId.isNullOrBlank()) {
@@ -339,9 +340,11 @@ class MangaDexSubscriptionSyncer(
   }
 
   @Suppress("UNCHECKED_CAST")
-  private fun checkForNewManga(config: Map<String, String?>) {
+  private fun checkForNewManga(
+    config: Map<String, String?>,
+    library: org.gotson.komga.domain.model.Library?,
+  ) {
     val token = getValidToken(config)
-    val library = libraryRepository.findAll().firstOrNull()
 
     var offset = 0
     val limit = 100
@@ -392,7 +395,10 @@ class MangaDexSubscriptionSyncer(
   }
 
   @Suppress("UNCHECKED_CAST")
-  private fun checkFeed(config: Map<String, String?>) {
+  private fun checkFeed(
+    config: Map<String, String?>,
+    library: org.gotson.komga.domain.model.Library?,
+  ) {
     val token = getValidToken(config)
     val language = config["language"] ?: "en"
 
@@ -405,6 +411,28 @@ class MangaDexSubscriptionSyncer(
           .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 
     logger.info { "Checking subscription feed since $lastCheck" }
+
+    val seriesByMangaId =
+      seriesRepository
+        .findAll()
+        .filter { it.mangaDexUuid != null }
+        .associateBy { it.mangaDexUuid!! }
+
+    val knownIdsByManga =
+      seriesByMangaId.mapValues { (_, series) ->
+        chapterUrlRepository
+          .findUrlsBySeriesId(series.id)
+          .mapNotNull { url -> chapterIdRegex.find(url)?.groupValues?.get(1) }
+          .toSet()
+      }
+
+    val blacklistedIdsByManga =
+      seriesByMangaId.mapValues { (_, series) ->
+        blacklistedChapterRepository
+          .findUrlsBySeriesId(series.id)
+          .mapNotNull { url -> chapterIdRegex.find(url)?.groupValues?.get(1) }
+          .toSet()
+      }
 
     var offset = 0
     val limit = 100
@@ -443,7 +471,7 @@ class MangaDexSubscriptionSyncer(
 
         val chapterUrl = "https://mangadex.org/chapter/$chapterId"
 
-        if (isChapterKnown(mangaId, chapterId, chapterUrl)) continue
+        if (isChapterKnown(mangaId, chapterId, chapterUrl, knownIdsByManga, blacklistedIdsByManga)) continue
 
         val mangaUrl = "https://mangadex.org/title/$mangaId"
         if (downloadExecutor.isUrlAlreadyQueued(mangaUrl)) continue
@@ -468,7 +496,6 @@ class MangaDexSubscriptionSyncer(
     if (newChaptersByManga.isEmpty()) {
       logger.info { "Subscription feed: no new chapters" }
     } else {
-      val library = libraryRepository.findAll().firstOrNull()
       var queued = 0
 
       for ((mangaId, chapters) in newChaptersByManga) {
@@ -501,28 +528,12 @@ class MangaDexSubscriptionSyncer(
     mangaId: String,
     chapterId: String,
     chapterUrl: String,
+    knownIdsByManga: Map<String, Set<String>>,
+    blacklistedIdsByManga: Map<String, Set<String>>,
   ): Boolean {
-    val series = seriesRepository.findByMangaDexUuid(mangaId)
-    if (series != null) {
-      val existingUrls = chapterUrlRepository.findUrlsBySeriesId(series.id)
-      val existingIds =
-        existingUrls
-          .mapNotNull { url ->
-            chapterIdRegex.find(url)?.groupValues?.get(1)
-          }.toSet()
-      if (chapterId in existingIds) return true
-
-      val blacklisted = blacklistedChapterRepository.findUrlsBySeriesId(series.id)
-      val blacklistedIds =
-        blacklisted
-          .mapNotNull { url ->
-            chapterIdRegex.find(url)?.groupValues?.get(1)
-          }.toSet()
-      if (chapterId in blacklistedIds) return true
-    }
-
+    if (chapterId in (knownIdsByManga[mangaId] ?: emptySet())) return true
+    if (chapterId in (blacklistedIdsByManga[mangaId] ?: emptySet())) return true
     if (chapterUrlRepository.existsByUrl(chapterUrl)) return true
-
     return false
   }
 

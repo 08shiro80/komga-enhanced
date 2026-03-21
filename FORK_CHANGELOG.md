@@ -36,6 +36,21 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **Removed redundant pre-check in DownloadExecutor** — `processDownload` no longer calls `getMangaDexChapterCount` before starting a download. The ID-based check in ChapterChecker is more accurate and already cached.
 - **Chapter URL import skips unchanged series** — `importFromSeriesPath` compares CBZ file count against DB URL count. If they match, the series is skipped entirely without opening any CBZ files. Previously every library scan re-read ComicInfo.xml from all ~16,000 CBZ files (15 min), now only series with changes are scanned.
 
+### Performance
+- **Shared HttpClient in GalleryDlWrapper** — Reuse a single `HttpClient` instance instead of creating one per request (5 occurrences). Reduces GC pressure and connection setup overhead.
+- **Thread-safe MangaDex throttling** — `lastMangaDexRequestTime` uses `AtomicLong` + `@Synchronized` to prevent race conditions in concurrent API calls.
+- **Cache eviction for MangaDex API data** — `chapterCache` and `mangaInfoCache` now evict expired entries on access, preventing unbounded memory growth over long-running sessions.
+- **Bounded process output buffer** — Gallery-dl stdout/stderr capture is limited to 512 KB via `appendBounded()`, preventing OOM on extremely verbose downloads.
+- **Safe file operations** — All `File.delete()` calls check return values via `deleteQuietly()` helper; `renameTo()` replaced with `Files.move()` for reliable cross-filesystem moves.
+- **Plugin config loaded once per download** — `pluginConfigRepository` is queried once at the start of `download()` instead of per temp-config-file creation.
+- **Silent exceptions logged** — 9 swallowed `catch (_: Exception)` blocks now log at DEBUG level for diagnostics.
+- **Log level cleanup** — 20+ internal detail logs demoted from INFO to DEBUG (gallery-dl stdout/stderr, ComicInfo injection, ZIP comments, CBZ moves, series.json writes).
+- **Folder index in ChapterChecker** — `buildFolderIndex()` scans libraries once and builds a `Map<String, File>`, replacing per-manga O(n) folder search with O(1) lookup.
+- **Executor shutdown fallback** — `ChapterChecker` and `DownloadExecutor` thread pools use `shutdownNow()` fallback after timeout, plus `@PreDestroy` lifecycle management.
+- **Race condition fixes in DownloadExecutor** — `processing` flag set after `submit()` (not in task's `finally`), `cancelledIds`/`activeDownloads` synchronized, `pendingScans` protected by dedicated lock.
+- **Batch queries in MangaDexSubscriptionSyncer** — `isChapterKnown()` uses pre-loaded `HashMap` lookups instead of 3 DB queries per chapter (N+1 → O(1)). Library loaded once and passed through.
+- **Single-pass XML parsing in ChapterUrlImporter** — `parseComicInfoXml()` iterates line-by-line with early-exit instead of 6 separate full-string regex scans.
+
 ### Security
 - **Spring Boot 3.5.11 → 3.5.12** — Fixes CVE-2026-22732 (Spring Security Web 6.5.8 → 6.5.9, severity 9.1) and CVE-2026-22737 / CVE-2026-22735 (Spring WebFlux 6.2.16 → 6.2.17).
 

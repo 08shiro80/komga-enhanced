@@ -1,6 +1,7 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PreDestroy
 import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.DownloadQueue
@@ -21,6 +22,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 private val logger = KotlinLogging.logger {}
@@ -49,10 +51,20 @@ class DownloadExecutor(
   private val activeDownloads = ConcurrentHashMap<String, ActiveDownload>()
   private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
   private val pendingScans = ConcurrentHashMap<String, MutableSet<java.nio.file.Path>>()
+  private val pendingScanLock = Any()
   private val downloadThread =
     Executors.newSingleThreadExecutor { r ->
       Thread(r, "download-worker").apply { isDaemon = true }
     }
+
+  @PreDestroy
+  fun shutdown() {
+    downloadThread.shutdown()
+    if (!downloadThread.awaitTermination(30, TimeUnit.SECONDS)) {
+      logger.warn { "Download thread did not terminate in time, forcing shutdown" }
+      downloadThread.shutdownNow()
+    }
+  }
 
   @Scheduled(fixedDelay = 10000, initialDelay = 10000)
   fun processQueue() {
@@ -90,10 +102,9 @@ class DownloadExecutor(
           processDownload(download)
         } catch (e: Exception) {
           logger.error(e) { "Error processing download queue" }
-        } finally {
-          processing.set(false)
         }
       }
+      processing.set(false)
     } catch (e: Exception) {
       logger.error(e) { "Error processing download queue" }
       processing.set(false)
@@ -362,11 +373,13 @@ class DownloadExecutor(
   }
 
   private fun processDownload(download: DownloadQueue) {
-    if (cancelledIds.remove(download.id)) {
-      logger.info { "Download ${download.id} was cancelled before processing started, skipping" }
-      return
+    synchronized(activeDownloads) {
+      if (cancelledIds.remove(download.id)) {
+        logger.info { "Download ${download.id} was cancelled before processing started, skipping" }
+        return
+      }
+      activeDownloads[download.id] = ActiveDownload(download)
     }
-    activeDownloads[download.id] = ActiveDownload(download)
 
     try {
       updateDownloadStatus(download, DownloadStatus.DOWNLOADING, startedDate = LocalDateTime.now())
@@ -549,9 +562,11 @@ class DownloadExecutor(
         }
 
         if (library != null && result.filesDownloaded > 0) {
-          pendingScans
-            .getOrPut(library.id) { java.util.Collections.synchronizedSet(mutableSetOf()) }
-            .add(finalPath)
+          synchronized(pendingScanLock) {
+            pendingScans
+              .getOrPut(library.id) { mutableSetOf() }
+              .add(finalPath)
+          }
 
           val remaining = downloadQueueRepository.findPendingOrdered()
           if (remaining.isEmpty()) {
@@ -653,8 +668,11 @@ class DownloadExecutor(
   }
 
   private fun scanPendingFolders() {
-    val folders = pendingScans.toMap()
-    pendingScans.clear()
+    val folders: Map<String, Set<java.nio.file.Path>>
+    synchronized(pendingScanLock) {
+      folders = pendingScans.mapValues { it.value.toSet() }
+      pendingScans.clear()
+    }
 
     for ((libraryId, paths) in folders) {
       val library = libraryRepository.findByIdOrNull(libraryId) ?: continue
