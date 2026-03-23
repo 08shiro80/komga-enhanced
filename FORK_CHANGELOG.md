@@ -6,6 +6,42 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.2] - 2026-03-22
+
+### Bug Fixes
+- **Cover image not loaded after download** — `scanSeriesFolder()` (targeted scan after download) did not trigger `refreshSeriesLocalArtwork`, so the `cover.jpg` downloaded by gallery-dl was only picked up on the next full library scan.
+- **MangaDex feed missing chapters for certain content ratings** — Feed API calls did not include `contentRating[]` parameters, so the API applied its default filter which excludes some rating categories. Added all four content rating levels to feed requests in GalleryDlWrapper and MangaDexSubscriptionSyncer.
+- **MangaDex subscription feed always fails with 400** — `publishAtSince` was formatted with `ISO_OFFSET_DATE_TIME` (`2026-03-21T08:43:24.6358255Z`) but MangaDex requires exact `YYYY-MM-DDTHH:mm:ss` without fractional seconds or timezone suffix. Also sanitizes old DB values on read.
+- **Subscription dedup always empty** — `seriesRepository.findAll()` returned series with `mangaDexUuid = null` (toDomain doesn't read MANGADEX_UUID column), so all dedup maps were empty and every chapter was queued as "unknown". Now uses `findByMangaDexUuid()` per manga on-demand.
+- **CustomList dead code removed** — `initializeList()` created a MangaDex CustomList on every startup that was never used for feed checking (feed uses `/user/follows/manga/feed`). Caused duplicate "Komga Subscriptions" lists.
+
+- **ChapterChecker executor leak on exception** — Thread pool was only shut down in happy path. If `futures.map { it.join() }` threw, the 5-thread pool leaked. Wrapped in try-finally.
+- **gallery-dl process leak in `isInstalled()`** — `process.waitFor(5s)` timeout left process running. Now calls `destroyForcibly()` on timeout.
+- **Reader threads not interrupted after join timeout** — stdout/stderr reader threads continued running after `join(5000)` timeout. Now interrupted if still alive.
+
+### Improved
+- **36 languages in plugin dropdown** — MangaDex Subscription and gallery-dl Downloader language selection expanded from 10 to 36 languages (added zh-hk, es-la, pt-br, pl, tr, nl, id, ms, th, vi, ar, uk, hu, ro, cs, bg, el, da, fi, sv, no, lt, ca, hr, tl, hi).
+
+### Performance
+- **Pre-compiled regex constants in GalleryDlWrapper** — 5 regex patterns (`extractChapterId`, `extractChapterNumberFromFilename`, `parseGalleryDlProgress`, `extractChapterNumFromFilename`, scanlation group) moved from per-call compilation to companion object constants.
+- **Single directory traversal after download** — Replaced 2× `walkTopDown()` + 1× `listFiles()` with a single `walkTopDown()` pass for CBZ file collection and empty directory cleanup.
+- **Cached library list in ChapterChecker** — `libraryRepository.findAll()` called once in `checkUrls()` and passed through to `checkSingleUrl()`, `findSeriesForManga()`, and `buildFolderIndex()`. Eliminates ~300 redundant DB queries per chapter check run.
+- **Blacklist filtered by series** — `blacklistedChapterRepository.findAll()` replaced with `findUrlsBySeriesId()` when series ID is known, avoiding loading the entire blacklist table on every download.
+- **O(1) chapter lookup in ComicInfo injection** — `updateExistingCbzChapterUrls()` pre-indexes chapters by padded/plain number into a Map. Previously O(n×m) linear search per CBZ file (1M comparisons for 1000 chapters × 1000 CBZs), now O(n+m).
+- **Hash set computed once in series restore** — `newBooksWithHash.map { it.fileHash }.toSet()` was recomputed inside `find` loop per deleted candidate. Now computed once before the loop.
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `MangaDexSubscriptionSyncer.kt` | `last_check_time` sanitized with `.take(19)`, `initializeList()` removed, batch dedup uses `findByMangaDexUuid()` on-demand |
+| `PluginInitializer.kt` | 36 languages in both plugin configSchemas, CustomList removed from description |
+| `GalleryDlWrapper.kt` | `contentRating[]` params, pre-compiled regex, single dir traversal, blacklist per series, process/thread cleanup |
+| `ChapterChecker.kt` | Executor try-finally, cached library list passed through call chain |
+| `LibraryContentLifecycle.kt` | Hash set computed once in series restore |
+| `README.md` | CustomList references removed, auto-blacklist docs updated |
+
+---
+
 ## [0.1.1] - 2026-03-16
 
 ### New Features
@@ -14,7 +50,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **ZIP file comments in CBZ** — CBZ files now include metadata as ZIP file comments: `Title`, `Title UUID`, `Chapter UUID`, `Chapter`, `Volume`. Compatible with all manga downloaders (none use the ZIP comment field). Only Calibre's ComicBookInfo plugin uses this field, but with a different JSON format that doesn't conflict.
 - **Auto-scan after download** — New chapters are automatically scanned after all downloads complete. Collects downloaded series folders during the download queue and scans them all via targeted `scanSeriesFolder()` once the queue is empty — no scan per individual download, no full library scan. `scanSeriesFolder` creates new series if needed (with `tryRestoreByMangaDexUuid` fallback), imports chapter URLs only for the affected series, and syncs MangaDex UUID per series. Full library scan remains unchanged for manual use.
 - **Configurable folder naming** — New `folder_naming` plugin config for gallery-dl-downloader. Options: `uuid` (default, uses MangaDex UUID like `0c6fe779-...`) or `title` (uses manga title like `Roman Club`). Set in Plugin Manager → gallery-dl Downloader settings. Only affects new manga — existing folders are never renamed.
-- **MangaDex Subscription Feed** — New `mangadex-subscription` plugin that watches the MangaDex follow feed (`GET /user/follows/manga/feed?publishAtSince=...`) for new chapters and auto-queues downloads. Uses OAuth2 personal client auth, auto-creates and subscribes to a CustomList, and checks the feed at a configurable interval (default 30 min). Deduplicates against existing DB state: checks `mangaDexUuid` → series → CHAPTER_URL IDs, blacklisted chapter IDs, and URL existence before queuing. Groups new chapters by manga to avoid duplicate downloads when both follow.txt and subscription are active. When a manga is newly added to the follow list, all chapters are downloaded (not just new ones since last check) — detected by checking `GET /user/follows/manga` against existing series in DB via `mangaDexUuid`. Disabled by default — requires MangaDex API credentials in Plugin Manager.
+- **MangaDex Subscription Feed** — New `mangadex-subscription` plugin that watches the MangaDex follow feed (`GET /user/follows/manga/feed?publishAtSince=...`) for new chapters and auto-queues downloads. Uses OAuth2 personal client auth and checks the feed at a configurable interval (default 30 min). Deduplicates against existing DB state: checks `mangaDexUuid` → series → CHAPTER_URL IDs, blacklisted chapter IDs, and URL existence before queuing. Groups new chapters by manga to avoid duplicate downloads when both follow.txt and subscription are active. When a manga is newly added to the follow list, all chapters are downloaded (not just new ones since last check) — detected by checking `GET /user/follows/manga` against existing series in DB via `mangaDexUuid`. Disabled by default — requires MangaDex API credentials in Plugin Manager.
 
 ### Bug Fixes
 - **Download progress counter includes auto-blacklisted chapters** — Progress showed e.g. "2/14" when 12 of 14 chapters were auto-blacklisted. Now excludes auto-blacklisted chapters from the total, showing "2/2" instead.

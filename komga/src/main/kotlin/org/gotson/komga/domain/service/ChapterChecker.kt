@@ -66,44 +66,48 @@ class ChapterChecker(
     val startTime = System.currentTimeMillis()
     logger.info { "Starting chapter check for ${urls.size} manga URLs" }
 
-    val folderIndex = buildFolderIndex()
+    val libraries = libraryRepository.findAll()
+    val folderIndex = buildFolderIndex(libraries)
 
     val executor = Executors.newFixedThreadPool(5)
-    val futures =
-      urls.map { url ->
-        CompletableFuture.supplyAsync(
-          {
-            try {
-              concurrencyLimit.acquire()
+    val results: List<ChapterCheckResult>
+    try {
+      val futures =
+        urls.map { url ->
+          CompletableFuture.supplyAsync(
+            {
               try {
-                checkSingleUrl(url, folderIndex)
-              } finally {
-                concurrencyLimit.release()
+                concurrencyLimit.acquire()
+                try {
+                  checkSingleUrl(url, folderIndex, libraries)
+                } finally {
+                  concurrencyLimit.release()
+                }
+              } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                ChapterCheckResult(
+                  url = url,
+                  mangaId = null,
+                  title = null,
+                  apiChapterCount = 0,
+                  downloadedChapterCount = 0,
+                  filesystemChapterCount = 0,
+                  newChaptersEstimate = 0,
+                  needsDownload = false,
+                  error = "Interrupted",
+                )
               }
-            } catch (e: InterruptedException) {
-              Thread.currentThread().interrupt()
-              ChapterCheckResult(
-                url = url,
-                mangaId = null,
-                title = null,
-                apiChapterCount = 0,
-                downloadedChapterCount = 0,
-                filesystemChapterCount = 0,
-                newChaptersEstimate = 0,
-                needsDownload = false,
-                error = "Interrupted",
-              )
-            }
-          },
-          executor,
-        )
+            },
+            executor,
+          )
+        }
+      results = futures.map { it.join() }
+    } finally {
+      executor.shutdown()
+      if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
+        logger.warn { "Chapter check executor timed out, forcing shutdown" }
+        executor.shutdownNow()
       }
-
-    val results = futures.map { it.join() }
-    executor.shutdown()
-    if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
-      logger.warn { "Chapter check executor timed out, forcing shutdown" }
-      executor.shutdownNow()
     }
 
     val durationMs = System.currentTimeMillis() - startTime
@@ -167,6 +171,7 @@ class ChapterChecker(
   private fun checkSingleUrl(
     url: String,
     folderIndex: Map<String, java.io.File>,
+    libraries: Collection<org.gotson.komga.domain.model.Library>,
   ): ChapterCheckResult {
     val mangaId = GalleryDlWrapper.extractMangaDexId(url)
     if (mangaId == null) {
@@ -190,7 +195,7 @@ class ChapterChecker(
       val title = mangaInfo?.title
 
       val mangaFolder = folderIndex[mangaId]
-      val series = findSeriesForManga(mangaId, mangaFolder)
+      val series = findSeriesForManga(mangaId, mangaFolder, libraries)
       val knownChapterIds = getKnownChapterIds(series)
       val blacklistedChapterIds = getBlacklistedChapterIds(series)
       val allKnownIds = knownChapterIds + blacklistedChapterIds
@@ -240,12 +245,13 @@ class ChapterChecker(
   private fun findSeriesForManga(
     mangaId: String,
     folder: java.io.File?,
+    libraries: Collection<org.gotson.komga.domain.model.Library>,
   ): org.gotson.komga.domain.model.Series? {
     val byUuid = seriesRepository.findByMangaDexUuid(mangaId)
     if (byUuid != null) return byUuid
 
     if (folder == null) return null
-    libraryRepository.findAll().forEach { library ->
+    libraries.forEach { library ->
       if (folder.absolutePath.startsWith(library.path.toFile().absolutePath)) {
         val folderUrl = folder.toURI().toURL()
         return seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, folderUrl)
@@ -280,10 +286,10 @@ class ChapterChecker(
       ?: 0
   }
 
-  private fun buildFolderIndex(): Map<String, java.io.File> {
+  private fun buildFolderIndex(libraries: Collection<org.gotson.komga.domain.model.Library>): Map<String, java.io.File> {
     val index = mutableMapOf<String, java.io.File>()
     val uuidRegex = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
-    libraryRepository.findAll().forEach { library ->
+    libraries.forEach { library ->
       val libraryDir = library.path.toFile()
       if (!libraryDir.exists()) return@forEach
       libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { dir ->

@@ -695,7 +695,7 @@ class DownloadExecutor(
 
   private data class FolderLookupResult(
     val folder: java.io.File,
-    val komgaSeriesId: String,
+    val komgaSeriesId: String?,
   )
 
   private fun findExistingMangaFolder(
@@ -714,7 +714,8 @@ class DownloadExecutor(
       val series =
         seriesRepository
           .findNotDeletedByLibraryIdAndUrlOrNull(libraryId, uuidFolder.toURI().toURL())
-      return FolderLookupResult(uuidFolder, series?.id ?: "")
+      if (series != null) return FolderLookupResult(uuidFolder, series.id)
+      return FolderLookupResult(uuidFolder, null)
     }
 
     val seriesId =
@@ -760,7 +761,7 @@ class DownloadExecutor(
           seriesRepository
             .findNotDeletedByLibraryIdAndUrlOrNull(libraryId, match.toURI().toURL())
         logger.info { "findExistingMangaFolder: found by series.json scan: ${match.absolutePath}" }
-        return FolderLookupResult(match, series?.id ?: "")
+        return FolderLookupResult(match, series?.id)
       }
     }
 

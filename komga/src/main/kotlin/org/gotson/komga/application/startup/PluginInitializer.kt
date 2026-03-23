@@ -54,7 +54,7 @@ class PluginInitializer(
                   "title": "Default Language",
                   "description": "Preferred language for downloads (ISO 639-1 code)",
                   "default": "en",
-                  "enum": ["en", "ja", "de", "fr", "es", "it", "pt", "ru", "zh", "ko"]
+                  "enum": ["ar", "bg", "ca", "cs", "da", "de", "el", "en", "es", "es-la", "fi", "fr", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "ms", "nl", "no", "pl", "pt", "pt-br", "ro", "ru", "sv", "th", "tl", "tr", "uk", "vi", "zh", "zh-hk"]
                 },
                 "folder_naming": {
                   "type": "string",
@@ -104,7 +104,7 @@ class PluginInitializer(
           name = "MangaDex Subscription Sync",
           version = "1.0.0",
           author = "Komga Team",
-          description = "Watches your MangaDex subscription feed for new chapters and auto-downloads them via CustomList. Requires a MangaDex personal API client (register at mangadex.org/settings).",
+          description = "Watches your MangaDex follow feed for new chapters and auto-downloads them. Requires a MangaDex personal API client (register at mangadex.org/settings).",
           enabled = false,
           pluginType = PluginType.DOWNLOAD,
           entryPoint = "org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer",
@@ -141,13 +141,6 @@ class PluginInitializer(
                   "title": "Check Interval (minutes)",
                   "default": 30,
                   "description": "How often to check the subscription feed for new chapters"
-                },
-                "language": {
-                  "type": "string",
-                  "title": "Language",
-                  "default": "en",
-                  "description": "Preferred chapter language (ISO 639-1)",
-                  "enum": ["en", "ja", "de", "fr", "es", "it", "pt", "ru", "zh", "ko"]
                 }
               },
               "required": ["client_id", "client_secret", "username", "password"]

@@ -1,6 +1,6 @@
 # Komga Enhanced
 
-**Komga Enhanced** - A powerful manga media server with integrated manga downloading from 250+ sites, automatic chapter tracking, and Tachiyomi/Mihon backup import.
+**Komga Enhanced** - A powerful manga media server with integrated manga downloading, automatic chapter tracking, and Tachiyomi/Mihon backup import.
 
 > **Built on [Komga](https://github.com/gotson/komga)** - Extends the excellent Komga media server with manga downloading and automation features.
 
@@ -12,7 +12,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 
 | Problem | Solution |
 |---------|----------|
-| Manually downloading manga | **Automatic downloads** via gallery-dl — supports MangaDex, mangahere, hdoujin, senmanga, weebdex, and [250+ more sites](https://github.com/mikf/gallery-dl/blob/master/docs/supportedsites.md) |
+| Manually downloading manga | **Automatic downloads** via gallery-dl — supports MangaDex and other manga/image sites |
 | Losing track of downloaded chapters | **Chapter URL tracking** prevents duplicates |
 | Re-downloading after crashes | **DB + filesystem tracking** - never re-download completed chapters |
 | Title changes cause re-downloads | **UUID folder names** - MangaDex UUID as folder name, immune to title changes |
@@ -30,9 +30,9 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 
 ## Key Features
 
-### Download System (250+ Sites)
+### Download System
 
-Download manga from MangaDex, mangahere, hdoujin, senmanga, weebdex, and any site supported by [gallery-dl](https://github.com/mikf/gallery-dl/blob/master/docs/supportedsites.md):
+Download manga from MangaDex and other manga/image sites via [gallery-dl](https://github.com/mikf/gallery-dl):
 
 - **Queue-based downloads** with priority support
 - **Real-time progress** via Server-Sent Events (SSE)
@@ -40,7 +40,7 @@ Download manga from MangaDex, mangahere, hdoujin, senmanga, weebdex, and any sit
 - **UUID folder names** - uses MangaDex UUID as folder name, immune to title changes and mislabeled titles
 - **Crash recovery** - skips already-downloaded chapters via DB + filesystem checks
 - **Rate limiting** - respects site-specific API limits
-- **Multi-language support** - download chapters in your preferred language
+- **Multi-language support** - 36 languages, shared across all plugins (one setting)
 - **Automatic publisher detection** - derives publisher from source site (MangaDex, Mangahere, etc.)
 - **Custom gallery-dl path** - point to a local gallery-dl checkout for latest extractors
 
@@ -52,7 +52,7 @@ POST /api/v1/downloads
 }
 ```
 
-Any URL supported by gallery-dl works — not just MangaDex.
+Any manga/image URL supported by gallery-dl works — not just MangaDex.
 
 ### Follow List Automation
 
@@ -79,15 +79,14 @@ Automatically sync new chapters from your MangaDex subscription feed — complet
 1. Create a [MangaDex API Client](https://mangadex.org/settings) (Personal Client)
 2. Enable the `mangadex-subscription` plugin in **Settings → Plugins**
 3. Enter your `client_id`, `client_secret`, `username`, and `password`
-4. The syncer authenticates via OAuth2, creates/reuses a CustomList, and polls your subscription feed
+4. The syncer authenticates via OAuth2 and polls your follow feed
 
 **How it works:**
 - Authenticates with MangaDex via OAuth2 (password grant through Keycloak)
-- Creates a dedicated CustomList (`Komga Subscriptions`) for tracking
 - Checks `GET /user/follows/manga` for newly followed manga → queues full download
 - Checks `GET /user/follows/manga/feed?publishAtSince=...` for new chapters of existing manga
 - Deduplicates against DB: checks mangaDexUuid → series → CHAPTER_URL IDs and blacklist before queuing
-- Filters by your configured language (default: `en`)
+- Filters by the language configured in the gallery-dl Downloader plugin (`Default Language`)
 - Resilient to temporary MangaDex API failures (retries on next scheduled check)
 
 **Configuration** (via Plugin Manager UI):
@@ -99,7 +98,6 @@ Automatically sync new chapters from your MangaDex subscription feed — complet
 | `username` | — | MangaDex username |
 | `password` | — | MangaDex password |
 | `sync_interval_minutes` | 30 | How often to check for new chapters |
-| `language` | en | Chapter language filter |
 
 **No app restart needed** — the syncer automatically restarts when you save config or toggle the plugin.
 
@@ -157,15 +155,9 @@ Permanently prevent unwanted chapters from being re-downloaded:
 - Persists even after book deletion (stored in separate database table)
 - Respected by both the downloader and chapter checker
 
-#### Edge Case: Duplicate Uploads on MangaDex
+#### Automatic Same-Group Duplicate Detection
 
-In rare cases, a scanlation group uploads the same chapter multiple times on MangaDex. For example, manga [`cbce49c7-6311-4955-8b10-1005775d5cee`](https://mangadex.org/title/cbce49c7-6311-4955-8b10-1005775d5cee) has 27 API entries for only 13 unique chapter numbers — all from the same group (Galaxy Degen Scans). These are duplicate uploads, not multi-group entries.
-
-This causes permanent re-queuing: the MangaDex `/feed` API reports `total=27`, but since each chapter number only produces one CBZ file, the known count stays at 13. The ChapterChecker sees `api=27 > known=13` and keeps queuing the manga for download. Re-downloads and library rescans can inflate the DB count (e.g. to 22), but it can never reach 27.
-
-**Solution:** Open the series 3-dot menu → **Manage Blacklist** → paste the duplicate chapter URLs to blacklist them. The blacklisted count is included in the known count, so blacklisting the extra entries resolves the mismatch.
-
-To find the duplicate chapter URLs, open the manga page on [mangadex.org](https://mangadex.org) and look for chapters with the same number uploaded multiple times by the same group. Right-click the duplicate chapters → copy link, then paste into the Manage Blacklist dialog.
+When a scanlation group uploads the same chapter multiple times on MangaDex (e.g. same chapter number, same group, different UUIDs), the system automatically detects this, keeps the newest upload, and blacklists the older duplicates. No manual intervention needed — the blacklisted count is included in the known count so the ChapterChecker stays in sync.
 
 ### Chapter URL Tracking
 
@@ -415,7 +407,7 @@ komga:
 | Feature | Original | This Fork |
 |---------|----------|-----------|
 | Media Server | Yes | Yes |
-| Manga Downloads (250+ sites) | No | Yes |
+| Manga Downloads | No | Yes |
 | Automatic Chapter Tracking | No | Yes |
 | MangaDex Subscription Sync | No | Yes |
 | Follow List Automation | No | Yes |
@@ -440,6 +432,7 @@ komga:
 - [Tachiyomi Migration](docs/tachiyomi-import.md)
 - [Page Splitting](docs/page-splitting.md)
 - [Metadata Plugins](docs/metadata-plugins.md)
+- [Plugin Development](docs/plugin-development.md)
 - [API Reference](docs/api-reference.md)
 
 ---

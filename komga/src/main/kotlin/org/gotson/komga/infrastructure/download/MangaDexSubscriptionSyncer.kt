@@ -52,6 +52,7 @@ class MangaDexSubscriptionSyncer(
   private val tokenEndpoint = "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token"
   private val apiBase = "https://api.mangadex.org"
   private val chapterIdRegex = Regex("mangadex\\.org/chapter/([0-9a-f-]+)")
+  private val mangaDexDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
   private var accessToken: String? = null
   private var refreshToken: String? = null
@@ -81,15 +82,6 @@ class MangaDexSubscriptionSyncer(
       authenticate(config)
     } catch (e: MangaDexApiException) {
       logger.error(e) { "MangaDex authentication failed, will retry on next feed check" }
-    }
-
-    val listId = config["list_id"]
-    if (listId.isNullOrBlank()) {
-      try {
-        initializeList(config)
-      } catch (e: MangaDexApiException) {
-        logger.warn { "CustomList setup failed (${e.message}), will retry on next feed check" }
-      }
     }
 
     scheduledTask =
@@ -258,61 +250,6 @@ class MangaDexSubscriptionSyncer(
     return accessToken ?: throw MangaDexApiException("No valid access token after refresh")
   }
 
-  private fun initializeList(config: Map<String, String?>) {
-    val token = getValidToken(config)
-
-    val defaultListResponse = apiGet("$apiBase/list/default", token)
-    var listId: String? = null
-
-    if (defaultListResponse.statusCode() == 200) {
-      val body: Map<String, Any> = objectMapper.readValue(defaultListResponse.body())
-
-      @Suppress("UNCHECKED_CAST")
-      val data = body["data"] as? Map<String, Any>
-      listId = data?.get("id") as? String
-      if (listId != null) {
-        logger.info { "Found existing default CustomList: $listId" }
-      }
-    }
-
-    if (listId == null) {
-      val createBody =
-        objectMapper.writeValueAsString(
-          mapOf(
-            "name" to "Komga Subscriptions",
-            "visibility" to "private",
-          ),
-        )
-      val createResponse = apiPost("$apiBase/list", token, createBody)
-      if (createResponse.statusCode() !in 200..201) {
-        throw MangaDexApiException("Failed to create CustomList (HTTP ${createResponse.statusCode()})")
-      }
-
-      val createData: Map<String, Any> = objectMapper.readValue(createResponse.body())
-
-      @Suppress("UNCHECKED_CAST")
-      val data = createData["data"] as? Map<String, Any>
-      listId = data?.get("id") as? String
-        ?: throw MangaDexApiException("No list ID in create response")
-
-      logger.info { "Created CustomList: $listId" }
-
-      val setDefaultResponse = apiPost("$apiBase/list/$listId/default", token, null)
-      if (setDefaultResponse.statusCode() !in 200..204) {
-        logger.warn { "Failed to set list as default (HTTP ${setDefaultResponse.statusCode()})" }
-      }
-    }
-
-    val subscribeResponse = apiPost("$apiBase/list/$listId/subscribe", token, null)
-    if (subscribeResponse.statusCode() !in 200..204) {
-      logger.warn { "Failed to subscribe to list (HTTP ${subscribeResponse.statusCode()})" }
-    } else {
-      logger.info { "Subscribed to CustomList: $listId" }
-    }
-
-    saveConfigValue("list_id", listId)
-  }
-
   private fun runFeedCheck() {
     try {
       val plugin = pluginRepository.findByIdOrNull(pluginId)
@@ -332,15 +269,6 @@ class MangaDexSubscriptionSyncer(
       }
       checkForNewManga(config, library)
       checkFeed(config, library)
-
-      val listId = config["list_id"]
-      if (listId.isNullOrBlank()) {
-        try {
-          initializeList(config)
-        } catch (e: MangaDexApiException) {
-          logger.warn { "CustomList setup failed (${e.message}), will retry next cycle" }
-        }
-      }
     } catch (e: MangaDexApiException) {
       logger.error(e) { "MangaDex feed check failed: ${e.message}" }
     }
@@ -407,39 +335,24 @@ class MangaDexSubscriptionSyncer(
     library: org.gotson.komga.domain.model.Library?,
   ) {
     val token = getValidToken(config)
-    val language = config["language"] ?: "en"
+    val language =
+      pluginConfigRepository
+        .findByPluginIdAndKey("gallery-dl-downloader", "default_language")
+        ?.configValue ?: "en"
 
     val lastCheck =
-      config["last_check_time"]
+      (config["last_check_time"]?.take(19))
         ?: Instant
           .now()
           .minusSeconds(86400)
           .atOffset(ZoneOffset.UTC)
-          .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+          .format(mangaDexDateFormat)
 
     logger.info { "Checking subscription feed since $lastCheck" }
 
-    val seriesByMangaId =
-      seriesRepository
-        .findAll()
-        .filter { it.mangaDexUuid != null }
-        .associateBy { it.mangaDexUuid!! }
-
-    val knownIdsByManga =
-      seriesByMangaId.mapValues { (_, series) ->
-        chapterUrlRepository
-          .findUrlsBySeriesId(series.id)
-          .mapNotNull { url -> chapterIdRegex.find(url)?.groupValues?.get(1) }
-          .toSet()
-      }
-
-    val blacklistedIdsByManga =
-      seriesByMangaId.mapValues { (_, series) ->
-        blacklistedChapterRepository
-          .findUrlsBySeriesId(series.id)
-          .mapNotNull { url -> chapterIdRegex.find(url)?.groupValues?.get(1) }
-          .toSet()
-      }
+    val seriesCache = mutableMapOf<String, org.gotson.komga.domain.model.Series?>()
+    val knownIdsByManga = mutableMapOf<String, Set<String>>()
+    val blacklistedIdsByManga = mutableMapOf<String, Set<String>>()
 
     var offset = 0
     val limit = 100
@@ -479,7 +392,7 @@ class MangaDexSubscriptionSyncer(
 
         val chapterUrl = "https://mangadex.org/chapter/$chapterId"
 
-        if (isChapterKnown(mangaId, chapterId, chapterUrl, knownIdsByManga, blacklistedIdsByManga)) continue
+        if (isChapterKnown(mangaId, chapterId, chapterUrl, seriesCache, knownIdsByManga, blacklistedIdsByManga)) continue
 
         val mangaUrl = "https://mangadex.org/title/$mangaId"
         if (downloadExecutor.isUrlAlreadyQueued(mangaUrl)) continue
@@ -528,7 +441,7 @@ class MangaDexSubscriptionSyncer(
 
     saveConfigValue(
       "last_check_time",
-      Instant.now().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+      Instant.now().atOffset(ZoneOffset.UTC).format(mangaDexDateFormat),
     )
   }
 
@@ -536,9 +449,26 @@ class MangaDexSubscriptionSyncer(
     mangaId: String,
     chapterId: String,
     chapterUrl: String,
-    knownIdsByManga: Map<String, Set<String>>,
-    blacklistedIdsByManga: Map<String, Set<String>>,
+    seriesCache: MutableMap<String, org.gotson.komga.domain.model.Series?>,
+    knownIdsByManga: MutableMap<String, Set<String>>,
+    blacklistedIdsByManga: MutableMap<String, Set<String>>,
   ): Boolean {
+    if (mangaId !in seriesCache) {
+      val series = seriesRepository.findByMangaDexUuid(mangaId)
+      seriesCache[mangaId] = series
+      if (series != null) {
+        knownIdsByManga[mangaId] =
+          chapterUrlRepository
+            .findUrlsBySeriesId(series.id)
+            .mapNotNull { url -> chapterIdRegex.find(url)?.groupValues?.get(1) }
+            .toSet()
+        blacklistedIdsByManga[mangaId] =
+          blacklistedChapterRepository
+            .findUrlsBySeriesId(series.id)
+            .mapNotNull { url -> chapterIdRegex.find(url)?.groupValues?.get(1) }
+            .toSet()
+      }
+    }
     if (chapterId in (knownIdsByManga[mangaId] ?: emptySet())) return true
     if (chapterId in (blacklistedIdsByManga[mangaId] ?: emptySet())) return true
     if (chapterUrlRepository.existsByUrl(chapterUrl)) return true

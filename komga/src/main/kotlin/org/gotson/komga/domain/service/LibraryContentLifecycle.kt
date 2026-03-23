@@ -345,6 +345,8 @@ class LibraryContentLifecycle(
       logger.info { "No new books in $seriesPath, checking chapter URLs" }
     }
 
+    taskEmitter.refreshSeriesLocalArtwork(series.id)
+
     try {
       chapterUrlImporter.syncMangaDexUuidForSeries(series)
       val result = chapterUrlImporter.importFromSeriesPath(seriesPath, series.id)
@@ -439,9 +441,10 @@ class LibraryContentLifecycle(
       val newBooksWithHash = newBooks.map { book -> bookRepository.findByIdOrNull(book.id)!!.copy(fileHash = hasher.computeHash(book.path)) }
       bookRepository.update(newBooksWithHash)
 
+      val newHashSet = newBooksWithHash.map { it.fileHash }.toSet()
       val match =
         deletedCandidates.find { (_, books) ->
-          books.map { it.fileHash }.toSet() == newBooksWithHash.map { it.fileHash }.toSet()
+          books.map { it.fileHash }.toSet() == newHashSet
         }
 
       if (match != null) {

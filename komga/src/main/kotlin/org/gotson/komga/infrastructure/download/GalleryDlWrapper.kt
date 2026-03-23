@@ -151,20 +151,24 @@ class GalleryDlWrapper(
       null
     }
 
-  fun isInstalled(): Boolean =
-    try {
+  fun isInstalled(): Boolean {
+    return try {
       val command = getGalleryDlCommand() + "--version"
       val process =
         applyGalleryDlEnv(ProcessBuilder())
           .command(command)
           .start()
 
-      process.waitFor(5, TimeUnit.SECONDS)
+      if (!process.waitFor(5, TimeUnit.SECONDS)) {
+        process.destroyForcibly()
+        return false
+      }
       process.exitValue() == 0
     } catch (e: Exception) {
       logger.debug { "gallery-dl not found: ${e.message}" }
       false
     }
+  }
 
   private fun fetchMangaDexMetadata(mangaId: String): MangaInfo? {
     try {
@@ -349,6 +353,11 @@ class GalleryDlWrapper(
     private val COMICINFO_WEB_REGEX = Regex("<Web>(.+?)</Web>")
     private val VOLUME_PREFIX_REGEX = Regex("^v\\d+ .+")
     private val BRACKET_GROUP_REGEX = Regex("\\[(.+?)]$")
+    private val CBZ_UUID_REGEX = """[\[\(]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})[\]\)]""".toRegex()
+    private val CHAPTER_NUM_C_REGEX = Regex("""^c(\d+(?:\.\d+)?)""")
+    private val CHAPTER_NUM_CH_REGEX = Regex("""^ch\.?\s*(\d+(?:\.\d+)?)""")
+    private val SCANLATION_GROUP_REGEX = """\[([^\]]+)\]\s*$""".toRegex()
+    private val PROGRESS_REGEX = """(\d+)%\s+[\d.]+\s*[KMG]?B\s+[\d.]+\s*[KMG]?B/s""".toRegex()
 
     fun extractMangaDexId(url: String): String? = MANGADEX_ID_REGEX.find(url)?.groupValues?.get(1)
   }
@@ -401,15 +410,14 @@ class GalleryDlWrapper(
 
   private fun extractChapterId(cbzPath: Path): String? {
     val filename = cbzPath.fileName.toString()
-    val regex = """[\[\(]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})[\]\)]""".toRegex()
-    return regex.find(filename)?.groupValues?.get(1)
+    return CBZ_UUID_REGEX.find(filename)?.groupValues?.get(1)
   }
 
   private fun extractChapterNumberFromFilename(filename: String): String? {
     val name = filename.substringBeforeLast('.').lowercase()
     val match =
-      Regex("""^c(\d+(?:\.\d+)?)""").find(name)
-        ?: Regex("""^ch\.?\s*(\d+(?:\.\d+)?)""").find(name)
+      CHAPTER_NUM_C_REGEX.find(name)
+        ?: CHAPTER_NUM_CH_REGEX.find(name)
     val raw = match?.groupValues?.get(1) ?: return null
     return try {
       val num = raw.toDouble()
@@ -592,7 +600,7 @@ class GalleryDlWrapper(
         if (offset >= total) break
       }
 
-      logger.debug { "Fetched ${chapters.size} chapters from MangaDex for manga $mangaId" }
+      logger.debug { "Fetched ${chapters.size} chapters from MangaDex for manga $mangaId (language=$language)" }
     } catch (e: Exception) {
       logger.warn(e) { "Failed to fetch chapter list from MangaDex" }
     }
@@ -915,7 +923,12 @@ class GalleryDlWrapper(
       val knownUrls = dbUrls + cbzUrls
       logger.info { "Known chapter URLs: ${knownUrls.size} (db: ${dbUrls.size}, cbz: ${cbzUrls.size})" }
 
-      val blacklistedUrls = blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
+      val blacklistedUrls =
+        if (komgaSeriesId != null) {
+          blacklistedChapterRepository.findUrlsBySeriesId(komgaSeriesId)
+        } else {
+          blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
+        }
 
       val chapters =
         allChapters.filter { chapter ->
@@ -1057,12 +1070,16 @@ class GalleryDlWrapper(
         if (!process.waitFor(2, TimeUnit.HOURS)) {
           process.destroyForcibly()
           stdoutThread.join(5000)
+          if (stdoutThread.isAlive) stdoutThread.interrupt()
           stderrThread.join(5000)
+          if (stderrThread.isAlive) stderrThread.interrupt()
           deleteQuietly(configFile)
           throw GalleryDlException("Timeout downloading $url")
         }
         stdoutThread.join(5000)
+        if (stdoutThread.isAlive) stdoutThread.interrupt()
         stderrThread.join(5000)
+        if (stderrThread.isAlive) stderrThread.interrupt()
 
         val exitCode = process.exitValue()
         deleteQuietly(configFile)
@@ -1071,11 +1088,8 @@ class GalleryDlWrapper(
           throw GalleryDlException("Download failed with exit code $exitCode: ${errorOutput.toString().trim()}")
         }
 
-        val cbzFilesInSubdirs =
-          destDir
-            .walkTopDown()
-            .filter { it.isFile && it.extension.lowercase() == "cbz" && it.parentFile != destDir }
-            .toList()
+        val allFiles = destDir.walkTopDown().toList()
+        val cbzFilesInSubdirs = allFiles.filter { it.isFile && it.extension.lowercase() == "cbz" && it.parentFile != destDir }
         if (cbzFilesInSubdirs.isNotEmpty()) {
           logger.debug { "Found ${cbzFilesInSubdirs.size} CBZ files in subdirectories, moving to root" }
           cbzFilesInSubdirs.forEach { cbzFile ->
@@ -1085,7 +1099,7 @@ class GalleryDlWrapper(
               logger.debug { "Moved ${cbzFile.relativeTo(destDir).path} -> ${target.name}" }
             }
           }
-          destDir.walkTopDown().filter { it.isDirectory && it != destDir && it.listFiles()?.isEmpty() == true }.forEach { deleteQuietly(it) }
+          allFiles.filter { it.isDirectory && it != destDir && it.listFiles()?.isEmpty() == true }.forEach { deleteQuietly(it) }
         }
 
         val downloadedCbzFiles =
@@ -1258,7 +1272,9 @@ class GalleryDlWrapper(
 
             val completed = chapterProcess.waitFor(10, TimeUnit.MINUTES)
             chStdoutThread.join(5000)
+            if (chStdoutThread.isAlive) chStdoutThread.interrupt()
             chStderrThread.join(5000)
+            if (chStderrThread.isAlive) chStderrThread.interrupt()
             if (!completed) {
               chapterProcess.destroyForcibly()
               logger.warn { "Chapter $chapterNum download timed out" }
@@ -2194,10 +2210,25 @@ class GalleryDlWrapper(
         ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
         ?: return
 
+    val chaptersByNumber = mutableMapOf<String, MutableList<ChapterDownloadInfo>>()
+    for (ch in allChapters) {
+      val chNum = ch.chapterNumber ?: continue
+      val padded = padChapterNumber(chNum)
+      val plain =
+        try {
+          val n = chNum.toDouble()
+          if (n == n.toLong().toDouble()) n.toLong().toString() else chNum
+        } catch (_: NumberFormatException) {
+          chNum
+        }
+      chaptersByNumber.getOrPut(padded) { mutableListOf() }.add(ch)
+      if (plain != padded) {
+        chaptersByNumber.getOrPut(plain) { mutableListOf() }.add(ch)
+      }
+    }
+
     var updated = 0
     val alreadyUpdated = mutableSetOf<String>()
-    val groupRegex = """\[([^\]]+)\]\s*$""".toRegex()
-
     for (cbzFile in cbzFiles) {
       if (cbzFile.absolutePath in alreadyUpdated) continue
       if (hasComicInfoXml(cbzFile)) continue
@@ -2206,31 +2237,18 @@ class GalleryDlWrapper(
       val nameLower = fileName.lowercase()
       val chapterNum = extractChapterNumFromFilename(nameLower) ?: continue
       val fileGroup =
-        groupRegex
+        SCANLATION_GROUP_REGEX
           .find(fileName)
           ?.groupValues
           ?.get(1)
           ?.trim()
 
+      val candidates = chaptersByNumber[chapterNum] ?: continue
       val chapter =
-        allChapters.find { ch ->
-          val chNum = ch.chapterNumber ?: return@find false
-          val padded = padChapterNumber(chNum)
-          val plain =
-            try {
-              val n = chNum.toDouble()
-              if (n == n.toLong().toDouble()) n.toLong().toString() else chNum
-            } catch (e: NumberFormatException) {
-              logger.debug(e) { "Could not parse chapter number: $chNum" }
-              chNum
-            }
-          val numMatch = chapterNum == padded || chapterNum == plain
-          if (!numMatch) return@find false
-          if (fileGroup != null) {
-            ch.scanlationGroup != null && fileGroup.equals(ch.scanlationGroup, ignoreCase = true)
-          } else {
-            true
-          }
+        if (fileGroup != null) {
+          candidates.find { it.scanlationGroup != null && fileGroup.equals(it.scanlationGroup, ignoreCase = true) }
+        } else {
+          candidates.firstOrNull()
         } ?: continue
 
       try {
@@ -2451,8 +2469,7 @@ class GalleryDlWrapper(
     line: String,
     currentFile: Int,
   ): DownloadProgress? {
-    val progressRegex = """(\d+)%\s+[\d.]+\s*[KMG]?B\s+[\d.]+\s*[KMG]?B/s""".toRegex()
-    val match = progressRegex.find(line) ?: return null
+    val match = PROGRESS_REGEX.find(line) ?: return null
 
     val percent = match.groupValues[1].toIntOrNull() ?: return null
 
@@ -2532,9 +2549,9 @@ class GalleryDlWrapper(
   }
 
   private fun extractChapterNumFromFilename(nameLower: String): String? {
-    val cMatch = Regex("""^c(\d+(?:\.\d+)?)""").find(nameLower)
+    val cMatch = CHAPTER_NUM_C_REGEX.find(nameLower)
     if (cMatch != null) return cMatch.groupValues[1]
-    val chMatch = Regex("""^ch\.\s*(\d+(?:\.\d+)?)""").find(nameLower)
+    val chMatch = CHAPTER_NUM_CH_REGEX.find(nameLower)
     if (chMatch != null) return chMatch.groupValues[1]
     return null
   }
