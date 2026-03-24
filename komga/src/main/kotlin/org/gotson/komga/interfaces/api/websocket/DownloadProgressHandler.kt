@@ -189,5 +189,6 @@ data class DownloadProgressDto(
   val filesDownloaded: Int,
   val percentage: Int?,
   val error: String?,
+  val chapterTitle: String? = null,
   val timestamp: LocalDateTime = LocalDateTime.now(),
 )

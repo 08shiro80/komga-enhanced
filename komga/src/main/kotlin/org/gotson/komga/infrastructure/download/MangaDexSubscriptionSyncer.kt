@@ -262,7 +262,17 @@ class MangaDexSubscriptionSyncer(
 
       if (!hasRequiredCredentials(config)) return
 
-      val library = libraryRepository.findAll().firstOrNull()
+      val targetLibraryName = config["target_library"]?.takeIf { it.isNotBlank() }
+      val library =
+        if (targetLibraryName != null) {
+          libraryRepository.findAll().firstOrNull { it.name.equals(targetLibraryName, ignoreCase = true) }
+            ?: run {
+              logger.warn { "Target library '$targetLibraryName' not found, falling back to first library" }
+              libraryRepository.findAll().firstOrNull()
+            }
+        } else {
+          libraryRepository.findAll().firstOrNull()
+        }
       if (library == null) {
         logger.warn { "No library found — MangaDex subscription sync skipped" }
         return

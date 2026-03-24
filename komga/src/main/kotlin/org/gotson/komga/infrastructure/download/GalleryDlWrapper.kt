@@ -9,21 +9,11 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
-import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 private val logger = KotlinLogging.logger {}
 
@@ -33,29 +23,51 @@ class GalleryDlWrapper(
   private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
   private val blacklistedChapterRepository: org.gotson.komga.domain.persistence.BlacklistedChapterRepository,
   private val chapterUrlRepository: org.gotson.komga.domain.persistence.ChapterUrlRepository,
+  private val mangaDexApiClient: MangaDexApiClient,
+  private val comicInfoGenerator: ComicInfoGenerator,
+  private val galleryDlProcess: GalleryDlProcess,
+  private val chapterMatcher: ChapterMatcher,
 ) {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
-  private val lastMangaDexRequestTime = AtomicLong(0)
-  private val mangaDexMinIntervalMs = 450L
-  private val chapterCache = ConcurrentHashMap<String, Pair<List<ChapterDownloadInfo>, Long>>()
-  private val mangaInfoCache = ConcurrentHashMap<String, Pair<MangaInfo, Long>>()
-  private val httpClient: HttpClient =
-    HttpClient
-      .newBuilder()
-      .connectTimeout(Duration.ofSeconds(10))
-      .followRedirects(HttpClient.Redirect.NORMAL)
-      .build()
 
-  @Synchronized
-  private fun throttleMangaDexApi() {
-    val now = System.currentTimeMillis()
-    val elapsed = now - lastMangaDexRequestTime.get()
-    if (elapsed < mangaDexMinIntervalMs) {
-      Thread.sleep(mangaDexMinIntervalMs - elapsed)
-    }
-    lastMangaDexRequestTime.set(System.currentTimeMillis())
+  @Volatile
+  private var pluginConfigCache: Pair<Map<String, String?>, Long>? = null
+  private val configCacheTtlMs = 60_000L
+
+  companion object {
+    private const val MAX_OUTPUT_SIZE = 512 * 1024
+    private val progressRegex = """(\d+)%\s+[\d.]+\s*[KMG]?B\s+[\d.]+\s*[KMG]?B/s""".toRegex()
+
+    fun extractMangaDexId(url: String): String? = MangaDexApiClient.extractMangaDexId(url)
   }
+
+  fun evictPluginConfigCache() {
+    pluginConfigCache = null
+  }
+
+  private fun getPluginConfig(): Map<String, String?> {
+    val cached = pluginConfigCache
+    if (cached != null && System.currentTimeMillis() - cached.second < configCacheTtlMs) {
+      return cached.first
+    }
+    val config =
+      pluginConfigRepository
+        .findByPluginId(pluginId)
+        .associate { it.configKey to it.configValue }
+    pluginConfigCache = config to System.currentTimeMillis()
+    return config
+  }
+
+  private fun getDefaultLanguage(): String =
+    try {
+      getPluginConfig()["default_language"] ?: "en"
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to load default language" }
+      "en"
+    }
+
+  private fun getGalleryDlPath(): String? = getPluginConfig()["gallery_dl_path"]?.takeIf { it.isNotBlank() }
 
   private fun deleteQuietly(file: File) {
     if (!file.delete()) {
@@ -74,545 +86,25 @@ class GalleryDlWrapper(
     sb.appendLine(line)
   }
 
-  private fun evictExpiredCacheEntries() {
-    val now = System.currentTimeMillis()
-    chapterCache.entries.removeIf { now - it.value.second > CACHE_TTL_MS }
-    mangaInfoCache.entries.removeIf { now - it.value.second > CACHE_TTL_MS }
-  }
-
   fun getChaptersForManga(
     mangaId: String,
     language: String? = null,
   ): List<ChapterDownloadInfo> {
-    evictExpiredCacheEntries()
     val lang = language ?: getDefaultLanguage()
-    val cacheKey = "$mangaId:$lang"
-    val cached = chapterCache[cacheKey]
-    if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
-      logger.debug { "Using cached chapter data for $mangaId" }
-      return cached.first
-    }
-    val chapters = fetchAllChaptersFromMangaDex(mangaId, lang)
-    chapterCache[cacheKey] = Pair(chapters, System.currentTimeMillis())
-    return chapters
+    return mangaDexApiClient.getChaptersForManga(mangaId, lang)
   }
 
-  fun getMangaMetadata(mangaId: String): MangaInfo? {
-    evictExpiredCacheEntries()
-    val cached = mangaInfoCache[mangaId]
-    if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
-      logger.debug { "Using cached manga metadata for $mangaId" }
-      return cached.first
-    }
-    val info = fetchMangaDexMetadata(mangaId)
-    if (info != null) mangaInfoCache[mangaId] = Pair(info, System.currentTimeMillis())
-    return info
-  }
+  fun getMangaMetadata(mangaId: String): MangaInfo? = mangaDexApiClient.getMangaMetadata(mangaId)
 
-  private fun getDefaultLanguage(): String =
-    try {
-      pluginConfigRepository
-        .findByPluginIdAndKey(pluginId, "default_language")
-        ?.configValue ?: "en"
-    } catch (e: Exception) {
-      logger.debug(e) { "Failed to load default language" }
-      "en"
-    }
+  fun getMangaDexChapterCount(mangaDexId: String): Int? = mangaDexApiClient.getMangaDexChapterCount(mangaDexId, getDefaultLanguage())
 
-  fun getMangaDexChapterCount(mangaDexId: String): Int? =
-    try {
-      throttleMangaDexApi()
-      val pluginConfig =
-        pluginConfigRepository
-          .findByPluginId(pluginId)
-          .associate { it.configKey to it.configValue }
-      val language = pluginConfig["default_language"] ?: "en"
-      val feedUrl =
-        "https://api.mangadex.org/manga/$mangaDexId/feed?" +
-          "translatedLanguage[]=$language&" +
-          "$CONTENT_RATING_PARAMS&" +
-          "limit=0"
-      val request =
-        HttpRequest
-          .newBuilder()
-          .uri(URI.create(feedUrl))
-          .timeout(Duration.ofSeconds(10))
-          .GET()
-          .build()
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-      if (response.statusCode() == 200) {
-        val json = objectMapper.readValue<Map<String, Any?>>(response.body())
-        (json["total"] as? Number)?.toInt()
-      } else {
-        null
-      }
-    } catch (e: Exception) {
-      logger.debug { "Failed to get MangaDex chapter count for $mangaDexId: ${e.message}" }
-      null
-    }
-
-  fun isInstalled(): Boolean {
-    return try {
-      val command = getGalleryDlCommand() + "--version"
-      val process =
-        applyGalleryDlEnv(ProcessBuilder())
-          .command(command)
-          .start()
-
-      if (!process.waitFor(5, TimeUnit.SECONDS)) {
-        process.destroyForcibly()
-        return false
-      }
-      process.exitValue() == 0
-    } catch (e: Exception) {
-      logger.debug { "gallery-dl not found: ${e.message}" }
-      false
-    }
-  }
-
-  private fun fetchMangaDexMetadata(mangaId: String): MangaInfo? {
-    try {
-      val request =
-        HttpRequest
-          .newBuilder()
-          .uri(URI.create("https://api.mangadex.org/manga/$mangaId?includes[]=author&includes[]=artist&includes[]=cover_art"))
-          .timeout(Duration.ofSeconds(10))
-          .GET()
-          .build()
-
-      throttleMangaDexApi()
-      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-      if (response.statusCode() == 429) {
-        logger.warn { "MangaDex rate limited (429) for manga $mangaId, waiting 2s and retrying" }
-        Thread.sleep(2000)
-        throttleMangaDexApi()
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-      }
-
-      if (response.statusCode() != 200) {
-        logger.warn { "MangaDex API returned ${response.statusCode()} for manga $mangaId" }
-        return null
-      }
-
-      val jsonResponse = objectMapper.readValue(response.body(), Map::class.java) as Map<*, *>
-      val data = jsonResponse["data"] as? Map<*, *> ?: return null
-      val attributes = data["attributes"] as? Map<*, *> ?: return null
-
-      val titleMap = attributes["title"] as? Map<*, *> ?: emptyMap<String, String>()
-      val mainEnglishTitle = titleMap["en"] as? String
-
-      val altTitles = attributes["altTitles"] as? List<*> ?: emptyList<Map<String, String>>()
-      val alternativeTitlesWithLang = mutableMapOf<String, String>()
-      val alternativeTitlesList = mutableListOf<String>()
-      var altEnglishTitle: String? = null
-
-      altTitles.forEach { altTitleEntry ->
-        if (altTitleEntry is Map<*, *>) {
-          altTitleEntry.entries.forEach { (lang, title) ->
-            if (lang is String && title is String) {
-              alternativeTitlesWithLang[title] = lang
-              alternativeTitlesList.add(title)
-              if (altEnglishTitle == null && lang == "en") {
-                altEnglishTitle = title
-                logger.debug { "Found English title in altTitles: $title" }
-              }
-            }
-          }
-        }
-      }
-
-      titleMap.forEach { (lang, title) ->
-        if (lang is String && title is String && title !in alternativeTitlesList) {
-          alternativeTitlesWithLang[title] = lang
-          alternativeTitlesList.add(title)
-        }
-      }
-
-      // Priority: altTitles English > main title English > any title
-      val englishTitle =
-        when {
-          altEnglishTitle != null -> altEnglishTitle
-          mainEnglishTitle != null -> {
-            logger.debug { "Using main title.en (may be romaji): $mainEnglishTitle" }
-            mainEnglishTitle
-          }
-          else -> {
-            val fallback = titleMap.values.firstOrNull() as? String
-            logger.debug { "No English title found, using first available: $fallback" }
-            fallback
-          }
-        }
-
-      val finalTitle =
-        if (englishTitle != null && englishTitle.length > 80) {
-          val allEnglishTitles = mutableListOf<String>()
-          if (mainEnglishTitle != null) allEnglishTitles.add(mainEnglishTitle)
-          altTitles.forEach { entry ->
-            if (entry is Map<*, *>) {
-              entry.entries.forEach { (lang, title) ->
-                if (lang == "en" && title is String) allEnglishTitles.add(title)
-              }
-            }
-          }
-          val shortest = allEnglishTitles.minByOrNull { it.length }
-          if (shortest != null && shortest.length < englishTitle.length) {
-            logger.debug { "Title too long (${englishTitle.length} chars), using shortest EN title: $shortest" }
-            shortest
-          } else {
-            englishTitle
-          }
-        } else {
-          englishTitle
-        }
-
-      val descriptionMap = attributes["description"] as? Map<*, *> ?: emptyMap<String, String>()
-      val description = descriptionMap["en"] as? String
-
-      val relationships = data["relationships"] as? List<*> ?: emptyList<Map<String, Any>>()
-      var author: String? = null
-      var artist: String? = null
-
-      relationships.forEach { rel ->
-        if (rel is Map<*, *>) {
-          val relType = rel["type"] as? String
-          val relAttributes = rel["attributes"] as? Map<*, *>
-          val name = relAttributes?.get("name") as? String
-
-          when (relType) {
-            "author" -> if (author == null && name != null) author = name
-            "artist" -> if (artist == null && name != null) artist = name
-          }
-        }
-      }
-
-      val authorArtist =
-        when {
-          author != null && artist != null && author != artist -> "$author, $artist"
-          author != null -> author
-          artist != null -> artist
-          else -> null
-        }
-
-      val tags = attributes["tags"] as? List<*> ?: emptyList<Map<String, Any>>()
-      val genres = mutableListOf<String>()
-
-      tags.forEach { tag ->
-        if (tag is Map<*, *>) {
-          val tagAttributes = tag["attributes"] as? Map<*, *>
-          val tagName = tagAttributes?.get("name") as? Map<*, *>
-          val englishTagName = tagName?.get("en") as? String
-          if (englishTagName != null) {
-            genres.add(englishTagName)
-          }
-        }
-      }
-
-      val year = attributes["year"] as? Int
-      val status = attributes["status"] as? String
-      val publicationDemographic = attributes["publicationDemographic"] as? String
-
-      var coverFilename: String? = null
-      relationships.forEach { rel ->
-        if (rel is Map<*, *> && rel["type"] == "cover_art") {
-          val coverAttributes = rel["attributes"] as? Map<*, *>
-          coverFilename = coverAttributes?.get("fileName") as? String
-        }
-      }
-
-      logger.debug { "Successfully fetched MangaDex metadata for $mangaId: title='$finalTitle', author='$authorArtist', cover='$coverFilename'" }
-
-      return MangaInfo(
-        title = finalTitle ?: "Unknown",
-        author = authorArtist,
-        totalChapters = 0, // Will be updated during download
-        description = description,
-        alternativeTitles = alternativeTitlesList,
-        alternativeTitlesWithLanguage = alternativeTitlesWithLang,
-        scanlationGroup = null,
-        year = year,
-        status = status,
-        publicationDemographic = publicationDemographic,
-        genres = genres,
-        coverFilename = coverFilename,
-        mangaDexId = mangaId,
-      )
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to fetch MangaDex API metadata for $mangaId" }
-      return null
-    }
-  }
-
-  companion object {
-    private const val CACHE_TTL_MS = 30 * 60 * 1000L
-    private const val MAX_OUTPUT_SIZE = 512 * 1024
-    private const val CONTENT_RATING_PARAMS =
-      "contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic"
-    private val MANGADEX_ID_REGEX = """mangadex\.org/title/([a-f0-9-]{36})""".toRegex()
-    private val ZIP_COMMENT_UUID_REGEX = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
-    private val COMICINFO_WEB_REGEX = Regex("<Web>(.+?)</Web>")
-    private val VOLUME_PREFIX_REGEX = Regex("^v\\d+ .+")
-    private val BRACKET_GROUP_REGEX = Regex("\\[(.+?)]$")
-    private val CBZ_UUID_REGEX = """[\[\(]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})[\]\)]""".toRegex()
-    private val CHAPTER_NUM_C_REGEX = Regex("""^c(\d+(?:\.\d+)?)""")
-    private val CHAPTER_NUM_CH_REGEX = Regex("""^ch\.?\s*(\d+(?:\.\d+)?)""")
-    private val SCANLATION_GROUP_REGEX = """\[([^\]]+)\]\s*$""".toRegex()
-    private val PROGRESS_REGEX = """(\d+)%\s+[\d.]+\s*[KMG]?B\s+[\d.]+\s*[KMG]?B/s""".toRegex()
-
-    fun extractMangaDexId(url: String): String? = MANGADEX_ID_REGEX.find(url)?.groupValues?.get(1)
-  }
-
-  private fun downloadMangaCover(
-    mangaId: String,
-    coverFilename: String,
-    destinationPath: Path,
-  ) {
-    try {
-      val coverUrl = "https://uploads.mangadex.org/covers/$mangaId/$coverFilename"
-      logger.info { "Downloading cover from: $coverUrl" }
-
-      val request =
-        HttpRequest
-          .newBuilder()
-          .uri(URI.create(coverUrl))
-          .timeout(Duration.ofSeconds(30))
-          .GET()
-          .build()
-
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray())
-
-      if (response.statusCode() != 200) {
-        logger.warn { "Cover download failed with status ${response.statusCode()}" }
-        logToDatabase(
-          org.gotson.komga.domain.model.LogLevel.WARN,
-          "Cover download failed with status ${response.statusCode()}",
-        )
-        return
-      }
-
-      val extension = coverFilename.substringAfterLast('.', "jpg")
-      val coverFile = destinationPath.resolve("cover.$extension").toFile()
-      coverFile.writeBytes(response.body())
-
-      logger.debug { "Cover downloaded successfully: ${coverFile.absolutePath} (${response.body().size} bytes)" }
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.INFO,
-        "Downloaded cover image: ${coverFile.name} (${response.body().size} bytes)",
-      )
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to download cover for manga $mangaId" }
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.WARN,
-        "Failed to download cover: ${e.message}",
-      )
-    }
-  }
-
-  private fun extractChapterId(cbzPath: Path): String? {
-    val filename = cbzPath.fileName.toString()
-    return CBZ_UUID_REGEX.find(filename)?.groupValues?.get(1)
-  }
-
-  private fun extractChapterNumberFromFilename(filename: String): String? {
-    val name = filename.substringBeforeLast('.').lowercase()
-    val match =
-      CHAPTER_NUM_C_REGEX.find(name)
-        ?: CHAPTER_NUM_CH_REGEX.find(name)
-    val raw = match?.groupValues?.get(1) ?: return null
-    return try {
-      val num = raw.toDouble()
-      if (num == num.toLong().toDouble()) num.toLong().toString() else raw
-    } catch (e: NumberFormatException) {
-      logger.debug(e) { "Could not parse chapter number: $raw" }
-      raw
-    }
-  }
-
-  private fun fetchChapterMetadata(chapterId: String): ChapterInfo? {
-    try {
-      val request =
-        HttpRequest
-          .newBuilder()
-          .uri(URI.create("https://api.mangadex.org/chapter/$chapterId"))
-          .timeout(Duration.ofSeconds(10))
-          .GET()
-          .build()
-
-      throttleMangaDexApi()
-      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-      if (response.statusCode() == 429) {
-        logger.warn { "MangaDex rate limited (429) for chapter $chapterId, waiting 2s" }
-        Thread.sleep(2000)
-        throttleMangaDexApi()
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-      }
-
-      if (response.statusCode() != 200) {
-        logger.warn { "MangaDex chapter API returned ${response.statusCode()} for chapter $chapterId" }
-        return null
-      }
-
-      val jsonResponse = objectMapper.readValue(response.body(), Map::class.java) as Map<*, *>
-      val data = jsonResponse["data"] as? Map<*, *> ?: return null
-      val attributes = data["attributes"] as? Map<*, *> ?: return null
-
-      val chapterNumber = attributes["chapter"] as? String
-      val chapterTitle = attributes["title"] as? String
-      val volume = attributes["volume"] as? String
-      val pages = attributes["pages"] as? Int ?: 0
-      val publishDate = attributes["publishAt"] as? String
-      val language = attributes["translatedLanguage"] as? String
-
-      val relationships = data["relationships"] as? List<*> ?: emptyList<Map<String, Any>>()
-      var scanlationGroup: String? = null
-
-      relationships.forEach { relationship ->
-        if (relationship is Map<*, *>) {
-          val type = relationship["type"] as? String
-          if (type == "scanlation_group") {
-            val groupAttributes = relationship["attributes"] as? Map<*, *>
-            scanlationGroup = groupAttributes?.get("name") as? String
-          }
-        }
-      }
-
-      logger.debug { "Fetched chapter metadata: chapter=$chapterNumber, title='$chapterTitle', volume=$volume, pages=$pages" }
-
-      return ChapterInfo(
-        chapterNumber = chapterNumber,
-        chapterTitle = chapterTitle,
-        volume = volume,
-        pages = pages,
-        scanlationGroup = scanlationGroup,
-        publishDate = publishDate,
-        language = language,
-      )
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to fetch chapter metadata for $chapterId" }
-      return null
-    }
-  }
-
-  data class ChapterDownloadInfo(
-    val chapterId: String,
-    val chapterNumber: String?,
-    val chapterTitle: String?,
-    val volume: String?,
-    val pages: Int,
-    val scanlationGroup: String?,
-    val publishDate: String?,
-    val language: String?,
-    val chapterUrl: String,
-  )
-
-  private fun fetchAllChaptersFromMangaDex(
-    mangaId: String,
-    language: String = "en",
-  ): List<ChapterDownloadInfo> {
-    val chapters = mutableListOf<ChapterDownloadInfo>()
-    var offset = 0
-    val limit = 500
-
-    try {
-      while (true) {
-        val apiUrl =
-          "https://api.mangadex.org/manga/$mangaId/feed?" +
-            "translatedLanguage[]=$language&" +
-            "$CONTENT_RATING_PARAMS&" +
-            "includes[]=scanlation_group&" +
-            "order[chapter]=asc&" +
-            "limit=$limit&" +
-            "offset=$offset"
-
-        val request =
-          HttpRequest
-            .newBuilder()
-            .uri(URI.create(apiUrl))
-            .timeout(Duration.ofSeconds(30))
-            .GET()
-            .build()
-
-        throttleMangaDexApi()
-        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-        if (response.statusCode() == 429) {
-          logger.warn { "MangaDex rate limited (429) on feed, waiting 2s" }
-          Thread.sleep(2000)
-          throttleMangaDexApi()
-          response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        }
-
-        if (response.statusCode() != 200) {
-          logger.warn { "MangaDex feed API returned ${response.statusCode()}" }
-          break
-        }
-
-        val jsonResponse = objectMapper.readValue(response.body(), Map::class.java) as Map<*, *>
-        val data = jsonResponse["data"] as? List<*> ?: break
-
-        if (data.isEmpty()) break
-
-        data.forEach { item ->
-          if (item is Map<*, *>) {
-            val id = item["id"] as? String ?: return@forEach
-            val attributes = item["attributes"] as? Map<*, *> ?: return@forEach
-
-            val chapterNumber = attributes["chapter"] as? String
-            val chapterTitle = attributes["title"] as? String
-            val volume = attributes["volume"] as? String
-            val pages = attributes["pages"] as? Int ?: 0
-            val publishDate = attributes["publishAt"] as? String
-            val chapterLanguage = attributes["translatedLanguage"] as? String
-
-            // Extract scanlation group from relationships
-            val relationships = item["relationships"] as? List<*> ?: emptyList<Map<String, Any>>()
-            var scanlationGroup: String? = null
-
-            relationships.forEach { relationship ->
-              if (relationship is Map<*, *>) {
-                val type = relationship["type"] as? String
-                if (type == "scanlation_group") {
-                  val groupAttributes = relationship["attributes"] as? Map<*, *>
-                  scanlationGroup = groupAttributes?.get("name") as? String
-                }
-              }
-            }
-
-            chapters.add(
-              ChapterDownloadInfo(
-                chapterId = id,
-                chapterNumber = chapterNumber,
-                chapterTitle = chapterTitle,
-                volume = volume,
-                pages = pages,
-                scanlationGroup = scanlationGroup,
-                publishDate = publishDate,
-                language = chapterLanguage,
-                chapterUrl = "https://mangadex.org/chapter/$id",
-              ),
-            )
-          }
-        }
-
-        val total = jsonResponse["total"] as? Int ?: 0
-        offset += limit
-        if (offset >= total) break
-      }
-
-      logger.debug { "Fetched ${chapters.size} chapters from MangaDex for manga $mangaId (language=$language)" }
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to fetch chapter list from MangaDex" }
-    }
-
-    return chapters
-  }
+  fun isInstalled(): Boolean = galleryDlProcess.isInstalled(getGalleryDlPath())
 
   fun getChapterInfo(url: String): MangaInfo {
     val mangadexId = extractMangaDexId(url)
     if (mangadexId != null) {
       logger.info { "Detected MangaDex URL, fetching metadata from API for manga ID: $mangadexId" }
-      val apiMetadata = fetchMangaDexMetadata(mangadexId)
+      val apiMetadata = mangaDexApiClient.fetchMangaDexMetadata(mangadexId)
       if (apiMetadata != null) {
         logger.info { "Using MangaDex API metadata: ${apiMetadata.title}" }
         return apiMetadata.copy(sourceUrl = url)
@@ -622,11 +114,17 @@ class GalleryDlWrapper(
 
     val output = StringBuilder()
     val errorOutput = StringBuilder()
-    val configFile = createInfoConfigFile()
+    val pluginConfig = getPluginConfig()
+    val configFile =
+      galleryDlProcess.createInfoConfigFile(
+        pluginConfig["mangadex_username"],
+        pluginConfig["mangadex_password"],
+        pluginConfig["default_language"] ?: "en",
+      )
 
     try {
       val command =
-        getGalleryDlCommand().toMutableList().apply {
+        galleryDlProcess.getCommand(getGalleryDlPath()).toMutableList().apply {
           add(url)
           add("-j")
           add("--simulate")
@@ -637,11 +135,11 @@ class GalleryDlWrapper(
       logger.debug { "Executing getChapterInfo: ${command.joinToString(" ")}" }
 
       val process =
-        applyGalleryDlEnv(ProcessBuilder())
+        galleryDlProcess
+          .applyEnv(ProcessBuilder(), getGalleryDlPath())
           .command(command)
           .start()
 
-      // Read stdout
       BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
         reader.lines().forEach { line ->
           appendBounded(output, line)
@@ -649,7 +147,6 @@ class GalleryDlWrapper(
         }
       }
 
-      // Read stderr
       BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
         reader.lines().forEach { line ->
           appendBounded(errorOutput, line)
@@ -706,11 +203,17 @@ class GalleryDlWrapper(
 
   fun fetchGalleryDlChapterMapping(url: String): Map<String, ChapterDownloadInfo> {
     val output = StringBuilder()
-    val configFile = createInfoConfigFile()
+    val pluginConfig = getPluginConfig()
+    val configFile =
+      galleryDlProcess.createInfoConfigFile(
+        pluginConfig["mangadex_username"],
+        pluginConfig["mangadex_password"],
+        pluginConfig["default_language"] ?: "en",
+      )
 
     try {
       val command =
-        getGalleryDlCommand().toMutableList().apply {
+        galleryDlProcess.getCommand(getGalleryDlPath()).toMutableList().apply {
           add(url)
           add("-j")
           add("--simulate")
@@ -719,7 +222,8 @@ class GalleryDlWrapper(
         }
 
       val process =
-        applyGalleryDlEnv(ProcessBuilder())
+        galleryDlProcess
+          .applyEnv(ProcessBuilder(), getGalleryDlPath())
           .command(command)
           .start()
 
@@ -784,35 +288,6 @@ class GalleryDlWrapper(
     }
   }
 
-  private fun createInfoConfigFile(): File {
-    val tempFile = File.createTempFile("gallery-dl-info-", ".json")
-
-    val pluginConfig = pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
-    val mangadexUsername = pluginConfig["mangadex_username"]
-    val mangadexPassword = pluginConfig["mangadex_password"]
-    val defaultLanguage = pluginConfig["default_language"] ?: "en"
-
-    val config =
-      mutableMapOf<String, Any>(
-        "extractor" to
-          mutableMapOf<String, Any>(
-            "base-directory" to "",
-            "mangadex" to
-              mutableMapOf<String, Any>("lang" to defaultLanguage).apply {
-                if (!mangadexUsername.isNullOrBlank()) {
-                  this["username"] = mangadexUsername
-                }
-                if (!mangadexPassword.isNullOrBlank()) {
-                  this["password"] = mangadexPassword
-                }
-              },
-          ),
-      )
-
-    tempFile.writeText(objectMapper.writeValueAsString(config))
-    return tempFile
-  }
-
   fun download(
     url: String,
     destinationPath: Path,
@@ -850,17 +325,14 @@ class GalleryDlWrapper(
       }
 
       val seriesJson = readSeriesJson(destinationPath)
-      val pluginConfig =
-        pluginConfigRepository
-          .findByPluginId(pluginId)
-          .mapNotNull { c -> c.configValue?.let { c.configKey to it } }
-          .toMap()
+      val pluginConfig = getPluginConfig().mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
       val defaultLanguage = pluginConfig["default_language"] ?: "en"
-      val configFile = createTempConfigFile(pluginConfig)
+      val configFile = galleryDlProcess.createTempConfigFile(pluginConfig, defaultLanguage)
       configFileForCleanup = configFile
 
+      val gdlPath = getGalleryDlPath()
       val command =
-        getGalleryDlCommand().toMutableList().apply {
+        galleryDlProcess.getCommand(gdlPath).toMutableList().apply {
           add(url)
           add("-d")
           add(destinationPath.toString())
@@ -888,7 +360,7 @@ class GalleryDlWrapper(
             logger.debug { "Cover already exists and unchanged, skipping download" }
           } else {
             logger.info { "Downloading cover image" }
-            downloadMangaCover(mangaDexId, mangaInfo.coverFilename!!, destinationPath)
+            mangaDexApiClient.downloadMangaCover(mangaDexId, mangaInfo.coverFilename!!, destinationPath)
           }
         } else {
           logger.warn { "Cannot download cover: mangaDexId=$mangaDexId, coverFilename=${mangaInfo.coverFilename}" }
@@ -906,7 +378,7 @@ class GalleryDlWrapper(
           emptyList()
         }
 
-      normalizeDoubleBracketFilenames(destDir)
+      chapterMatcher.normalizeDoubleBracketFilenames(destDir)
 
       val dbUrls =
         if (komgaSeriesId != null) {
@@ -916,7 +388,7 @@ class GalleryDlWrapper(
         }
       val cbzUrls =
         if (dbUrls.isEmpty()) {
-          extractChapterUrlsFromCbzFiles(destDir)
+          chapterMatcher.extractChapterUrlsFromCbzFiles(destDir)
         } else {
           emptySet()
         }
@@ -944,7 +416,7 @@ class GalleryDlWrapper(
           true
         }
 
-      val sameGroupDuplicates = findSameGroupDuplicates(allChapters)
+      val sameGroupDuplicates = chapterMatcher.findSameGroupDuplicates(allChapters)
       val sameGroupDuplicateUrls = sameGroupDuplicates.map { it.chapterUrl }.toSet()
       if (sameGroupDuplicates.isNotEmpty() && komgaSeriesId != null) {
         for (old in sameGroupDuplicates) {
@@ -979,10 +451,13 @@ class GalleryDlWrapper(
       val skippedCount = allChapters.size - filteredChapters.size
       if (skippedCount > 0) {
         logger.info {
-          "Skipping $skippedCount already downloaded chapters, ${filteredChapters.size} remaining to download " +
+          "Resuming download: $skippedCount/${allChapters.size} chapters already done, ${filteredChapters.size} remaining " +
             "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist, same-group duplicates: ${sameGroupDuplicates.size})"
         }
-        logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Skipping $skippedCount already downloaded chapters")
+        logToDatabase(
+          org.gotson.komga.domain.model.LogLevel.INFO,
+          "Resuming: $skippedCount/${allChapters.size} chapters already downloaded, ${filteredChapters.size} remaining",
+        )
 
         updateExistingCbzChapterUrls(destDir, allChapters, knownUrls, mangaInfo)
       } else {
@@ -1027,13 +502,18 @@ class GalleryDlWrapper(
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download: $url")
 
         val process =
-          applyGalleryDlEnv(ProcessBuilder())
+          galleryDlProcess
+            .applyEnv(ProcessBuilder(), gdlPath)
             .command(command)
             .directory(File(System.getProperty("user.home")))
             .start()
 
         onProcessStarted(process)
         var lastProgress = 0
+
+        val seenChapterDirs =
+          java.util.concurrent.ConcurrentHashMap
+            .newKeySet<String>()
 
         val stdoutThread =
           Thread {
@@ -1042,8 +522,23 @@ class GalleryDlWrapper(
                 appendBounded(output, line)
                 logger.debug { "gallery-dl: $line" }
 
-                if (line.contains("✔") || line.contains("*")) {
-                  filesDownloaded.incrementAndGet()
+                val trimmed = line.trim()
+                if (trimmed.isNotEmpty()) {
+                  val file = File(trimmed)
+                  val parentDir = file.parentFile?.name ?: ""
+                  if (parentDir.isNotEmpty() && seenChapterDirs.add(parentDir)) {
+                    val count = filesDownloaded.incrementAndGet()
+                    val total = if (totalChapters > 0) totalChapters else 0
+                    val percent = if (totalChapters > 0) (count * 100) / totalChapters else 0
+                    onProgress(
+                      DownloadProgress(
+                        currentChapter = count,
+                        totalChapters = total,
+                        percent = percent,
+                        message = "Downloading chapter $count" + if (totalChapters > 0) "/$totalChapters" else "",
+                      ),
+                    )
+                  }
                 }
               }
             }
@@ -1113,7 +608,7 @@ class GalleryDlWrapper(
         val retryChapters =
           if (mangaDexId != null) {
             try {
-              fetchAllChaptersFromMangaDex(mangaDexId).also {
+              mangaDexApiClient.fetchAllChaptersFromMangaDex(mangaDexId).also {
                 if (it.isNotEmpty()) logger.debug { "Fetched ${it.size} chapters from MangaDex API" }
               }
             } catch (e: Exception) {
@@ -1127,7 +622,7 @@ class GalleryDlWrapper(
 
         downloadedCbzFiles.forEach { cbzFile ->
           try {
-            val chapterNum = extractChapterNumberFromFilename(cbzFile.name)
+            val chapterNum = chapterMatcher.extractChapterNumberFromFilename(cbzFile.name)
             val matched = chapterMap[chapterNum]
             if (matched != null) {
               val chapterInfo =
@@ -1165,7 +660,7 @@ class GalleryDlWrapper(
           }
         }
 
-        normalizeDoubleBracketFilenames(destDir)
+        chapterMatcher.normalizeDoubleBracketFilenames(destDir)
       } else if (filteredChapters.isEmpty()) {
         logger.info { "All ${allChapters.size} chapters already downloaded, nothing to do" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "All chapters already downloaded, skipping: $url")
@@ -1173,11 +668,13 @@ class GalleryDlWrapper(
       } else {
         val failuresFile = File(destDir, ".chapter-failures.json")
         val chapterFailures = loadChapterFailures(failuresFile)
-        val mangaDexId = extractMangaDexId(url)
+        val currentMangaDexId = extractMangaDexId(url)
 
         totalChapters = filteredChapters.count { (chapterFailures[it.chapterUrl] ?: 0) < 3 }
-        logger.info { "Downloading $totalChapters chapters (${filteredChapters.size - totalChapters} auto-blacklisted)" }
-        logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download of $totalChapters chapters: $url")
+        val autoBlacklisted = filteredChapters.size - totalChapters
+        val resumeInfo = if (skippedCount > 0) " (resuming, $skippedCount already done)" else ""
+        logger.info { "Downloading $totalChapters chapters$resumeInfo${if (autoBlacklisted > 0) " ($autoBlacklisted auto-blacklisted)" else ""}" }
+        logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Downloading $totalChapters chapters$resumeInfo: $url")
 
         var downloadIndex = 0
         filteredChapters.forEachIndexed { index, chapter ->
@@ -1226,7 +723,7 @@ class GalleryDlWrapper(
           logger.info { "Downloading chapter $chapterNum ($downloadIndex/$totalChapters): ${chapter.chapterUrl}" }
 
           val chapterCommand =
-            getGalleryDlCommand().toMutableList().apply {
+            galleryDlProcess.getCommand(gdlPath).toMutableList().apply {
               add(chapter.chapterUrl)
               add("-d")
               add(destinationPath.toString())
@@ -1236,7 +733,8 @@ class GalleryDlWrapper(
 
           try {
             val chapterProcess =
-              applyGalleryDlEnv(ProcessBuilder())
+              galleryDlProcess
+                .applyEnv(ProcessBuilder(), gdlPath)
                 .command(chapterCommand)
                 .directory(File(System.getProperty("user.home")))
                 .start()
@@ -1282,7 +780,7 @@ class GalleryDlWrapper(
               filesDownloaded.incrementAndGet()
 
               val chapterStr = chapter.chapterNumber ?: "${index + 1}"
-              val paddedChapter = padChapterNumber(chapterStr)
+              val paddedChapter = chapterMatcher.padChapterNumber(chapterStr)
               val cbzFiles =
                 destDir
                   .listFiles()
@@ -1296,31 +794,11 @@ class GalleryDlWrapper(
 
               val groupName = chapter.scanlationGroup?.lowercase()
 
-              fun matchesChapterNumber(name: String): Boolean {
-                val chapterPart =
-                  if (VOLUME_PREFIX_REGEX.matches(name)) name.substringAfter(" ") else name
-                return chapterPart.startsWith("c$paddedChapter ") || chapterPart == "c$paddedChapter" ||
-                  chapterPart.startsWith("c$chapterStr ") || chapterPart == "c$chapterStr" ||
-                  chapterPart.startsWith("ch. $paddedChapter ") || chapterPart.startsWith("ch. $paddedChapter-") || chapterPart == "ch. $paddedChapter"
-              }
-
-              fun matchesChapterAndGroup(name: String): Boolean {
-                if (!matchesChapterNumber(name)) return false
-                if (groupName == null) return true
-                val bracketGroup =
-                  BRACKET_GROUP_REGEX
-                    .find(name)
-                    ?.groupValues
-                    ?.get(1)
-                    ?.lowercase()
-                return bracketGroup != null && bracketGroup == groupName
-              }
-
               val targetCbz =
-                recentCbzFiles.find { matchesChapterAndGroup(it.nameWithoutExtension.lowercase()) }
-                  ?: cbzFiles.find { matchesChapterAndGroup(it.nameWithoutExtension.lowercase()) }
-                  ?: recentCbzFiles.find { matchesChapterNumber(it.nameWithoutExtension.lowercase()) }
-                  ?: cbzFiles.find { matchesChapterNumber(it.nameWithoutExtension.lowercase()) }
+                recentCbzFiles.find { chapterMatcher.matchesChapterAndGroup(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr, groupName) }
+                  ?: cbzFiles.find { chapterMatcher.matchesChapterAndGroup(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr, groupName) }
+                  ?: recentCbzFiles.find { chapterMatcher.matchesChapterNumber(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr) }
+                  ?: cbzFiles.find { chapterMatcher.matchesChapterNumber(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr) }
 
               if (targetCbz == null) {
                 logger.warn { "Could not find CBZ file for chapter $chapterNum (expected c$paddedChapter or c$chapterStr)" }
@@ -1338,7 +816,7 @@ class GalleryDlWrapper(
                     )
                   addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
                   if (komgaSeriesId != null && !chapterUrlRepository.existsByUrl(chapter.chapterUrl)) {
-                    val chapterNum =
+                    val chapterNumVal =
                       chapter.chapterNumber
                         ?.toDoubleOrNull()
                         ?: (index + 1).toDouble()
@@ -1350,7 +828,7 @@ class GalleryDlWrapper(
                             .toString(),
                         seriesId = komgaSeriesId,
                         url = chapter.chapterUrl,
-                        chapter = chapterNum,
+                        chapter = chapterNumVal,
                         volume = chapter.volume?.toIntOrNull(),
                         title = chapter.chapterTitle,
                         lang = chapter.language ?: "en",
@@ -1359,7 +837,7 @@ class GalleryDlWrapper(
                         scanlationGroup = chapter.scanlationGroup,
                       ),
                     )
-                    logger.debug { "Registered chapter URL in DB: ch.$chapterNum ${chapter.chapterUrl}" }
+                    logger.debug { "Registered chapter URL in DB: ch.$chapterNumVal ${chapter.chapterUrl}" }
                   }
                   logger.debug { "Processed ${targetCbz.name}" }
                 } catch (e: Exception) {
@@ -1368,7 +846,15 @@ class GalleryDlWrapper(
               }
 
               val progressPercent = if (totalChapters > 0) (downloadIndex * 100) / totalChapters else 100
-              onProgress(DownloadProgress(filesDownloaded.get(), totalChapters, progressPercent, "Downloaded chapter $chapterNum"))
+              onProgress(
+                DownloadProgress(
+                  currentChapter = filesDownloaded.get(),
+                  totalChapters = totalChapters,
+                  percent = progressPercent,
+                  message = "Downloaded chapter $chapterNum",
+                  chapterTitle = chapter.chapterTitle,
+                ),
+              )
             } else {
               val exitCode = chapterProcess.exitValue()
               chapterFailures[chapter.chapterUrl] = failCount + 1
@@ -1381,7 +867,7 @@ class GalleryDlWrapper(
         }
 
         saveChapterFailures(failuresFile, chapterFailures)
-        normalizeDoubleBracketFilenames(destDir)
+        chapterMatcher.normalizeDoubleBracketFilenames(destDir)
         deleteQuietly(configFile)
       }
 
@@ -1450,6 +936,256 @@ class GalleryDlWrapper(
     }
   }
 
+  private fun addComicInfoToCbz(
+    cbzPath: Path,
+    mangaInfo: MangaInfo,
+  ) {
+    try {
+      val chapterId = chapterMatcher.extractChapterId(cbzPath)
+      val chapterInfo =
+        if (chapterId != null) {
+          logger.debug { "Fetching chapter metadata for ${cbzPath.fileName} (chapter ID: $chapterId)" }
+          mangaDexApiClient.fetchChapterMetadata(chapterId)
+        } else {
+          logger.warn { "Could not extract chapter ID from ${cbzPath.fileName}, using series metadata only" }
+          null
+        }
+
+      val chapterUrl = if (chapterId != null) "https://mangadex.org/chapter/$chapterId" else null
+      val comicInfoXml = comicInfoGenerator.generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
+      val zipComment = comicInfoGenerator.generateZipComment(mangaInfo, chapterInfo, chapterId)
+
+      comicInfoGenerator.injectComicInfo(cbzPath, comicInfoXml, zipComment)
+
+      logToDatabase(
+        org.gotson.komga.domain.model.LogLevel.INFO,
+        "Injected ComicInfo.xml into ${cbzPath.fileName}" +
+          if (chapterInfo != null) " (chapter ${chapterInfo.chapterNumber})" else "",
+      )
+      logger.debug {
+        "Added ComicInfo.xml to ${cbzPath.fileName}" +
+          if (chapterInfo != null) " with chapter metadata (ch. ${chapterInfo.chapterNumber})" else ""
+      }
+    } catch (e: Exception) {
+      logToDatabase(
+        org.gotson.komga.domain.model.LogLevel.WARN,
+        "Failed to inject ComicInfo.xml into ${cbzPath.fileName}: ${e.message}",
+      )
+      logger.warn(e) { "Failed to add ComicInfo.xml to ${cbzPath.fileName}" }
+    }
+  }
+
+  private fun addComicInfoToCbzWithChapterInfo(
+    cbzPath: Path,
+    mangaInfo: MangaInfo,
+    chapterInfo: ChapterInfo?,
+    chapterUrl: String? = null,
+  ) {
+    try {
+      val chapterId =
+        chapterMatcher.extractChapterId(cbzPath)
+          ?: chapterUrl
+            ?.substringAfterLast("/chapter/", "")
+            ?.takeIf { it.isNotEmpty() }
+      val comicInfoXml = comicInfoGenerator.generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
+      val zipComment = comicInfoGenerator.generateZipComment(mangaInfo, chapterInfo, chapterId)
+
+      comicInfoGenerator.injectComicInfoWithRetry(cbzPath, comicInfoXml, zipComment)
+
+      logToDatabase(
+        org.gotson.komga.domain.model.LogLevel.INFO,
+        "Injected ComicInfo.xml into ${cbzPath.fileName}" +
+          if (chapterInfo != null) " (chapter ${chapterInfo.chapterNumber})" else "",
+      )
+      logger.debug {
+        "Added ComicInfo.xml to ${cbzPath.fileName}" +
+          if (chapterInfo != null) " with chapter metadata (ch. ${chapterInfo.chapterNumber})" else ""
+      }
+    } catch (e: Exception) {
+      logToDatabase(
+        org.gotson.komga.domain.model.LogLevel.WARN,
+        "Failed to inject ComicInfo.xml into ${cbzPath.fileName}: ${e.message}",
+      )
+      logger.warn(e) { "Failed to add ComicInfo.xml to ${cbzPath.fileName}" }
+    }
+  }
+
+  private fun updateExistingCbzChapterUrls(
+    destDir: File,
+    allChapters: List<ChapterDownloadInfo>,
+    existingUrls: Set<String>,
+    mangaInfo: MangaInfo,
+  ) {
+    val cbzFiles =
+      destDir
+        .listFiles()
+        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+        ?: return
+
+    val chaptersByNumber = mutableMapOf<String, MutableList<ChapterDownloadInfo>>()
+    for (ch in allChapters) {
+      val chNum = ch.chapterNumber ?: continue
+      val padded = chapterMatcher.padChapterNumber(chNum)
+      val plain =
+        try {
+          val n = chNum.toDouble()
+          if (n == n.toLong().toDouble()) n.toLong().toString() else chNum
+        } catch (_: NumberFormatException) {
+          chNum
+        }
+      chaptersByNumber.getOrPut(padded) { mutableListOf() }.add(ch)
+      if (plain != padded) {
+        chaptersByNumber.getOrPut(plain) { mutableListOf() }.add(ch)
+      }
+    }
+
+    var updated = 0
+    val alreadyUpdated = mutableSetOf<String>()
+    for (cbzFile in cbzFiles) {
+      if (cbzFile.absolutePath in alreadyUpdated) continue
+      if (comicInfoGenerator.hasComicInfoXml(cbzFile)) continue
+
+      val fileName = cbzFile.nameWithoutExtension
+      val nameLower = fileName.lowercase()
+      val chapterNum = chapterMatcher.extractChapterNumFromFilename(nameLower) ?: continue
+      val fileGroup = chapterMatcher.extractScanlationGroup(fileName)
+
+      val candidates = chaptersByNumber[chapterNum] ?: continue
+      val chapter =
+        if (fileGroup != null) {
+          candidates.find { it.scanlationGroup != null && fileGroup.equals(it.scanlationGroup, ignoreCase = true) }
+        } else {
+          candidates.firstOrNull()
+        } ?: continue
+
+      try {
+        val chapterInfo =
+          ChapterInfo(
+            chapterNumber = chapter.chapterNumber,
+            chapterTitle = chapter.chapterTitle,
+            volume = chapter.volume,
+            pages = chapter.pages,
+            scanlationGroup = chapter.scanlationGroup,
+            publishDate = chapter.publishDate,
+            language = chapter.language,
+          )
+        addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+        alreadyUpdated.add(cbzFile.absolutePath)
+        updated++
+        logger.debug { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
+      } catch (e: Exception) {
+        logger.debug { "Failed to update ComicInfo.xml in ${cbzFile.name}: ${e.message}" }
+      }
+    }
+
+    if (updated > 0) {
+      logger.debug { "Existing CBZ update: $updated ComicInfo injected" }
+    }
+  }
+
+  fun repairMissingComicInfo(
+    mangaDexId: String,
+    directories: List<File>,
+  ): RepairResult {
+    val mangaInfo =
+      try {
+        getMangaMetadata(mangaDexId) ?: return RepairResult(0, 0, "Could not fetch metadata for $mangaDexId")
+      } catch (e: Exception) {
+        return RepairResult(0, 0, "Failed to fetch metadata: ${e.message}")
+      }
+
+    val allChapters =
+      try {
+        getChaptersForManga(mangaDexId)
+      } catch (e: Exception) {
+        return RepairResult(0, 0, "Failed to fetch chapters: ${e.message}")
+      }
+
+    val chapterMap = mutableMapOf<String, MutableList<ChapterDownloadInfo>>()
+    for (ch in allChapters) {
+      val num = ch.chapterNumber ?: continue
+      val padded = chapterMatcher.padChapterNumber(num)
+      val plain =
+        try {
+          val n = num.toDouble()
+          if (n == n.toLong().toDouble()) n.toLong().toString() else num
+        } catch (_: NumberFormatException) {
+          num
+        }
+      chapterMap.getOrPut(padded) { mutableListOf() }.add(ch)
+      if (plain != padded) chapterMap.getOrPut(plain) { mutableListOf() }.add(ch)
+    }
+
+    var repaired = 0
+    var skipped = 0
+
+    for (dir in directories) {
+      val cbzFiles =
+        dir
+          .listFiles()
+          ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
+          ?: continue
+
+      for (cbzFile in cbzFiles) {
+        try {
+          val hasComment =
+            java.util.zip.ZipFile(cbzFile).use { zf ->
+              !zf.comment.isNullOrBlank()
+            }
+
+          if (hasComment) {
+            skipped++
+            continue
+          }
+
+          val chapterNum =
+            chapterMatcher.extractChapterNumFromFilename(cbzFile.nameWithoutExtension.lowercase())
+          val fileGroup =
+            chapterMatcher.extractScanlationGroup(cbzFile.nameWithoutExtension)
+
+          val candidates = if (chapterNum != null) chapterMap[chapterNum] else null
+          val chapter =
+            if (candidates != null && fileGroup != null) {
+              candidates.find { it.scanlationGroup?.equals(fileGroup, ignoreCase = true) == true }
+                ?: candidates.firstOrNull()
+            } else {
+              candidates?.firstOrNull()
+            }
+
+          if (chapter != null) {
+            val chapterInfo =
+              ChapterInfo(
+                chapterNumber = chapter.chapterNumber,
+                chapterTitle = chapter.chapterTitle,
+                volume = chapter.volume,
+                pages = chapter.pages,
+                scanlationGroup = chapter.scanlationGroup,
+                publishDate = chapter.publishDate,
+                language = chapter.language,
+              )
+            addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+            repaired++
+            logger.info { "Repaired: ${cbzFile.name}" }
+          } else {
+            addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
+            repaired++
+            logger.info { "Repaired (series-only): ${cbzFile.name}" }
+          }
+        } catch (e: Exception) {
+          logger.warn(e) { "Failed to repair ${cbzFile.name}" }
+        }
+      }
+    }
+
+    return RepairResult(repaired, skipped, null)
+  }
+
+  data class RepairResult(
+    val repaired: Int,
+    val skipped: Int,
+    val error: String?,
+  )
+
   private fun deriveTitleFromUrl(url: String): String? =
     try {
       val uri = URI(url)
@@ -1471,288 +1207,6 @@ class GalleryDlWrapper(
       logger.debug(e) { "Failed to derive title from URL" }
       null
     }
-
-  private fun getGalleryDlPath(): String? {
-    val pluginConfig =
-      pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }
-    return pluginConfig["gallery_dl_path"]?.takeIf { it.isNotBlank() }
-  }
-
-  private fun applyGalleryDlEnv(processBuilder: ProcessBuilder): ProcessBuilder {
-    val galleryDlPath = getGalleryDlPath()
-    if (galleryDlPath != null) {
-      val env = processBuilder.environment()
-      val existing = env["PYTHONPATH"]
-      env["PYTHONPATH"] =
-        if (existing.isNullOrBlank()) galleryDlPath else "$galleryDlPath${File.pathSeparator}$existing"
-      logger.debug { "Set PYTHONPATH=$galleryDlPath for gallery-dl" }
-    }
-    return processBuilder
-  }
-
-  private fun getGalleryDlCommand(): List<String> =
-    try {
-      val process =
-        applyGalleryDlEnv(ProcessBuilder())
-          .command("gallery-dl", "--version")
-          .start()
-      process.waitFor(2, TimeUnit.SECONDS)
-      if (process.exitValue() == 0) {
-        listOf("gallery-dl")
-      } else {
-        getPythonGalleryDlCommand()
-      }
-    } catch (e: Exception) {
-      getPythonGalleryDlCommand()
-    }
-
-  private fun getPythonGalleryDlCommand(): List<String> {
-    val pythonCmds = listOf("python3", "python")
-
-    return pythonCmds
-      .firstOrNull { python ->
-        try {
-          val process =
-            applyGalleryDlEnv(ProcessBuilder())
-              .command(python, "-m", "gallery_dl", "--version")
-              .start()
-          process.waitFor(2, TimeUnit.SECONDS)
-          process.exitValue() == 0
-        } catch (e: Exception) {
-          false
-        }
-      }?.let { listOf(it, "-m", "gallery_dl") } ?: listOf("gallery-dl")
-  }
-
-  private fun getWebsiteConfigs(defaultLanguage: String): Map<String, Map<String, Any>> = getDefaultWebsiteConfigs(defaultLanguage)
-
-  private fun getDefaultWebsiteConfigs(defaultLanguage: String): Map<String, Map<String, Any>> =
-    mapOf(
-      "mangadex" to
-        mapOf(
-          "lang" to defaultLanguage,
-          "api" to "api",
-          "data-saver" to false,
-          "path-restrict" to "auto",
-          "path-replace" to "_",
-          "directory" to listOf("{volume:?v/ /}c{chapter:>03}{chapter_minor} [{group:J, }]"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "mangahere" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}{chapter_minor} [{group:J, }]"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "comick" to
-        mapOf(
-          "lang" to defaultLanguage,
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "batoto" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "mangasee" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "mangakakalot" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "manganato" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "webtoons" to
-        mapOf(
-          "directory" to listOf("e{episode:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "asurascans" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "flamescans" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "reaperscans" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "mangaplus" to
-        mapOf(
-          "directory" to listOf("c{chapter:>03}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "imgur" to
-        mapOf(
-          "directory" to listOf("{album[title]}"),
-          "filename" to "{num:>03}.{extension}",
-        ),
-      "nhentai" to
-        mapOf(
-          "directory" to listOf("{gallery_id}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "exhentai" to
-        mapOf(
-          "directory" to listOf("{gallery_id}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-      "rawkuma" to
-        mapOf(
-          "directory" to listOf("{chapter_id}"),
-          "filename" to "{page:>03}.{extension}",
-        ),
-    )
-
-  private fun createTempConfigFile(
-    pluginConfig: Map<String, String> =
-      pluginConfigRepository
-        .findByPluginId(pluginId)
-        .mapNotNull { c -> c.configValue?.let { c.configKey to it } }
-        .toMap(),
-  ): File {
-    val tempFile = File.createTempFile("gallery-dl-", ".json")
-
-    val mangadexUsername = pluginConfig["mangadex_username"]
-    val mangadexPassword = pluginConfig["mangadex_password"]
-    val defaultLanguage = pluginConfig["default_language"] ?: "en"
-
-    val websiteConfigs = getWebsiteConfigs(defaultLanguage).toMutableMap()
-
-    if (!mangadexUsername.isNullOrBlank() || !mangadexPassword.isNullOrBlank()) {
-      val mangadexConfig = websiteConfigs["mangadex"]?.toMutableMap() ?: mutableMapOf()
-      if (!mangadexUsername.isNullOrBlank()) {
-        mangadexConfig["username"] = mangadexUsername
-      }
-      if (!mangadexPassword.isNullOrBlank()) {
-        mangadexConfig["password"] = mangadexPassword
-      }
-      websiteConfigs["mangadex"] = mangadexConfig
-    }
-
-    val config =
-      mutableMapOf<String, Any>(
-        "extractor" to
-          mutableMapOf<String, Any>(
-            "base-directory" to "",
-          ).apply {
-            putAll(websiteConfigs)
-          },
-        "postprocessors" to
-          listOf(
-            mapOf(
-              "name" to "zip",
-              "extension" to "cbz",
-              "compression" to "store",
-              "keep-files" to false,
-            ),
-          ),
-      )
-
-    tempFile.writeText(objectMapper.writeValueAsString(config))
-    logger.debug { "Created config file with ${websiteConfigs.size} website configs" }
-    return tempFile
-  }
-
-  private fun createCoverConfigFile(
-    pluginConfig: Map<String, String> =
-      pluginConfigRepository
-        .findByPluginId(pluginId)
-        .mapNotNull { c -> c.configValue?.let { c.configKey to it } }
-        .toMap(),
-  ): File {
-    val tempFile = File.createTempFile("gallery-dl-cover-", ".json")
-
-    val mangadexUsername = pluginConfig["mangadex_username"]
-    val mangadexPassword = pluginConfig["mangadex_password"]
-
-    val config =
-      mutableMapOf<String, Any>(
-        "extractor" to
-          mutableMapOf<String, Any>(
-            "base-directory" to "",
-            "mangadex" to
-              mutableMapOf<String, Any>("lang" to "en").apply {
-                if (!mangadexUsername.isNullOrBlank()) {
-                  this["username"] = mangadexUsername
-                }
-                if (!mangadexPassword.isNullOrBlank()) {
-                  this["password"] = mangadexPassword
-                }
-              },
-          ),
-      )
-
-    tempFile.writeText(objectMapper.writeValueAsString(config))
-    return tempFile
-  }
-
-  private fun downloadCover(
-    mangaUrl: String,
-    destinationPath: Path,
-  ) {
-    try {
-      val coverUrl = "${mangaUrl.trimEnd('/')}?tab=art"
-      val configFile = createCoverConfigFile()
-
-      val command =
-        getGalleryDlCommand().toMutableList().apply {
-          add(coverUrl)
-          add("-d")
-          add(destinationPath.toString())
-          add("--config")
-          add(configFile.absolutePath)
-          add("--range")
-          add("1")
-        }
-
-      logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Downloading cover from: $coverUrl")
-      logger.debug { "Starting cover download: ${command.joinToString(" ")}" }
-
-      val process =
-        applyGalleryDlEnv(ProcessBuilder())
-          .command(command)
-          .start()
-
-      if (!process.waitFor(2, TimeUnit.MINUTES)) {
-        process.destroyForcibly()
-        deleteQuietly(configFile)
-        throw java.util.concurrent.TimeoutException("Cover download timeout")
-      }
-
-      val exitCode = process.exitValue()
-      deleteQuietly(configFile)
-
-      if (exitCode == 0) {
-        logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Cover download completed")
-        logger.debug { "Cover download completed successfully" }
-      } else {
-        logToDatabase(
-          org.gotson.komga.domain.model.LogLevel.WARN,
-          "Cover download failed with exit code: $exitCode",
-        )
-        logger.warn { "Cover download failed with exit code: $exitCode" }
-      }
-    } catch (e: Exception) {
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.WARN,
-        "Cover download failed: ${e.message}",
-      )
-      logger.warn(e) { "Cover download failed for $mangaUrl" }
-    }
-  }
 
   private fun logToDatabase(
     level: org.gotson.komga.domain.model.LogLevel,
@@ -1824,7 +1278,13 @@ class GalleryDlWrapper(
       }
 
       logger.debug { "Writing series.json to: ${seriesJsonFile.absolutePath}" }
-      seriesJsonFile.writeText(newContent)
+      val tempFile = File(seriesJsonFile.parent, ".series.json.tmp")
+      tempFile.writeText(newContent)
+      try {
+        Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+      } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+        Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+      }
 
       if (!seriesJsonFile.exists()) {
         throw java.io.IOException("series.json file was not created")
@@ -1860,438 +1320,6 @@ class GalleryDlWrapper(
     }
   }
 
-  private fun generateZipComment(
-    mangaInfo: MangaInfo,
-    chapterInfo: ChapterInfo?,
-    chapterId: String? = null,
-  ): String {
-    val lines = mutableListOf<String>()
-    if (mangaInfo.mangaDexId != null) lines.add("Title UUID: ${mangaInfo.mangaDexId}")
-    if (chapterId != null) lines.add("Chapter UUID: $chapterId")
-    if (chapterInfo?.chapterNumber != null) lines.add("Chapter: ${chapterInfo.chapterNumber}")
-    if (chapterInfo?.volume != null) lines.add("Volume: ${chapterInfo.volume}")
-    return lines.joinToString("\n")
-  }
-
-  private fun verifyZipComment(cbzPath: Path) {
-    try {
-      ZipFile(cbzPath.toFile()).use { zf ->
-        val comment = zf.comment
-        if (comment.isNullOrBlank()) {
-          logger.warn { "ZIP comment MISSING after write: ${cbzPath.fileName}" }
-        } else {
-          logger.debug { "ZIP comment verified (${comment.length} chars): ${cbzPath.fileName}" }
-        }
-      }
-    } catch (e: Exception) {
-      logger.warn { "Could not verify ZIP comment for ${cbzPath.fileName}: ${e.message}" }
-    }
-  }
-
-  private fun generateComicInfoXml(
-    mangaInfo: MangaInfo,
-    chapterInfo: ChapterInfo?,
-    chapterUrl: String? = null,
-  ): String {
-    val seriesTitle = mangaInfo.title.escapeXml()
-    val author = mangaInfo.author?.escapeXml() ?: ""
-    val description = mangaInfo.description?.escapeXml() ?: ""
-    val genres = mangaInfo.genres.joinToString(", ") { it.escapeXml() }
-
-    val chapterTitle = chapterInfo?.chapterTitle?.escapeXml() ?: ""
-    val chapterNumber = chapterInfo?.chapterNumber
-    val volume = chapterInfo?.volume
-    val scanlationGroup = chapterInfo?.scanlationGroup?.escapeXml() ?: mangaInfo.scanlationGroup?.escapeXml() ?: ""
-    val pageCount = chapterInfo?.pages ?: 0
-    val publishDate = chapterInfo?.publishDate
-    val language = chapterInfo?.language ?: "en"
-
-    val mangaType = if (language == "ja") "YesAndRightToLeft" else "Yes"
-
-    return """<?xml version="1.0"?>
-<ComicInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <Title>$chapterTitle</Title>
-  <Series>$seriesTitle</Series>
-  ${if (chapterNumber != null) "<Number>$chapterNumber</Number>" else ""}
-  ${if (volume != null) "<Volume>$volume</Volume>" else ""}
-  ${if (description.isNotBlank()) "<Summary>$description</Summary>" else ""}
-  ${
-      if (publishDate != null && publishDate.length >= 4) {
-        "<Year>${publishDate.substring(0, 4)}</Year>"
-      } else if (mangaInfo.year != null) {
-        "<Year>${mangaInfo.year}</Year>"
-      } else {
-        ""
-      }
-    }
-  ${if (publishDate != null && publishDate.length >= 7) "<Month>${publishDate.substring(5, 7)}</Month>" else ""}
-  ${if (publishDate != null && publishDate.length >= 10) "<Day>${publishDate.substring(8, 10)}</Day>" else ""}
-  <Writer>$author</Writer>
-  <Translator>$scanlationGroup</Translator>
-  <Publisher>${mangaInfo.publisher.escapeXml()}</Publisher>
-  ${if (genres.isNotBlank()) "<Genre>$genres</Genre>" else ""}
-  <Web>${(chapterUrl ?: mangaInfo.sourceUrl ?: "").escapeXml()}</Web>
-  ${if (pageCount > 0) "<PageCount>$pageCount</PageCount>" else ""}
-  <LanguageISO>$language</LanguageISO>
-  <Manga>$mangaType</Manga>
-  ${if (mangaInfo.publicationDemographic != null) "<AgeRating>${mapDemographicToAgeRating(mangaInfo.publicationDemographic)}</AgeRating>" else ""}
-</ComicInfo>"""
-  }
-
-  private fun mapDemographicToAgeRating(demographic: String): String =
-    when (demographic.lowercase()) {
-      "shounen" -> "Teen"
-      "shoujo" -> "Everyone 10+"
-      "seinen" -> "Mature 17+"
-      "josei" -> "Mature 17+"
-      else -> "Unknown"
-    }
-
-  private fun String.escapeXml() =
-    this
-      .replace("&", "&amp;")
-      .replace("<", "&lt;")
-      .replace(">", "&gt;")
-      .replace("\"", "&quot;")
-      .replace("'", "&apos;")
-
-  private fun addComicInfoToCbz(
-    cbzPath: Path,
-    mangaInfo: MangaInfo,
-  ) {
-    try {
-      val chapterId = extractChapterId(cbzPath)
-      val chapterInfo =
-        if (chapterId != null) {
-          logger.debug { "Fetching chapter metadata for ${cbzPath.fileName} (chapter ID: $chapterId)" }
-          fetchChapterMetadata(chapterId)
-        } else {
-          logger.warn { "Could not extract chapter ID from ${cbzPath.fileName}, using series metadata only" }
-          null
-        }
-
-      val chapterUrl = if (chapterId != null) "https://mangadex.org/chapter/$chapterId" else null
-      val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
-      val zipComment = generateZipComment(mangaInfo, chapterInfo, chapterId)
-      val tempFile = cbzPath.resolveSibling("${cbzPath.fileName}.comicinfo.tmp")
-
-      try {
-        val allEntries = mutableListOf<Pair<ZipEntry, ByteArray>>()
-
-        ZipInputStream(Files.newInputStream(cbzPath)).use { zipIn ->
-          var entry = zipIn.nextEntry
-          while (entry != null) {
-            if (entry.name != "ComicInfo.xml") {
-              allEntries.add(entry to zipIn.readBytes())
-            }
-            entry = zipIn.nextEntry
-          }
-        }
-
-        ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
-          zipOut.setComment(zipComment)
-
-          zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
-          zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
-          zipOut.closeEntry()
-
-          for ((entry, data) in allEntries) {
-            zipOut.putNextEntry(ZipEntry(entry.name))
-            zipOut.write(data)
-            zipOut.closeEntry()
-          }
-        }
-
-        Files.move(tempFile, cbzPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-      } finally {
-        Files.deleteIfExists(tempFile)
-      }
-
-      verifyZipComment(cbzPath)
-
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.INFO,
-        "Injected ComicInfo.xml into ${cbzPath.fileName}" +
-          if (chapterInfo != null) " (chapter ${chapterInfo.chapterNumber})" else "",
-      )
-      logger.debug {
-        "Added ComicInfo.xml to ${cbzPath.fileName}" +
-          if (chapterInfo != null) " with chapter metadata (ch. ${chapterInfo.chapterNumber})" else ""
-      }
-    } catch (e: Exception) {
-      logToDatabase(
-        org.gotson.komga.domain.model.LogLevel.WARN,
-        "Failed to inject ComicInfo.xml into ${cbzPath.fileName}: ${e.message}",
-      )
-      logger.warn(e) { "Failed to add ComicInfo.xml to ${cbzPath.fileName}" }
-    }
-  }
-
-  private fun addComicInfoToCbzWithChapterInfo(
-    cbzPath: Path,
-    mangaInfo: MangaInfo,
-    chapterInfo: ChapterInfo?,
-    chapterUrl: String? = null,
-  ) {
-    val maxRetries = 5
-    val retryDelayMs = 1000L
-
-    val chapterId =
-      extractChapterId(cbzPath)
-        ?: chapterUrl
-          ?.substringAfterLast("/chapter/", "")
-          ?.takeIf { it.isNotEmpty() }
-    val zipComment = generateZipComment(mangaInfo, chapterInfo, chapterId)
-
-    for (attempt in 1..maxRetries) {
-      try {
-        val comicInfoXml = generateComicInfoXml(mangaInfo, chapterInfo, chapterUrl)
-        val tempFile = cbzPath.resolveSibling("${cbzPath.fileName}.tmp")
-
-        try {
-          val allEntries = mutableListOf<Pair<ZipEntry, ByteArray>>()
-
-          ZipInputStream(Files.newInputStream(cbzPath)).use { zipIn ->
-            var entry = zipIn.nextEntry
-            while (entry != null) {
-              if (entry.name != "ComicInfo.xml") {
-                allEntries.add(entry to zipIn.readBytes())
-              }
-              entry = zipIn.nextEntry
-            }
-          }
-
-          ZipOutputStream(Files.newOutputStream(tempFile)).use { zipOut ->
-            zipOut.setComment(zipComment)
-            val writtenEntries = mutableSetOf<String>()
-
-            zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
-            zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
-            zipOut.closeEntry()
-            writtenEntries.add("ComicInfo.xml")
-
-            for ((entry, data) in allEntries) {
-              if (entry.name !in writtenEntries) {
-                writtenEntries.add(entry.name)
-                zipOut.putNextEntry(ZipEntry(entry.name))
-                zipOut.write(data)
-                zipOut.closeEntry()
-              }
-            }
-          }
-
-          Files
-            .move(tempFile, cbzPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-
-          verifyZipComment(cbzPath)
-
-          logToDatabase(
-            org.gotson.komga.domain.model.LogLevel.INFO,
-            "Injected ComicInfo.xml into ${cbzPath.fileName}" +
-              if (chapterInfo != null) " (chapter ${chapterInfo.chapterNumber})" else "",
-          )
-          logger.debug {
-            "Added ComicInfo.xml to ${cbzPath.fileName}" +
-              if (chapterInfo != null) " with chapter metadata (ch. ${chapterInfo.chapterNumber})" else ""
-          }
-          return
-        } finally {
-          Files
-            .deleteIfExists(tempFile)
-        }
-      } catch (e: java.nio.file.FileSystemException) {
-        if (attempt < maxRetries) {
-          logger.debug { "File locked, retrying in ${retryDelayMs}ms (attempt $attempt/$maxRetries): ${cbzPath.fileName}" }
-          Thread.sleep(retryDelayMs * attempt)
-        } else {
-          logToDatabase(
-            org.gotson.komga.domain.model.LogLevel.WARN,
-            "Failed to inject ComicInfo.xml into ${cbzPath.fileName} after $maxRetries retries: ${e.message}",
-          )
-          logger.warn(e) { "Failed to add ComicInfo.xml to ${cbzPath.fileName} after $maxRetries retries" }
-        }
-      } catch (e: Exception) {
-        logToDatabase(
-          org.gotson.komga.domain.model.LogLevel.WARN,
-          "Failed to inject ComicInfo.xml into ${cbzPath.fileName}: ${e.message}",
-        )
-        logger.warn(e) { "Failed to add ComicInfo.xml to ${cbzPath.fileName}" }
-        return
-      }
-    }
-  }
-
-  private fun extractUrlFromZipComment(cbzFile: File): String? {
-    return try {
-      java.util.zip.ZipFile(cbzFile).use { zip ->
-        val comment = zip.comment ?: return null
-        val uuid =
-          ZIP_COMMENT_UUID_REGEX
-            .find(comment)
-            ?.groupValues
-            ?.get(1)
-            ?: return null
-        "https://mangadex.org/chapter/$uuid"
-      }
-    } catch (e: Exception) {
-      logger.debug(e) { "Failed to extract URL from ZIP comment: ${cbzFile.name}" }
-      null
-    }
-  }
-
-  private fun findSameGroupDuplicates(chapters: List<ChapterDownloadInfo>): List<ChapterDownloadInfo> {
-    val duplicates = mutableListOf<ChapterDownloadInfo>()
-    chapters
-      .filter { it.scanlationGroup != null }
-      .groupBy { Pair(it.chapterNumber, it.scanlationGroup) }
-      .values
-      .filter { it.size > 1 }
-      .forEach { group ->
-        val newest = group.maxByOrNull { it.publishDate ?: "" }
-        group.filter { it !== newest }.forEach { duplicates.add(it) }
-      }
-    return duplicates
-  }
-
-  private fun extractChapterUrlsFromCbzFiles(destDir: File): Set<String> {
-    val urls = mutableSetOf<String>()
-    val cbzFiles =
-      destDir
-        .listFiles()
-        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
-        ?: return urls
-
-    for (cbzFile in cbzFiles) {
-      try {
-        val urlFromComment = extractUrlFromZipComment(cbzFile)
-        if (urlFromComment != null) {
-          urls.add(urlFromComment)
-          continue
-        }
-        ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
-          var entry = zipIn.nextEntry
-          while (entry != null) {
-            if (entry.name == "ComicInfo.xml") {
-              val xml = zipIn.readBytes().toString(Charsets.UTF_8)
-              val match = COMICINFO_WEB_REGEX.find(xml)
-              if (match != null) {
-                val url =
-                  match.groupValues[1]
-                    .replace("&amp;", "&")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&quot;", "\"")
-                    .replace("&apos;", "'")
-                if (url.contains("mangadex.org/chapter/")) {
-                  urls.add(url)
-                }
-              }
-              break
-            }
-            entry = zipIn.nextEntry
-          }
-        }
-      } catch (e: Exception) {
-        logger.debug { "Failed to read chapter URL from ${cbzFile.name}: ${e.message}" }
-      }
-    }
-    return urls
-  }
-
-  private fun updateExistingCbzChapterUrls(
-    destDir: File,
-    allChapters: List<ChapterDownloadInfo>,
-    existingUrls: Set<String>,
-    mangaInfo: MangaInfo,
-  ) {
-    val cbzFiles =
-      destDir
-        .listFiles()
-        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
-        ?: return
-
-    val chaptersByNumber = mutableMapOf<String, MutableList<ChapterDownloadInfo>>()
-    for (ch in allChapters) {
-      val chNum = ch.chapterNumber ?: continue
-      val padded = padChapterNumber(chNum)
-      val plain =
-        try {
-          val n = chNum.toDouble()
-          if (n == n.toLong().toDouble()) n.toLong().toString() else chNum
-        } catch (_: NumberFormatException) {
-          chNum
-        }
-      chaptersByNumber.getOrPut(padded) { mutableListOf() }.add(ch)
-      if (plain != padded) {
-        chaptersByNumber.getOrPut(plain) { mutableListOf() }.add(ch)
-      }
-    }
-
-    var updated = 0
-    val alreadyUpdated = mutableSetOf<String>()
-    for (cbzFile in cbzFiles) {
-      if (cbzFile.absolutePath in alreadyUpdated) continue
-      if (hasComicInfoXml(cbzFile)) continue
-
-      val fileName = cbzFile.nameWithoutExtension
-      val nameLower = fileName.lowercase()
-      val chapterNum = extractChapterNumFromFilename(nameLower) ?: continue
-      val fileGroup =
-        SCANLATION_GROUP_REGEX
-          .find(fileName)
-          ?.groupValues
-          ?.get(1)
-          ?.trim()
-
-      val candidates = chaptersByNumber[chapterNum] ?: continue
-      val chapter =
-        if (fileGroup != null) {
-          candidates.find { it.scanlationGroup != null && fileGroup.equals(it.scanlationGroup, ignoreCase = true) }
-        } else {
-          candidates.firstOrNull()
-        } ?: continue
-
-      try {
-        val chapterInfo =
-          ChapterInfo(
-            chapterNumber = chapter.chapterNumber,
-            chapterTitle = chapter.chapterTitle,
-            volume = chapter.volume,
-            pages = chapter.pages,
-            scanlationGroup = chapter.scanlationGroup,
-            publishDate = chapter.publishDate,
-            language = chapter.language,
-          )
-        addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
-        alreadyUpdated.add(cbzFile.absolutePath)
-        updated++
-        logger.debug { "Injected missing ComicInfo.xml into ${cbzFile.name}" }
-      } catch (e: Exception) {
-        logger.debug { "Failed to update ComicInfo.xml in ${cbzFile.name}: ${e.message}" }
-      }
-    }
-
-    if (updated > 0) {
-      logger.debug { "Existing CBZ update: $updated ComicInfo injected" }
-    }
-  }
-
-  private fun hasComicInfoXml(cbzFile: File): Boolean {
-    try {
-      ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
-        var entry = zipIn.nextEntry
-        while (entry != null) {
-          if (entry.name == "ComicInfo.xml") return true
-          entry = zipIn.nextEntry
-        }
-      }
-    } catch (e: Exception) {
-      logger.debug(e) { "Failed to check ComicInfo.xml in ${cbzFile.name}" }
-      return false
-    }
-    return false
-  }
-
   private fun readSeriesJson(destinationPath: Path): Map<String, Any?>? {
     val seriesJsonFile = destinationPath.resolve("series.json").toFile()
     return if (seriesJsonFile.exists()) {
@@ -2315,7 +1343,6 @@ class GalleryDlWrapper(
     val alternativeTitlesWithLangMap = mutableMapOf<String, String>()
     var totalChapters = 0
     var category: String? = null
-
     var description: String? = null
 
     try {
@@ -2469,10 +1496,8 @@ class GalleryDlWrapper(
     line: String,
     currentFile: Int,
   ): DownloadProgress? {
-    val match = PROGRESS_REGEX.find(line) ?: return null
-
+    val match = progressRegex.find(line) ?: return null
     val percent = match.groupValues[1].toIntOrNull() ?: return null
-
     return DownloadProgress(
       currentChapter = currentFile,
       totalChapters = 0,
@@ -2480,21 +1505,6 @@ class GalleryDlWrapper(
       message = line,
     )
   }
-
-  private fun padChapterNumber(chapterNumStr: String): String =
-    try {
-      val num = chapterNumStr.toDouble()
-      if (num == num.toLong().toDouble()) {
-        String.format("%03d", num.toLong())
-      } else {
-        val intPart = num.toLong()
-        val decimalPart = chapterNumStr.substringAfter(".", "")
-        String.format("%03d.%s", intPart, decimalPart)
-      }
-    } catch (e: NumberFormatException) {
-      logger.debug(e) { "Could not pad chapter number: $chapterNumStr" }
-      chapterNumStr
-    }
 
   @Suppress("UNCHECKED_CAST")
   private fun loadChapterFailures(file: File): MutableMap<String, Int> =
@@ -2524,38 +1534,19 @@ class GalleryDlWrapper(
       logger.warn(e) { "Failed to save chapter failures" }
     }
   }
-
-  private fun normalizeDoubleBracketFilenames(dir: File) {
-    val cbzFiles =
-      dir
-        .listFiles()
-        ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
-        ?: return
-
-    for (file in cbzFiles) {
-      val name = file.nameWithoutExtension
-      if (name.contains("[[") || name.contains("]]")) {
-        val normalized =
-          name
-            .replace(Regex("""\[\['?"""), "[")
-            .replace(Regex("""'?\]\]"""), "]")
-        val newFile = File(dir, "$normalized.cbz")
-        if (!newFile.exists() && normalized != name) {
-          Files.move(file.toPath(), newFile.toPath())
-          logger.debug { "Normalized filename: ${file.name} -> $normalized.cbz" }
-        }
-      }
-    }
-  }
-
-  private fun extractChapterNumFromFilename(nameLower: String): String? {
-    val cMatch = CHAPTER_NUM_C_REGEX.find(nameLower)
-    if (cMatch != null) return cMatch.groupValues[1]
-    val chMatch = CHAPTER_NUM_CH_REGEX.find(nameLower)
-    if (chMatch != null) return chMatch.groupValues[1]
-    return null
-  }
 }
+
+data class ChapterDownloadInfo(
+  val chapterId: String,
+  val chapterNumber: String?,
+  val chapterTitle: String?,
+  val volume: String?,
+  val pages: Int,
+  val scanlationGroup: String?,
+  val publishDate: String?,
+  val language: String?,
+  val chapterUrl: String,
+)
 
 data class MangaInfo(
   val title: String,
@@ -2603,6 +1594,7 @@ data class DownloadProgress(
   val totalChapters: Int,
   val percent: Int,
   val message: String,
+  val chapterTitle: String? = null,
 )
 
 data class DownloadResult(

@@ -10,15 +10,18 @@ A `follow.txt` file in your library root tells Komga which manga to monitor for 
 
 1. Navigate to your library folder (e.g., `/manga/`)
 2. Create a file named `follow.txt`
-3. Add MangaDex URLs, one per line
+3. Add manga URLs, one per line — MangaDex and any site supported by gallery-dl
 
 ### Example follow.txt
 
 ```
-# My favorite manga to follow
+# MangaDex URLs get fast aggregate checking
 https://mangadex.org/title/a1c7c817-4e59-43b7-9365-09c5f56e5eb1
 https://mangadex.org/title/32d76d19-8a05-4db0-9fc2-e0b0648fe9d0
-https://mangadex.org/title/239d6260-d71f-43b0-afff-074e3619e3de
+
+# Other sites use gallery-dl for chapter checking
+https://mangahere.cc/manga/one_piece/
+https://hdoujin.me/12345
 
 # Comments start with #
 # Empty lines are ignored
@@ -57,7 +60,7 @@ curl -X PUT http://localhost:25600/api/v1/downloads/follow-config \
 
 1. **Scheduler runs** at configured interval
 2. **Reads follow.txt** from each library
-3. **Checks MangaDex** for new chapters
+3. **Checks for new chapters** — MangaDex via aggregate API, other sites via gallery-dl
 4. **Compares** against downloaded chapter history
 5. **Downloads** only new chapters
 6. **Updates** chapter tracking database
@@ -125,7 +128,7 @@ curl -X POST http://localhost:25600/api/v1/downloads/follow-check/{libraryId}
 
 - Verify `follow.txt` exists and is readable
 - Check if follow list checking is enabled
-- Verify MangaDex URLs are valid
+- Verify URLs are valid (MangaDex or gallery-dl supported sites)
 - Check download queue for pending items
 
 ### Duplicate downloads

@@ -10,6 +10,7 @@ import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.service.ChapterChecker
 import org.gotson.komga.domain.service.DownloadExecutor
 import org.gotson.komga.domain.service.DownloadScheduler
+import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
@@ -54,6 +55,7 @@ class DownloadController(
   private val libraryRepository: LibraryRepository,
   private val chapterChecker: ChapterChecker,
   private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
+  private val galleryDlWrapper: GalleryDlWrapper,
 ) {
   @GetMapping
   @Operation(summary = "List all downloads", tags = [TagNames.DOWNLOADS])
@@ -278,6 +280,64 @@ class DownloadController(
       mapOf(
         "foldersRenamed" to result.foldersRenamed,
         "cbzRenamed" to result.cbzRenamed,
+      ),
+    )
+  }
+
+  @PostMapping("repair-comicinfo/{libraryId}")
+  @Operation(summary = "Repair missing ComicInfo.xml and zip comments in MangaDex CBZ files", tags = [TagNames.DOWNLOADS])
+  fun repairComicInfo(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, Any>> {
+    val library =
+      libraryRepository.findByIdOrNull(libraryId)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found")
+
+    val libraryDir = library.path.toFile()
+    if (!libraryDir.isDirectory) {
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Library path is not a directory")
+    }
+
+    val uuidRegex = Regex("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+    val mangaDexDirs = mutableMapOf<String, MutableList<java.io.File>>()
+
+    libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { dir ->
+      if (uuidRegex.matches(dir.name)) {
+        mangaDexDirs.getOrPut(dir.name) { mutableListOf() }.add(dir)
+      } else {
+        val seriesJson = java.io.File(dir, "series.json")
+        if (seriesJson.exists()) {
+          try {
+            val content = seriesJson.readText()
+            val idMatch =
+              Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""").find(content)
+                ?: Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
+            if (idMatch != null) {
+              mangaDexDirs.getOrPut(idMatch.groupValues[1]) { mutableListOf() }.add(dir)
+            }
+          } catch (_: Exception) {
+          }
+        }
+      }
+    }
+
+    var totalRepaired = 0
+    var totalSkipped = 0
+    val errors = mutableListOf<String>()
+
+    for ((mangaDexId, dirs) in mangaDexDirs) {
+      val result = galleryDlWrapper.repairMissingComicInfo(mangaDexId, dirs)
+      totalRepaired += result.repaired
+      totalSkipped += result.skipped
+      if (result.error != null) errors.add("$mangaDexId: ${result.error}")
+    }
+
+    return ResponseEntity.ok(
+      mapOf(
+        "repaired" to totalRepaired,
+        "skipped" to totalSkipped,
+        "mangaProcessed" to mangaDexDirs.size,
+        "errors" to errors,
       ),
     )
   }

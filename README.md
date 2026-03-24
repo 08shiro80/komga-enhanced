@@ -22,7 +22,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 | No guest browsing for family | **Guest/Kiosk mode** - read-only browsing without login, per-library access control |
 | Migrating from Tachiyomi/Mihon | **Backup import** extracts your MangaDex follows |
 | Long vertical webtoon pages | **Page splitting** like TachiyomiSY |
-| Missing metadata | **MangaDex & AniList plugins** for rich metadata |
+| Missing metadata | **MangaDex, AniList & Kitsu plugins** for rich metadata |
 | No server logs in UI | **Web-based log viewer** - real-time auto-refresh, search, color-coded levels |
 | Bland default theme | **7 color themes** - AMOLED, Nord, Dracula, Solarized, Green, Red + Default |
 
@@ -38,7 +38,8 @@ Download manga from MangaDex and other manga/image sites via [gallery-dl](https:
 - **Real-time progress** via Server-Sent Events (SSE)
 - **ComicInfo.xml injection** - metadata embedded in every CBZ
 - **UUID folder names** - uses MangaDex UUID as folder name, immune to title changes and mislabeled titles
-- **Crash recovery** - skips already-downloaded chapters via DB + filesystem checks
+- **Crash recovery** - skips already-downloaded chapters via DB + filesystem checks, auto-resumes interrupted downloads on restart
+- **Repair ComicInfo** - retroactively inject missing ComicInfo.xml and ZIP comments into existing MangaDex CBZ files
 - **Rate limiting** - respects site-specific API limits
 - **Multi-language support** - 36 languages, shared across all plugins (one setting)
 - **Automatic publisher detection** - derives publisher from source site (MangaDex, Mangahere, etc.)
@@ -145,6 +146,12 @@ Rich metadata from multiple sources:
 - Configurable title preference (English/Romaji/Native)
 - Detailed series information
 
+**Kitsu Metadata Plugin:**
+- Fetches title, synopsis, authors, genres, age rating
+- Alternative titles in multiple languages
+- Cover art downloading
+- No API key required
+
 ### Chapter Blacklist
 
 Permanently prevent unwanted chapters from being re-downloaded:
@@ -213,70 +220,9 @@ New chapters are automatically scanned after download completes:
 
 ---
 
-## API Endpoints
+## API
 
-### Downloads
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/downloads` | List download queue |
-| POST | `/api/v1/downloads` | Add download to queue |
-| DELETE | `/api/v1/downloads/{id}` | Cancel/remove download |
-| DELETE | `/api/v1/downloads/clear/completed` | Clear completed |
-| DELETE | `/api/v1/downloads/clear/failed` | Clear failed |
-| DELETE | `/api/v1/downloads/clear/cancelled` | Clear cancelled |
-| DELETE | `/api/v1/downloads/clear/pending` | Clear pending |
-| GET | `/api/v1/downloads/progress` | SSE progress stream |
-| POST | `/api/v1/downloads/check-new` | Check for new chapters and queue |
-| POST | `/api/v1/downloads/check-only` | Check for new chapters only |
-| POST | `/api/v1/downloads/{libraryId}/migrate-to-uuid` | Migrate title folders to UUID names |
-
-### Chapter Blacklist
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/books/{bookId}/blacklist` | Blacklist a book's chapter |
-| DELETE | `/api/v1/books/{bookId}/blacklist` | Remove from blacklist |
-| GET | `/api/v1/books/{bookId}/blacklist` | Check if blacklisted |
-| GET | `/api/v1/series/{seriesId}/blacklist` | List blacklisted chapters |
-| POST | `/api/v1/series/{seriesId}/blacklist` | Manually add URL to blacklist |
-| DELETE | `/api/v1/series/{seriesId}/blacklist/{id}` | Remove blacklist entry |
-
-### Follow Configuration
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/downloads/follow-config` | Get follow settings |
-| PUT | `/api/v1/downloads/follow-config` | Update follow settings |
-
-### Media Management
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/media-management/oversized-pages` | List oversized pages |
-| POST | `/api/v1/media-management/oversized-pages/split/{bookId}` | Split book pages |
-| POST | `/api/v1/media-management/oversized-pages/split-all` | Split all oversized |
-
-### Page Hashes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| DELETE | `/api/v1/page-hashes/{pageHash}` | Remove known duplicate page hash |
-
-### Logs
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/logs?lines=500` | Last N log lines (admin) |
-| GET | `/api/v1/logs/download` | Download full log file |
-
-### System
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/health` | Health check |
-| POST | `/api/v1/tachiyomi/import` | Import Tachiyomi backup |
-| GET | `/api/v1/releases/fork` | Fork releases from GitHub |
+Full API documentation with request/response examples: **[API Reference](docs/api-reference.md)**
 
 ---
 
@@ -420,7 +366,7 @@ komga:
 | Color Themes | No | 7 presets |
 | Tachiyomi Import | No | Yes |
 | Page Splitting | No | Yes |
-| AniList Metadata | No | Yes |
+| AniList & Kitsu Metadata | No | Yes |
 | Real-time Progress | No | Yes (SSE) |
 
 ---

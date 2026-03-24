@@ -1,6 +1,6 @@
 # Metadata Plugins
 
-Enhance your library with rich metadata from MangaDex and AniList.
+Enhance your library with rich metadata from MangaDex, AniList, and Kitsu.
 
 ## Available Plugins
 
@@ -8,6 +8,7 @@ Enhance your library with rich metadata from MangaDex and AniList.
 |--------|--------|----------|
 | MangaDex | MangaDex API | Titles, descriptions, authors, tags, covers |
 | AniList | AniList GraphQL | Titles, descriptions, genres, scores, staff |
+| Kitsu | Kitsu API | Titles, synopsis, authors, genres, age rating, covers |
 
 ## MangaDex Metadata Plugin
 
@@ -123,6 +124,24 @@ Or with URL:
 }
 ```
 
+## Kitsu Metadata Plugin
+
+Fetches metadata from the Kitsu API. No API key required.
+
+### Features
+
+- Canonical and alternative titles in multiple languages
+- Synopsis
+- Author and staff information
+- Genre mapping
+- Age rating
+- Cover images
+- Publication status
+
+### How It Works
+
+Search for a manga by title via **Series → Search Online Metadata → Kitsu**. Select a result to apply metadata.
+
 ## Plugin Priority
 
 When multiple plugins can provide metadata:
@@ -130,7 +149,8 @@ When multiple plugins can provide metadata:
 1. Local `series.json` overrides always take priority
 2. MangaDex plugin runs first (if URL available)
 3. AniList plugin runs second (if ID available)
-4. Existing Komga metadata preserved if not overwritten
+4. Kitsu plugin available for manual search
+5. Existing Komga metadata preserved if not overwritten
 
 ## Automatic Detection
 

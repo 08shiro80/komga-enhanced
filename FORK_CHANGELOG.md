@@ -8,7 +8,13 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ## [0.1.2] - 2026-03-22
 
+### New Features
+- **Download resume after crash/restart** — Downloads stuck in DOWNLOADING status (e.g. after server crash) are automatically recovered to PENDING on startup via `ContextRefreshedEvent`. Combined with existing chapter URL tracking, downloads resume from where they left off instead of starting over. Resume progress is logged with "Resuming: X/Y chapters already downloaded, Z remaining".
+- **Kitsu metadata provider** — New `OnlineMetadataProvider` plugin fetching series-level metadata from Kitsu API (kitsu.app). Provides titles, synopsis, genres, authors, age rating, cover images, and alternative titles in multiple languages. No API key required.
+
 ### Bug Fixes
+- **Kitsu metadata search fails** — `PluginController.getMetadataProvider()` was missing the `"kitsu-metadata"` routing, so searching via Kitsu always returned "Failed to search metadata". Added KitsuMetadataPlugin constructor parameter and when-branch.
+- **Download progress shows "45/45" incrementing together** — Non-MangaDex bulk downloads (mangahere, rawkuma etc.) showed current and total incrementing together (45/45 → 49/49) because `totalChapters` was set to the current count when unknown. Now defaults to 0, which maps to `null` in the WebSocket DTO so the frontend shows only the current count.
 - **Cover image not loaded after download** — `scanSeriesFolder()` (targeted scan after download) did not trigger `refreshSeriesLocalArtwork`, so the `cover.jpg` downloaded by gallery-dl was only picked up on the next full library scan.
 - **MangaDex feed missing chapters for certain content ratings** — Feed API calls did not include `contentRating[]` parameters, so the API applied its default filter which excludes some rating categories. Added all four content rating levels to feed requests in GalleryDlWrapper and MangaDexSubscriptionSyncer.
 - **MangaDex subscription feed always fails with 400** — `publishAtSince` was formatted with `ISO_OFFSET_DATE_TIME` (`2026-03-21T08:43:24.6358255Z`) but MangaDex requires exact `YYYY-MM-DDTHH:mm:ss` without fractional seconds or timezone suffix. Also sanitizes old DB values on read.
@@ -19,10 +25,22 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **gallery-dl process leak in `isInstalled()`** — `process.waitFor(5s)` timeout left process running. Now calls `destroyForcibly()` on timeout.
 - **Reader threads not interrupted after join timeout** — stdout/stderr reader threads continued running after `join(5000)` timeout. Now interrupted if still alive.
 
+### New Features
+- **Repair ComicInfo endpoint** — New `POST /api/v1/downloads/repair-comicinfo/{libraryId}` endpoint to retroactively inject missing ComicInfo.xml and ZIP comments into existing MangaDex CBZ files. Scans library directory for MangaDex folders (UUID-named or containing series.json with MangaDex ID), fetches chapter metadata from MangaDex API, and repairs each CBZ. Skips files that already have a ZIP comment.
+- **Target library selection for MangaDex Subscription** — New `Target Library` config field lets users choose which library receives downloaded manga by name. Falls back to the first library if empty or not found.
+
 ### Improved
+- **Target library as dropdown selection** — MangaDex Subscription's `Target Library` config field is now a dropdown populated with existing library names instead of a free-text input. Uses `dynamicEnum: "libraries"` schema marker to fetch libraries at dialog open time. Clearable (falls back to first library).
+- **Plugin config dialog shows only schema-defined fields** — Frontend config dialog now iterates schema properties instead of all DB values. Orphan config entries (e.g. removed `language` field from subscription plugin) no longer show as untyped text fields.
 - **36 languages in plugin dropdown** — MangaDex Subscription and gallery-dl Downloader language selection expanded from 10 to 36 languages (added zh-hk, es-la, pt-br, pl, tr, nl, id, ms, th, vi, ar, uk, hu, ro, cs, bg, el, da, fi, sv, no, lt, ca, hr, tl, hi).
 
+### Refactored
+- **GalleryDlWrapper split into 4 focused components** — Extracted `MangaDexApiClient` (API calls, metadata fetching, caching, rate limiting via `MangaDexRateLimiter`), `ComicInfoGenerator` (XML generation, ZIP comment, CBZ metadata injection), `GalleryDlProcess` (subprocess management, config files, environment setup), and `ChapterMatcher` (filename regex, chapter URL extraction, duplicate detection). `GalleryDlWrapper` remains as the facade — all 6 consumer classes still reference only `GalleryDlWrapper`. `ChapterDownloadInfo` moved from nested class to top-level. Dead code `downloadCover()` (gallery-dl based) removed.
+
 ### Performance
+- **Plugin config caching (60s TTL)** — `GalleryDlWrapper` now caches plugin config in memory instead of querying the database on every method call. Reduces DB queries during downloads.
+- **Atomic series.json writes** — `series.json` is now written to a temp file first, then moved atomically (`ATOMIC_MOVE` with fallback). Prevents corruption if process crashes mid-write.
+- **Background cache eviction** — Chapter cache, manga info cache, and plugin config cache are now evicted by a scheduled job every 10 minutes instead of only on access.
 - **Pre-compiled regex constants in GalleryDlWrapper** — 5 regex patterns (`extractChapterId`, `extractChapterNumberFromFilename`, `parseGalleryDlProgress`, `extractChapterNumFromFilename`, scanlation group) moved from per-call compilation to companion object constants.
 - **Single directory traversal after download** — Replaced 2× `walkTopDown()` + 1× `listFiles()` with a single `walkTopDown()` pass for CBZ file collection and empty directory cleanup.
 - **Cached library list in ChapterChecker** — `libraryRepository.findAll()` called once in `checkUrls()` and passed through to `checkSingleUrl()`, `findSeriesForManga()`, and `buildFolderIndex()`. Eliminates ~300 redundant DB queries per chapter check run.
@@ -34,9 +52,16 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | File | Changes |
 |------|---------|
 | `MangaDexSubscriptionSyncer.kt` | `last_check_time` sanitized with `.take(19)`, `initializeList()` removed, batch dedup uses `findByMangaDexUuid()` on-demand |
-| `PluginInitializer.kt` | 36 languages in both plugin configSchemas, CustomList removed from description |
-| `GalleryDlWrapper.kt` | `contentRating[]` params, pre-compiled regex, single dir traversal, blacklist per series, process/thread cleanup |
+| `PluginInitializer.kt` | 36 languages in both plugin configSchemas, CustomList removed from description, `dynamicEnum: "libraries"` for target_library |
+| `GalleryDlWrapper.kt` | Refactored to facade pattern — delegates to 4 new components. `ChapterDownloadInfo` moved to top-level. Plugin config cache + orchestration retained. |
+| `MangaDexApiClient.kt` | **New** — All MangaDex HTTP API calls, chapter/manga caching, uses `MangaDexRateLimiter` |
+| `ComicInfoGenerator.kt` | **New** — ComicInfo.xml generation, ZIP comment, CBZ injection with retry |
+| `GalleryDlProcess.kt` | **New** — gallery-dl subprocess management, config files, environment setup |
+| `ChapterMatcher.kt` | **New** — Filename regex patterns, chapter matching, URL extraction from CBZ, duplicate detection |
+| `PluginManager.vue` | Dynamic library dropdown via `resolveDynamicEnums()`, `clearable` v-select for dynamicEnum fields |
 | `ChapterChecker.kt` | Executor try-finally, cached library list passed through call chain |
+| `PluginController.kt` | Added Kitsu metadata routing (`"kitsu-metadata"` when-branch) |
+| `DownloadController.kt` | New `repair-comicinfo/{libraryId}` endpoint |
 | `LibraryContentLifecycle.kt` | Hash set computed once in series restore |
 | `README.md` | CustomList references removed, auto-blacklist docs updated |
 

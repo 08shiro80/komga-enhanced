@@ -14,6 +14,8 @@ import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.interfaces.api.websocket.DownloadProgressDto
 import org.gotson.komga.interfaces.api.websocket.DownloadProgressHandler
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.context.event.ContextRefreshedEvent
+import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.nio.file.Files
@@ -56,6 +58,24 @@ class DownloadExecutor(
     Executors.newSingleThreadExecutor { r ->
       Thread(r, "download-worker").apply { isDaemon = true }
     }
+
+  @EventListener(ContextRefreshedEvent::class)
+  fun recoverStaleDownloads() {
+    val stale = downloadQueueRepository.findByStatus(DownloadStatus.DOWNLOADING)
+    if (stale.isEmpty()) return
+
+    logger.info { "Recovering ${stale.size} stale DOWNLOADING entries from previous run" }
+    stale.forEach { download ->
+      downloadQueueRepository.update(
+        download.copy(
+          status = DownloadStatus.PENDING,
+          errorMessage = "Recovered after restart (was at ${download.currentChapter ?: 0}/${download.totalChapters ?: "?"} chapters)",
+          lastModifiedDate = LocalDateTime.now(),
+        ),
+      )
+      logger.info { "Reset to PENDING: ${download.id} - ${download.title} (was at chapter ${download.currentChapter ?: 0}/${download.totalChapters ?: "?"})" }
+    }
+  }
 
   @PreDestroy
   fun shutdown() {
@@ -502,6 +522,7 @@ class DownloadExecutor(
               filesDownloaded = progress.currentChapter,
               percentage = progress.percent,
               error = null,
+              chapterTitle = progress.chapterTitle,
             ),
           )
           eventPublisher.publishEvent(

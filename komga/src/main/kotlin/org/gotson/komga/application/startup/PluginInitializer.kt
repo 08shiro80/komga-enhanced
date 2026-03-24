@@ -100,6 +100,21 @@ class PluginInitializer(
           dependencies = null,
         ),
         Plugin(
+          id = "kitsu-metadata",
+          name = "Kitsu Metadata Provider",
+          version = "1.0.0",
+          author = "Komga Team",
+          description = "Fetches manga metadata from the Kitsu API (kitsu.app). Provides series-level metadata including titles, synopsis, genres, authors, age rating, and alternative titles.",
+          enabled = true,
+          pluginType = PluginType.METADATA,
+          entryPoint = "org.gotson.komga.infrastructure.metadata.kitsu.KitsuMetadataPlugin",
+          sourceUrl = "https://kitsu.app",
+          installedDate = LocalDateTime.now(),
+          lastUpdated = LocalDateTime.now(),
+          configSchema = null,
+          dependencies = null,
+        ),
+        Plugin(
           id = "mangadex-subscription",
           name = "MangaDex Subscription Sync",
           version = "1.0.0",
@@ -141,6 +156,12 @@ class PluginInitializer(
                   "title": "Check Interval (minutes)",
                   "default": 30,
                   "description": "How often to check the subscription feed for new chapters"
+                },
+                "target_library": {
+                  "type": "string",
+                  "title": "Target Library",
+                  "description": "Library where new manga will be downloaded. If empty or not found, uses the first library.",
+                  "dynamicEnum": "libraries"
                 }
               },
               "required": ["client_id", "client_secret", "username", "password"]

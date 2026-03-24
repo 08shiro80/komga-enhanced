@@ -126,6 +126,25 @@ event: error
 data: {"id":"abc123","error":"Rate limited"}
 ```
 
+### Repair ComicInfo
+
+Retroactively inject missing ComicInfo.xml and ZIP comments into existing MangaDex CBZ files.
+
+```http
+POST /api/v1/downloads/repair-comicinfo/{libraryId}
+```
+
+Response:
+
+```json
+{
+  "mangaProcessed": 5,
+  "repaired": 12,
+  "skipped": 88,
+  "errors": []
+}
+```
+
 ## Follow Configuration API
 
 ### Get Configuration

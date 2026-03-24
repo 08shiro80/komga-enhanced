@@ -8,6 +8,7 @@ import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.service.OnlineMetadataProvider
 import org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer
 import org.gotson.komga.infrastructure.metadata.anilist.AniListMetadataPlugin
+import org.gotson.komga.infrastructure.metadata.kitsu.KitsuMetadataPlugin
 import org.gotson.komga.infrastructure.metadata.mangadex.MangaDexMetadataPlugin
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
 import org.gotson.komga.interfaces.api.rest.dto.PluginDto
@@ -38,12 +39,14 @@ class PluginController(
   private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
   private val mangaDexMetadataPlugin: MangaDexMetadataPlugin,
   private val aniListMetadataPlugin: AniListMetadataPlugin,
+  private val kitsuMetadataPlugin: KitsuMetadataPlugin,
   private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
 ) {
   private fun getMetadataProvider(pluginId: String): OnlineMetadataProvider? =
     when (pluginId) {
       "mangadex-metadata" -> mangaDexMetadataPlugin
       "anilist-metadata" -> aniListMetadataPlugin
+      "kitsu-metadata" -> kitsuMetadataPlugin
       else -> null
     }
 

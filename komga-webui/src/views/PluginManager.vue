@@ -155,14 +155,15 @@
           </v-alert>
 
           <v-form ref="configForm">
-            <template v-for="(value, key) in pluginConfig">
+            <template v-for="key in configKeys">
               <v-select
-                v-if="getSchemaField(key).enum"
+                v-if="getSchemaField(key).enum || getSchemaField(key).dynamicEnum"
                 :key="key"
                 v-model="pluginConfig[key]"
-                :items="getSchemaField(key).enum"
+                :items="getSchemaField(key).enum || []"
                 :label="getSchemaField(key).title || formatConfigKey(key)"
                 :hint="getSchemaField(key).description"
+                :clearable="!!getSchemaField(key).dynamicEnum"
                 persistent-hint
                 outlined
                 dense
@@ -323,6 +324,12 @@ export default {
       if (!this.logLevelFilter) return this.pluginLogs
       return this.pluginLogs.filter(log => log.logLevel === this.logLevelFilter)
     },
+    configKeys() {
+      if (this.parsedSchema?.properties) {
+        return Object.keys(this.parsedSchema.properties)
+      }
+      return Object.keys(this.pluginConfig || {})
+    },
   },
   mounted() {
     const savedPageSize = this.$store?.state?.persistedState?.dataTablePageSize
@@ -403,6 +410,7 @@ export default {
                     : ''
                 }
               })
+              await this.resolveDynamicEnums(this.parsedSchema.properties)
             }
           } catch (e) {
             this.parsedSchema = null
@@ -455,6 +463,19 @@ export default {
         this.showError(this.$t('plugin_manager.snack_logs_clear_failed') + ': ' + error.message)
       } finally {
         this.clearingLogs = false
+      }
+    },
+    async resolveDynamicEnums(properties) {
+      for (const key of Object.keys(properties)) {
+        const field = properties[key]
+        if (field.dynamicEnum === 'libraries') {
+          try {
+            const response = await this.$http.get('/api/v1/libraries')
+            field.enum = response.data.map(lib => lib.name)
+          } catch (e) {
+            field.enum = []
+          }
+        }
       }
     },
     getSchemaField(key) {
