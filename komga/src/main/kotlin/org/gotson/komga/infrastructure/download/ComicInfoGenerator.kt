@@ -190,7 +190,7 @@ class ComicInfoGenerator {
         }
       }
     } catch (e: Exception) {
-      logger.debug(e) { "Failed to check ComicInfo.xml in ${cbzFile.name}" }
+      logger.warn(e) { "Failed to check ComicInfo.xml in ${cbzFile.name}" }
       return false
     }
     return false

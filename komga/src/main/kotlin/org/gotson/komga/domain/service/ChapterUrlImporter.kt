@@ -175,7 +175,8 @@ class ChapterUrlImporter(
               ?.toIntOrNull(),
         )
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to extract ZIP comment from ${cbzFile.name}" }
       return null
     }
   }
@@ -264,7 +265,8 @@ class ChapterUrlImporter(
       val metadata = json["metadata"] as? Map<*, *> ?: return null
       val comicId = metadata["comicid"] as? String
       if (comicId.isNullOrBlank()) null else comicId
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to read series.json for ${series.name}" }
       null
     }
   }
@@ -282,7 +284,8 @@ class ChapterUrlImporter(
         ?.firstNotNullOfOrNull { link ->
           mangaDexTitleRegex.find(link.url.toString())?.groupValues?.get(1)
         }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to extract UUID from metadata links for ${series.name}" }
       null
     }
 

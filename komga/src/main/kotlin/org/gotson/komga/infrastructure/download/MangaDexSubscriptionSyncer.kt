@@ -326,7 +326,7 @@ class MangaDexSubscriptionSyncer(
           queued++
           logger.info { "New followed manga, queued full download: $mangaId" }
         } catch (e: Exception) {
-          logger.warn { "Failed to queue new manga $mangaId: ${e.message}" }
+          logger.warn(e) { "Failed to queue new manga $mangaId" }
         }
       }
 
@@ -442,7 +442,7 @@ class MangaDexSubscriptionSyncer(
           queued++
           logger.info { "Queued $mangaId: ${chapters.size} new chapters (${chapters.map { it.chapter }.joinToString(", ")})" }
         } catch (e: Exception) {
-          logger.warn { "Failed to queue $mangaId: ${e.message}" }
+          logger.warn(e) { "Failed to queue $mangaId" }
         }
       }
 

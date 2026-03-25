@@ -188,8 +188,10 @@ Read-only browsing without login — perfect for family or shared setups:
 
 Admin-only log viewer in **Settings → Logs**:
 
+- **Live streaming** via SSE — real-time log tailing without polling
+- **Pause/Resume** — buffer incoming logs while paused, flush on resume
+- **Debug toggle** — switch between INFO and DEBUG log level at runtime (no restart)
 - Color-coded log levels (ERROR=red, WARN=orange, DEBUG=grey)
-- Auto-refresh (5-second polling)
 - Client-side search/filter
 - Full log file download
 

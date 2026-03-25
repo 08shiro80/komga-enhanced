@@ -62,6 +62,4 @@ output/
 secret/
 
 ##Ignore
-CLAUDE.md
 gradle-tasks.txt
-backup/

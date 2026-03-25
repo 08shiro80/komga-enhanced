@@ -612,7 +612,7 @@ class GalleryDlWrapper(
                 if (it.isNotEmpty()) logger.debug { "Fetched ${it.size} chapters from MangaDex API" }
               }
             } catch (e: Exception) {
-              logger.debug(e) { "Failed to fetch chapters from MangaDex API" }
+              logger.warn(e) { "Failed to fetch chapters from MangaDex API for $mangaDexId" }
               emptyList()
             }
           } else {
@@ -1282,7 +1282,8 @@ class GalleryDlWrapper(
       tempFile.writeText(newContent)
       try {
         Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-      } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+      } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
+        logger.debug(e) { "Atomic move not supported, falling back to regular move for series.json" }
         Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
       }
 
@@ -1573,7 +1574,8 @@ data class MangaInfo(
         host
           .substringBeforeLast(".")
           .replaceFirstChar { it.uppercaseChar() }
-      } catch (_: Exception) {
+      } catch (e: Exception) {
+        logger.debug(e) { "Failed to derive publisher from URL: $url" }
         "Unknown"
       }
     }

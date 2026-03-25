@@ -104,7 +104,7 @@ class MangaDexApiClient(
         null
       }
     } catch (e: Exception) {
-      logger.debug { "Failed to get MangaDex chapter count for $mangaDexId: ${e.message}" }
+      logger.warn(e) { "Failed to get MangaDex chapter count for $mangaDexId" }
       null
     }
 

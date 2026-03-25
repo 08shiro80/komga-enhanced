@@ -26,7 +26,7 @@ class GalleryDlProcess {
       }
       process.exitValue() == 0
     } catch (e: Exception) {
-      logger.debug { "gallery-dl not found: ${e.message}" }
+      logger.warn(e) { "gallery-dl not found" }
       false
     }
   }

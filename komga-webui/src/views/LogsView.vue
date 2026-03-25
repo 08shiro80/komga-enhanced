@@ -29,12 +29,36 @@
         />
       </v-col>
       <v-col cols="auto">
-        <v-btn-toggle v-model="autoRefresh" dense>
-          <v-btn :value="true" small>
-            <v-icon small left>mdi-refresh-auto</v-icon>
-            Auto
-          </v-btn>
-        </v-btn-toggle>
+        <v-switch
+          v-model="debugMode"
+          label="Debug"
+          dense
+          hide-details
+          class="mt-0"
+          :loading="levelLoading"
+          @change="toggleLogLevel"
+        />
+      </v-col>
+      <v-col cols="auto">
+        <v-btn
+          :color="streaming ? 'success' : 'grey'"
+          @click="toggleStream"
+          small
+        >
+          <v-icon small left>{{ streaming ? 'mdi-play' : 'mdi-play-outline' }}</v-icon>
+          Live
+        </v-btn>
+      </v-col>
+      <v-col cols="auto">
+        <v-btn
+          :disabled="!streaming"
+          :color="paused ? 'warning' : 'grey'"
+          @click="togglePause"
+          small
+        >
+          <v-icon small left>{{ paused ? 'mdi-pause' : 'mdi-pause-circle-outline' }}</v-icon>
+          Pause
+        </v-btn>
       </v-col>
       <v-col cols="auto">
         <v-btn color="primary" @click="fetchLogs" :loading="loading" small>
@@ -69,39 +93,36 @@ import urls from '@/functions/urls'
 export default Vue.extend({
   name: 'LogsView',
   data: () => ({
-    logText: '',
+    logLines: [] as string[],
     search: '',
     lines: 500,
     lineOptions: [100, 250, 500, 1000, 2500, 5000],
-    autoRefresh: false,
     loading: false,
-    refreshTimer: null as number | null,
+    debugMode: false,
+    levelLoading: false,
+    streaming: false,
+    paused: false,
+    eventSource: null as EventSource | null,
+    pauseBuffer: [] as string[],
   }),
   computed: {
     filteredLines(): string[] {
-      const allLines = this.logText.split('\n')
-      if (!this.search) return allLines
+      if (!this.search) return this.logLines
       const s = this.search.toLowerCase()
-      return allLines.filter(l => l.toLowerCase().includes(s))
+      return this.logLines.filter(l => l.toLowerCase().includes(s))
     },
   },
   watch: {
-    autoRefresh(val) {
-      if (val) {
-        this.startAutoRefresh()
-      } else {
-        this.stopAutoRefresh()
-      }
-    },
     lines() {
       this.fetchLogs()
     },
   },
   mounted() {
+    this.fetchLogLevel()
     this.fetchLogs()
   },
   beforeDestroy() {
-    this.stopAutoRefresh()
+    this.stopStream()
   },
   methods: {
     async fetchLogs() {
@@ -111,31 +132,101 @@ export default Vue.extend({
           params: {lines: this.lines},
           headers: {Accept: 'text/plain'},
         })
-        this.logText = resp.data
-        this.$nextTick(() => {
-          const el = this.$refs.logContainer as HTMLElement
-          if (el) el.scrollTop = el.scrollHeight
-        })
+        this.logLines = (resp.data as string).split('\n')
+        this.scrollToBottom()
       } catch (e) {
-        this.logText = 'Failed to load logs.'
+        this.logLines = ['Failed to load logs.']
       } finally {
         this.loading = false
       }
     },
+    async fetchLogLevel() {
+      try {
+        const resp = await this.$http.get('/api/v1/logs/level')
+        this.debugMode = resp.data.level === 'DEBUG' || resp.data.level === 'TRACE'
+      } catch {
+        this.debugMode = false
+      }
+    },
+    async toggleLogLevel(val: boolean) {
+      this.levelLoading = true
+      try {
+        await this.$http.post('/api/v1/logs/level', null, {
+          params: {level: val ? 'DEBUG' : 'INFO'},
+        })
+      } catch {
+        this.debugMode = !val
+      } finally {
+        this.levelLoading = false
+      }
+    },
+    toggleStream() {
+      if (this.streaming) {
+        this.stopStream()
+      } else {
+        this.startStream()
+      }
+    },
+    startStream() {
+      this.stopStream()
+      const url = `${urls.originNoSlash}/api/v1/logs/stream`
+      this.eventSource = new EventSource(url)
+      this.streaming = true
+      this.paused = false
+      this.pauseBuffer = []
+
+      this.eventSource.onmessage = (event: MessageEvent) => {
+        if (this.paused) {
+          this.pauseBuffer.push(event.data)
+          return
+        }
+        this.appendLine(event.data)
+      }
+
+      this.eventSource.onerror = () => {
+        this.streaming = false
+        this.paused = false
+        if (this.eventSource) {
+          this.eventSource.close()
+          this.eventSource = null
+        }
+      }
+    },
+    stopStream() {
+      if (this.eventSource) {
+        this.eventSource.close()
+        this.eventSource = null
+      }
+      this.streaming = false
+      this.paused = false
+      this.pauseBuffer = []
+    },
+    togglePause() {
+      if (this.paused) {
+        for (const line of this.pauseBuffer) {
+          this.appendLine(line)
+        }
+        this.pauseBuffer = []
+        this.paused = false
+      } else {
+        this.paused = true
+      }
+    },
+    appendLine(line: string) {
+      this.logLines.push(line)
+      while (this.logLines.length > this.lines) {
+        this.logLines.shift()
+      }
+      this.scrollToBottom()
+    },
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const el = this.$refs.logContainer as HTMLElement
+        if (el) el.scrollTop = el.scrollHeight
+      })
+    },
     downloadLogs() {
       window.open(`${urls.originNoSlash}/api/v1/logs/download`, '_blank')
-    },
-    startAutoRefresh() {
-      this.stopAutoRefresh()
-      this.refreshTimer = window.setInterval(() => {
-        this.fetchLogs()
-      }, 5000)
-    },
-    stopAutoRefresh() {
-      if (this.refreshTimer !== null) {
-        window.clearInterval(this.refreshTimer)
-        this.refreshTimer = null
-      }
     },
     logLevelClass(line: string): string {
       if (line.includes(' ERROR ')) return 'log-error'

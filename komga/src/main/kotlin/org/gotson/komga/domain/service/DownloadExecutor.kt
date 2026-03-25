@@ -773,7 +773,8 @@ class DownloadExecutor(
               try {
                 val content = seriesJson.readText()
                 content.contains(mangaDexId) || content.contains(idWithSpaces)
-              } catch (_: Exception) {
+              } catch (e: Exception) {
+                logger.warn(e) { "Failed to read series.json in ${dir.name}" }
                 false
               }
           }
@@ -815,7 +816,8 @@ class DownloadExecutor(
       val content =
         try {
           seriesJson.readText()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+          logger.warn(e) { "Failed to read series.json in ${folder.name}" }
           continue
         }
 
@@ -908,7 +910,8 @@ class DownloadExecutor(
         val content = zip.getInputStream(entry).bufferedReader().readText()
         Regex("""<Volume>(\d+)</Volume>""").find(content)?.groupValues?.get(1)
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to extract volume from CBZ: ${cbzFile.name}" }
       null
     }
 
@@ -930,7 +933,8 @@ class DownloadExecutor(
         .findByPluginIdAndKey("gallery-dl-downloader", "folder_naming")
         ?.configValue
         ?: "uuid"
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to read folder_naming config, defaulting to uuid" }
       "uuid"
     }
 

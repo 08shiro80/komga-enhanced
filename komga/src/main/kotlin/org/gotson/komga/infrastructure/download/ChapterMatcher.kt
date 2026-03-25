@@ -101,7 +101,7 @@ class ChapterMatcher {
         "https://mangadex.org/chapter/$uuid"
       }
     } catch (e: Exception) {
-      logger.debug(e) { "Failed to extract URL from ZIP comment: ${cbzFile.name}" }
+      logger.warn(e) { "Failed to extract URL from ZIP comment: ${cbzFile.name}" }
       null
     }
 
@@ -144,7 +144,7 @@ class ChapterMatcher {
           }
         }
       } catch (e: Exception) {
-        logger.debug { "Failed to read chapter URL from ${cbzFile.name}: ${e.message}" }
+        logger.warn(e) { "Failed to read chapter URL from ${cbzFile.name}" }
       }
     }
     return urls

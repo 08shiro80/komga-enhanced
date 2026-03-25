@@ -315,7 +315,8 @@ class DownloadController(
             if (idMatch != null) {
               mangaDexDirs.getOrPut(idMatch.groupValues[1]) { mutableListOf() }.add(dir)
             }
-          } catch (_: Exception) {
+          } catch (e: Exception) {
+            logger.warn(e) { "Failed to read series.json in ${dir.name}" }
           }
         }
       }

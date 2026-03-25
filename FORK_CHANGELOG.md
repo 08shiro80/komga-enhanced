@@ -27,12 +27,17 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ### New Features
 - **Repair ComicInfo endpoint** — New `POST /api/v1/downloads/repair-comicinfo/{libraryId}` endpoint to retroactively inject missing ComicInfo.xml and ZIP comments into existing MangaDex CBZ files. Scans library directory for MangaDex folders (UUID-named or containing series.json with MangaDex ID), fetches chapter metadata from MangaDex API, and repairs each CBZ. Skips files that already have a ZIP comment.
+- **Dynamic log level toggle** — New Debug switch in the web log viewer (`Settings → Logs`) to toggle between INFO and DEBUG log level at runtime via `GET/POST /api/v1/logs/level`. No server restart needed, resets to INFO on restart.
+- **Live log streaming via SSE** — New `GET /api/v1/logs/stream` SSE endpoint tails the log file in real-time. Web log viewer has Live/Pause buttons replacing the old 5-second polling. Pause buffers incoming lines and flushes on unpause.
 - **Target library selection for MangaDex Subscription** — New `Target Library` config field lets users choose which library receives downloaded manga by name. Falls back to the first library if empty or not found.
 
 ### Improved
 - **Target library as dropdown selection** — MangaDex Subscription's `Target Library` config field is now a dropdown populated with existing library names instead of a free-text input. Uses `dynamicEnum: "libraries"` schema marker to fetch libraries at dialog open time. Clearable (falls back to first library).
 - **Plugin config dialog shows only schema-defined fields** — Frontend config dialog now iterates schema properties instead of all DB values. Orphan config entries (e.g. removed `language` field from subscription plugin) no longer show as untyped text fields.
 - **36 languages in plugin dropdown** — MangaDex Subscription and gallery-dl Downloader language selection expanded from 10 to 36 languages (added zh-hk, es-la, pt-br, pl, tr, nl, id, ms, th, vi, ar, uk, hu, ro, cs, bg, el, da, fi, sv, no, lt, ca, hr, tl, hi).
+
+### Improved
+- **Error logging across download system** — Replaced ~18 silent catch blocks and DEBUG-level logs with proper WARN-level logging including stack traces. Affected files: `DownloadExecutor`, `GalleryDlWrapper`, `ChapterChecker`, `ComicInfoGenerator`, `ChapterMatcher`, `MangaDexApiClient`, `GalleryDlProcess`, `MangaDexSubscriptionSyncer`, `ChapterUrlImporter`, `DownloadController`.
 
 ### Refactored
 - **GalleryDlWrapper split into 4 focused components** — Extracted `MangaDexApiClient` (API calls, metadata fetching, caching, rate limiting via `MangaDexRateLimiter`), `ComicInfoGenerator` (XML generation, ZIP comment, CBZ metadata injection), `GalleryDlProcess` (subprocess management, config files, environment setup), and `ChapterMatcher` (filename regex, chapter URL extraction, duplicate detection). `GalleryDlWrapper` remains as the facade — all 6 consumer classes still reference only `GalleryDlWrapper`. `ChapterDownloadInfo` moved from nested class to top-level. Dead code `downloadCover()` (gallery-dl based) removed.
@@ -61,7 +66,11 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `PluginManager.vue` | Dynamic library dropdown via `resolveDynamicEnums()`, `clearable` v-select for dynamicEnum fields |
 | `ChapterChecker.kt` | Executor try-finally, cached library list passed through call chain |
 | `PluginController.kt` | Added Kitsu metadata routing (`"kitsu-metadata"` when-branch) |
-| `DownloadController.kt` | New `repair-comicinfo/{libraryId}` endpoint |
+| `DownloadController.kt` | New `repair-comicinfo/{libraryId}` endpoint, error logging |
+| `LogController.kt` | Dynamic log level GET/POST endpoints, SSE log stream endpoint |
+| `LogsView.vue` | Debug toggle, Live/Pause SSE streaming (replaced polling) |
+| `DownloadExecutor.kt` | Error logging in findExistingMangaFolder, migrateLibrary, extractVolume, getFolderNaming |
+| `ChapterUrlImporter.kt` | Error logging in ZIP comment, series.json, metadata link extraction |
 | `LibraryContentLifecycle.kt` | Hash set computed once in series restore |
 | `README.md` | CustomList references removed, auto-blacklist docs updated |
 
