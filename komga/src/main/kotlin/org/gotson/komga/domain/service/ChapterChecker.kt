@@ -7,6 +7,7 @@ import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.infrastructure.download.ChapterMatcher
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
@@ -16,6 +17,20 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
+
+data class DeletedChapterScanResult(
+  val seriesScanned: Int,
+  val entriesRemoved: Int,
+  val totalSeries: Int,
+  val details: List<DeletedChapterDetail> = emptyList(),
+)
+
+data class DeletedChapterDetail(
+  val seriesName: String,
+  val removedCount: Int,
+  val remainingCount: Int,
+  val cbzFileCount: Int,
+)
 
 data class ChapterCheckResult(
   val url: String,
@@ -49,6 +64,7 @@ class ChapterChecker(
   private val libraryRepository: LibraryRepository,
   private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
   private val galleryDlWrapper: GalleryDlWrapper,
+  private val chapterMatcher: ChapterMatcher,
 ) {
   private val concurrencyLimit = Semaphore(5)
 
@@ -309,6 +325,62 @@ class ChapterChecker(
     }
     logger.debug { "Built folder index with ${index.size} entries" }
     return index
+  }
+
+  fun scanDeletedChaptersForLibrary(libraryId: String): DeletedChapterScanResult {
+    val allSeries = seriesRepository.findAllByLibraryId(libraryId)
+    var seriesScanned = 0
+    var totalRemoved = 0
+    val details = mutableListOf<DeletedChapterDetail>()
+
+    allSeries.forEach { series ->
+      val chapterUrls = chapterUrlRepository.findBySeriesId(series.id)
+      if (chapterUrls.isEmpty()) return@forEach
+
+      seriesScanned++
+      val seriesDir = series.path.toFile()
+
+      if (!seriesDir.exists()) {
+        val count = chapterUrls.size
+        chapterUrlRepository.deleteBySeriesId(series.id)
+        totalRemoved += count
+        details.add(DeletedChapterDetail(series.name, count, 0, 0))
+        logger.info { "Deleted chapters scan: folder missing for '${series.name}', removed $count entries" }
+        return@forEach
+      }
+
+      val cbzCount =
+        seriesDir
+          .listFiles()
+          ?.count { it.isFile && it.extension.lowercase() == "cbz" }
+          ?: 0
+
+      if (cbzCount == 0) {
+        val count = chapterUrls.size
+        chapterUrlRepository.deleteBySeriesId(series.id)
+        totalRemoved += count
+        details.add(DeletedChapterDetail(series.name, count, 0, 0))
+        logger.info { "Deleted chapters scan: no CBZ files in '${series.name}', removed $count entries" }
+        return@forEach
+      }
+
+      if (chapterUrls.size > cbzCount) {
+        val existingUrls = chapterMatcher.extractChapterUrlsFromCbzFiles(seriesDir)
+        val staleEntries = chapterUrls.filter { it.url !in existingUrls }
+        if (staleEntries.isNotEmpty()) {
+          staleEntries.forEach { chapterUrlRepository.delete(it.id) }
+          totalRemoved += staleEntries.size
+          val remaining = chapterUrls.size - staleEntries.size
+          details.add(DeletedChapterDetail(series.name, staleEntries.size, remaining, cbzCount))
+          logger.info {
+            "Deleted chapters scan: '${series.name}' had ${chapterUrls.size} DB entries, $cbzCount files, removed ${staleEntries.size} stale entries"
+          }
+        }
+      }
+    }
+
+    logger.info { "Deleted chapters scan complete: scanned $seriesScanned series, removed $totalRemoved entries" }
+    return DeletedChapterScanResult(seriesScanned, totalRemoved, allSeries.size, details)
   }
 
   companion object {

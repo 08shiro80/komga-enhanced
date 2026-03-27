@@ -6,6 +6,26 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.3] - 2026-03-27
+
+### New Features
+- **Scan deleted chapters** — New "Scan deleted chapters" option in the library 3-dot menu. Compares tracked chapter URLs in the database against CBZ files on the filesystem. Removes stale entries for chapters whose files no longer exist, so re-downloads correctly detect them as missing. Runs as a background task.
+- **Gallery-dl archive tracking for non-MangaDex** — Non-MangaDex downloads now use gallery-dl's built-in `--download-archive` option with a `.gallery-dl-archive.txt` file in the manga folder. This prevents duplicate folder creation and re-downloads when downloading from the same source a second time.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `application/tasks/Task.kt` | New `ScanDeletedChapters` task type |
+| `application/tasks/TaskEmitter.kt` | `scanDeletedChapters()` submission method |
+| `application/tasks/TaskHandler.kt` | Handler for scan deleted chapters task |
+| `domain/service/ChapterChecker.kt` | `scanDeletedChaptersForLibrary()` logic |
+| `interfaces/api/rest/LibraryController.kt` | `POST /api/v1/libraries/{id}/scan-deleted-chapters` endpoint |
+| `infrastructure/download/GalleryDlWrapper.kt` | `--download-archive` for non-MangaDex downloads |
+| `komga-webui/.../LibraryActionsMenu.vue` | Menu item |
+| `komga-webui/.../komga-libraries.service.ts` | API client method |
+| `komga-webui/.../en.json` | Translation |
+
+---
+
 ## [0.1.2] - 2026-03-22
 
 ### New Features

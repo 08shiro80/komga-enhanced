@@ -242,4 +242,13 @@ sealed class Task(
 
     override fun toString(): String = "FindBookThumbnailsToRegenerate(forBiggerResultOnly='$forBiggerResultOnly', priority='$priority')"
   }
+
+  class ScanDeletedChapters(
+    val libraryId: String,
+    priority: Int = DEFAULT_PRIORITY,
+  ) : Task(priority) {
+    override val uniqueId = "SCAN_DELETED_CHAPTERS_$libraryId"
+
+    override fun toString(): String = "ScanDeletedChapters(libraryId='$libraryId', priority='$priority')"
+  }
 }

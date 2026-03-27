@@ -283,4 +283,16 @@ class LibraryController(
       taskEmitter.emptyTrash(library.id, HIGH_PRIORITY)
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
   }
+
+  @PostMapping("{libraryId}/scan-deleted-chapters")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  @Operation(summary = "Scan for deleted chapters in a library")
+  fun libraryScanDeletedChapters(
+    @PathVariable libraryId: String,
+  ) {
+    libraryRepository.findByIdOrNull(libraryId)?.let { library ->
+      taskEmitter.scanDeletedChapters(library.id, HIGH_PRIORITY)
+    } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+  }
 }

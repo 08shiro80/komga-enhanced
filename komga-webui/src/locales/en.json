@@ -917,6 +917,7 @@
     "mark_unread": "Mark as unread",
     "pin": "Pin",
     "refresh_metadata": "Refresh metadata",
+    "scan_deleted_chapters": "Scan deleted chapters",
     "scan_library_files": "Scan library files",
     "scan_library_files_deep": "Scan library files (deep)",
     "select_all": "Select all",

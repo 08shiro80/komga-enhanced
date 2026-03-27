@@ -119,4 +119,16 @@ export default class KomgaLibrariesService {
       throw new Error(msg)
     }
   }
+
+  async scanDeletedChapters(library: LibraryDto) {
+    try {
+      await this.http.post(`${API_LIBRARIES}/${library.id}/scan-deleted-chapters`)
+    } catch (e) {
+      let msg = `An error occurred while trying to scan deleted chapters for library '${library.name}'`
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
 }

@@ -281,6 +281,13 @@ class TaskEmitter(
     submitTask(Task.FindBookThumbnailsToRegenerate(forBiggerResultOnly, priority))
   }
 
+  fun scanDeletedChapters(
+    libraryId: String,
+    priority: Int = DEFAULT_PRIORITY,
+  ) {
+    submitTask(Task.ScanDeletedChapters(libraryId, priority))
+  }
+
   private fun submitTask(task: Task) {
     logger.info { "Sending task: $task" }
     tasksRepository.save(task)

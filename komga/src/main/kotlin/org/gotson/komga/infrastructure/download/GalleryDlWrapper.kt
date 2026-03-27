@@ -342,6 +342,10 @@ class GalleryDlWrapper(
             add("-o")
             add("lang=$defaultLanguage")
           }
+          if (mangaDexId == null) {
+            add("--download-archive")
+            add(destinationPath.resolve(".gallery-dl-archive.txt").toString())
+          }
         }
 
       try {
