@@ -4,14 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       komga_version:
-        description: 'Upstream Komga version (e.g., 1.23.6)'
+        description: 'Upstream Komga version (auto-read from gradle.properties if empty)'
         type: string
-        required: true
-        default: '1.24.1'
+        required: false
+        default: ''
       fork_version:
-        description: 'Fork version (e.g., 0.0.5)'
+        description: 'Fork version (auto-read from gradle.properties if empty)'
         type: string
-        required: true
+        required: false
+        default: ''
       release_notes:
         description: Release notes (use \n for newlines)
         type: string
@@ -50,15 +51,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          KOMGA_VER="${{ inputs.komga_version }}"
+          FORK_VER="${{ inputs.fork_version }}"
+          if [ -z "$KOMGA_VER" ]; then
+            KOMGA_VER=$(grep '^baseVersion=' gradle.properties | cut -d= -f2)
+          fi
+          if [ -z "$FORK_VER" ]; then
+            FORK_VER=$(grep '^forkVersion=' gradle.properties | cut -d= -f2)
+          fi
           CURRENT=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "0.0.0")
-          NEXT="${{ inputs.komga_version }}-fork-${{ inputs.fork_version }}"
+          NEXT="${KOMGA_VER}-fork-${FORK_VER}"
           echo "version_current=$CURRENT" >> $GITHUB_OUTPUT
           echo "version_next=$NEXT" >> $GITHUB_OUTPUT
+          echo "komga_version=$KOMGA_VER" >> $GITHUB_OUTPUT
+          echo "fork_version=$FORK_VER" >> $GITHUB_OUTPUT
           echo "Previous version: $CURRENT"
           echo "New version: $NEXT"
 
       - name: Update version in gradle.properties
-        run: sed -i -e "s/version=.*/version=${{ steps.versions.outputs.version_next }}/" gradle.properties
+        run: |
+          sed -i -e "s/^baseVersion=.*/baseVersion=${{ steps.versions.outputs.komga_version }}/" gradle.properties
+          sed -i -e "s/^forkVersion=.*/forkVersion=${{ steps.versions.outputs.fork_version }}/" gradle.properties
+          sed -i -e "s/^version=.*/version=${{ steps.versions.outputs.version_next }}/" gradle.properties
 
       - uses: actions/setup-node@v6
         with:
