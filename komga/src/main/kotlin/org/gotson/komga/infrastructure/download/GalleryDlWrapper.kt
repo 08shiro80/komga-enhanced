@@ -674,10 +674,12 @@ class GalleryDlWrapper(
         val chapterFailures = loadChapterFailures(failuresFile)
         val currentMangaDexId = extractMangaDexId(url)
 
-        totalChapters = filteredChapters.count { (chapterFailures[it.chapterUrl] ?: 0) < 3 }
-        val autoBlacklisted = filteredChapters.size - totalChapters
+        val externalRedirects = filteredChapters.count { it.pages == 0 }
+        totalChapters = filteredChapters.count { it.pages > 0 && (chapterFailures[it.chapterUrl] ?: 0) < 3 }
+        val autoBlacklisted = filteredChapters.size - totalChapters - externalRedirects
         val resumeInfo = if (skippedCount > 0) " (resuming, $skippedCount already done)" else ""
-        logger.info { "Downloading $totalChapters chapters$resumeInfo${if (autoBlacklisted > 0) " ($autoBlacklisted auto-blacklisted)" else ""}" }
+        val externalInfo = if (externalRedirects > 0) " ($externalRedirects external redirects)" else ""
+        logger.info { "Downloading $totalChapters chapters$resumeInfo${if (autoBlacklisted > 0) " ($autoBlacklisted auto-blacklisted)" else ""}$externalInfo" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Downloading $totalChapters chapters$resumeInfo: $url")
 
         var downloadIndex = 0
@@ -697,6 +699,32 @@ class GalleryDlWrapper(
           }
 
           val chapterNum = chapter.chapterNumber ?: "${index + 1}"
+
+          if (chapter.pages == 0) {
+            if (komgaSeriesId != null && !blacklistedChapterRepository.existsByChapterUrl(chapter.chapterUrl)) {
+              try {
+                blacklistedChapterRepository.insert(
+                  org.gotson.komga.domain.model.BlacklistedChapter(
+                    id =
+                      java.util.UUID
+                        .randomUUID()
+                        .toString(),
+                    seriesId = komgaSeriesId,
+                    chapterUrl = chapter.chapterUrl,
+                    chapterNumber = chapter.chapterNumber,
+                    chapterTitle = chapter.chapterTitle,
+                  ),
+                )
+                logger.info { "Auto-blacklisted external redirect chapter $chapterNum (pages=0): ${chapter.chapterUrl}" }
+              } catch (e: Exception) {
+                logger.debug(e) { "Blacklist insert failed (likely duplicate): ${chapter.chapterUrl}" }
+              }
+            } else if (komgaSeriesId == null) {
+              logger.warn { "Cannot blacklist external chapter $chapterNum: series not yet in database" }
+            }
+            return@forEachIndexed
+          }
+
           val failCount = chapterFailures[chapter.chapterUrl] ?: 0
           if (failCount >= 3) {
             if (komgaSeriesId != null && !blacklistedChapterRepository.existsByChapterUrl(chapter.chapterUrl)) {

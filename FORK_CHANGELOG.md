@@ -8,6 +8,15 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ## [0.1.3] - 2026-03-27
 
+### Bug Fixes
+- **UNIQUE constraint on mangaDexUuid** — `DownloadExecutor` crashed with `UNIQUE constraint failed: SERIES.MANGADEX_UUID` when two series folders pointed to the same MangaDex manga. Now checks `seriesRepository.findByMangaDexUuid()` before updating, and skips with a warning if the UUID is already assigned to another series.
+- **External redirect chapters cause infinite re-queue** — MangaDex chapters that are external redirect links (`pages=0`) could never be downloaded by gallery-dl but were only blacklisted after 3 failed attempts. Now immediately auto-blacklisted on first encounter without a download attempt. Normal chapters keep the 3-failure threshold to avoid false blacklisting during MangaDex downtime.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `domain/service/DownloadExecutor.kt` | Pre-check before mangaDexUuid update |
+| `infrastructure/download/GalleryDlWrapper.kt` | Immediate blacklist for `pages=0` chapters |
+
 ### New Features
 - **Scan deleted chapters** — New "Scan deleted chapters" option in the library 3-dot menu. Compares tracked chapter URLs in the database against CBZ files on the filesystem. Removes stale entries for chapters whose files no longer exist, so re-downloads correctly detect them as missing. Runs as a background task.
 - **Gallery-dl archive tracking for non-MangaDex** — Non-MangaDex downloads now use gallery-dl's built-in `--download-archive` option with a `.gallery-dl-archive.txt` file in the manga folder. This prevents duplicate folder creation and re-downloads when downloading from the same source a second time.

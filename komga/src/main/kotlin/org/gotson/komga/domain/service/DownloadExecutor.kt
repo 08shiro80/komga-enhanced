@@ -580,8 +580,13 @@ class DownloadExecutor(
           try {
             val series = seriesRepository.findByIdOrNull(komgaSeriesId)
             if (series != null && series.mangaDexUuid == null) {
-              seriesRepository.update(series.copy(mangaDexUuid = mangaDexId), updateModifiedTime = false)
-              logger.info { "Set mangaDexUuid=$mangaDexId on series $komgaSeriesId" }
+              val existing = seriesRepository.findByMangaDexUuid(mangaDexId)
+              if (existing != null) {
+                logger.warn { "mangaDexUuid $mangaDexId already assigned to series ${existing.id}, skipping $komgaSeriesId" }
+              } else {
+                seriesRepository.update(series.copy(mangaDexUuid = mangaDexId), updateModifiedTime = false)
+                logger.info { "Set mangaDexUuid=$mangaDexId on series $komgaSeriesId" }
+              }
             }
           } catch (e: Exception) {
             logger.warn(e) { "Failed to set mangaDexUuid on series $komgaSeriesId" }
