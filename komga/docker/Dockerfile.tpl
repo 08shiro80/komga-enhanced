@@ -34,7 +34,6 @@ FROM build-linux AS build-arm64
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu"
 
 FROM build-${TARGETARCH} AS runner
-VOLUME /tmp
 VOLUME /config
 WORKDIR /app
 COPY --from=builder /builder/extracted/dependencies/ ./
