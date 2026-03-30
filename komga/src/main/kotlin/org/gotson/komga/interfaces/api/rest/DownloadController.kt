@@ -20,8 +20,6 @@ import org.gotson.komga.interfaces.api.rest.dto.ClearResultDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadActionDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadCreateDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadDto
-import org.gotson.komga.interfaces.api.rest.dto.FollowConfigDto
-import org.gotson.komga.interfaces.api.rest.dto.FollowConfigUpdateDto
 import org.gotson.komga.interfaces.api.rest.dto.FollowTxtDto
 import org.gotson.komga.interfaces.api.rest.dto.FollowTxtUpdateDto
 import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsDto
@@ -363,12 +361,7 @@ class DownloadController(
   @Operation(summary = "Get scheduler settings", tags = [TagNames.DOWNLOADS])
   fun getSchedulerSettings(): SchedulerSettingsDto {
     val config = followConfigRepository.findDefault() ?: FollowConfig()
-    return SchedulerSettingsDto(
-      enabled = config.enabled,
-      intervalHours = config.checkIntervalHours,
-      scheduleMode = config.scheduleMode,
-      checkTime = config.checkTime,
-    )
+    return config.toSchedulerDto()
   }
 
   @PostMapping("scheduler")
@@ -389,42 +382,10 @@ class DownloadController(
     val saved = followConfigRepository.save(updatedConfig)
     downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours, saved.scheduleMode, saved.checkTime)
 
-    return SchedulerSettingsDto(
-      enabled = saved.enabled,
-      intervalHours = saved.checkIntervalHours,
-      scheduleMode = saved.scheduleMode,
-      checkTime = saved.checkTime,
-    )
+    return saved.toSchedulerDto()
   }
 
-  @GetMapping("follow-config")
-  @Operation(summary = "Get follow configuration", tags = [TagNames.DOWNLOADS])
-  fun getFollowConfig(): FollowConfigDto {
-    val config = followConfigRepository.findDefault() ?: FollowConfig()
-    return config.toDto()
-  }
-
-  @PostMapping("follow-config")
-  @Operation(summary = "Save follow configuration", tags = [TagNames.DOWNLOADS])
-  fun saveFollowConfig(
-    @Valid @RequestBody update: FollowConfigUpdateDto,
-  ): FollowConfigDto {
-    val existingConfig = followConfigRepository.findDefault() ?: FollowConfig()
-
-    val updatedConfig =
-      existingConfig.copy(
-        urls = update.urls,
-        enabled = update.enabled,
-        checkIntervalHours = update.checkInterval,
-      )
-
-    val saved = followConfigRepository.save(updatedConfig)
-    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours, saved.scheduleMode, saved.checkTime)
-
-    return saved.toDto()
-  }
-
-  @PostMapping("follow-config/check-now")
+  @PostMapping("scheduler/check-now")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Trigger immediate follow list check", tags = [TagNames.DOWNLOADS])
   fun triggerFollowCheck() {
@@ -435,11 +396,12 @@ class DownloadController(
   }
 }
 
-fun FollowConfig.toDto() =
-  FollowConfigDto(
-    urls = urls,
+fun FollowConfig.toSchedulerDto() =
+  SchedulerSettingsDto(
     enabled = enabled,
-    checkInterval = checkIntervalHours,
+    intervalHours = checkIntervalHours,
+    scheduleMode = scheduleMode,
+    checkTime = checkTime,
     lastCheckTime = lastCheckTime?.toString(),
   )
 

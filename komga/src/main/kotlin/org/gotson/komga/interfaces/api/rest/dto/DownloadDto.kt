@@ -29,19 +29,6 @@ data class DownloadActionDto(
   val action: String, // pause, resume, cancel, retry
 )
 
-data class FollowConfigDto(
-  val urls: List<String>,
-  val enabled: Boolean,
-  val checkInterval: Int,
-  val lastCheckTime: String?,
-)
-
-data class FollowConfigUpdateDto(
-  val urls: List<String>,
-  val enabled: Boolean,
-  val checkInterval: Int,
-)
-
 data class FollowTxtDto(
   val libraryId: String,
   val libraryName: String,
@@ -57,6 +44,7 @@ data class SchedulerSettingsDto(
   val intervalHours: Int,
   val scheduleMode: String,
   val checkTime: String?,
+  val lastCheckTime: String?,
 )
 
 data class SchedulerSettingsUpdateDto(

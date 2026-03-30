@@ -145,80 +145,111 @@ Response:
 }
 ```
 
-## Follow Configuration API
+## Scheduler API
 
-### Get Configuration
+### Get Scheduler Settings
 
 ```http
-GET /api/v1/downloads/follow-config
+GET /api/v1/downloads/scheduler
 ```
 
 Response:
 
 ```json
 {
-  "libraries": [
-    {
-      "libraryId": "lib123",
-      "libraryName": "Manga",
-      "enabled": true,
-      "checkIntervalHours": 24,
-      "lastCheckAt": "2024-01-15T10:00:00Z",
-      "nextCheckAt": "2024-01-16T10:00:00Z",
-      "urlCount": 15
-    }
-  ]
+  "enabled": true,
+  "intervalHours": 24,
+  "scheduleMode": "fixed_time",
+  "checkTime": "16:00",
+  "lastCheckTime": "2024-01-15T10:00:00"
 }
 ```
 
-### Update Configuration
+| Field | Type | Description |
+|-------|------|-------------|
+| `enabled` | boolean | Whether the scheduler is active |
+| `intervalHours` | int | Hours between checks (used in `interval` mode) |
+| `scheduleMode` | string | `"interval"` or `"fixed_time"` |
+| `checkTime` | string? | Time in HH:mm format (used in `fixed_time` mode) |
+| `lastCheckTime` | string? | Timestamp of last check |
+
+### Update Scheduler Settings
 
 ```http
-PUT /api/v1/downloads/follow-config
+POST /api/v1/downloads/scheduler
 Content-Type: application/json
 
+{
+  "enabled": true,
+  "intervalHours": 24,
+  "scheduleMode": "fixed_time",
+  "checkTime": "16:00"
+}
+```
+
+Response: Updated scheduler settings
+
+### Trigger Immediate Check
+
+```http
+POST /api/v1/downloads/scheduler/check-now
+```
+
+Response: 204 No Content
+
+## Follow Text API (per Library)
+
+Per-library follow.txt management. Each library can have its own `follow.txt` file with URLs.
+
+### Get Follow Text
+
+```http
+GET /api/v1/downloads/follow-txt/{libraryId}
+```
+
+Response:
+
+```json
 {
   "libraryId": "lib123",
-  "enabled": true,
-  "checkIntervalHours": 12
+  "libraryName": "Manga",
+  "content": "https://mangadex.org/title/...\nhttps://mangadex.org/title/..."
 }
 ```
 
-### Get Follow List
+### Update Follow Text
 
 ```http
-GET /api/v1/downloads/follow-config/{libraryId}/urls
-```
-
-Response:
-
-```json
-{
-  "urls": [
-    "https://mangadex.org/title/...",
-    "https://mangadex.org/title/..."
-  ]
-}
-```
-
-### Update Follow List
-
-```http
-PUT /api/v1/downloads/follow-config/{libraryId}/urls
+PUT /api/v1/downloads/follow-txt/{libraryId}
 Content-Type: application/json
 
 {
-  "urls": [
-    "https://mangadex.org/title/...",
-    "https://mangadex.org/title/..."
-  ]
+  "content": "https://mangadex.org/title/...\nhttps://mangadex.org/title/..."
 }
 ```
 
-### Trigger Check
+Response: 204 No Content
+
+### Trigger Library Check
 
 ```http
-POST /api/v1/downloads/follow-check/{libraryId}
+POST /api/v1/downloads/follow-txt/{libraryId}/check-now
+```
+
+### Sync to MangaDex
+
+Upload follow.txt MangaDex URLs to your MangaDex follows list.
+
+```http
+POST /api/v1/downloads/follow-txt/{libraryId}/sync-to-mangadex
+```
+
+### Check New Chapters
+
+Check for new chapters across all followed manga.
+
+```http
+POST /api/v1/downloads/check-new
 ```
 
 ## Oversized Pages API

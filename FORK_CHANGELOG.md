@@ -9,6 +9,10 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 ## [0.1.3] - 2026-03-27
 
 ### Bug Fixes
+- **Documentation fixes** — Fixed incorrect API reference and README. Fixed Docker gallery-dl update command (`-u 0`, `pip3`, `--break-system-packages`). Removed inline API snippets from README (api-reference.md is the single source).
+
+### Changed
+- **Merged `/follow-config` into `/scheduler`** — Removed separate `/api/v1/downloads/follow-config` endpoint. All scheduler settings are now managed via `/api/v1/downloads/scheduler`. Removed `urls` field from scheduler (URLs are managed per-library via `follow-txt`). Check-now moved to `POST /scheduler/check-now`.
 - **UNIQUE constraint on mangaDexUuid** — `DownloadExecutor` crashed with `UNIQUE constraint failed: SERIES.MANGADEX_UUID` when two series folders pointed to the same MangaDex manga. Now checks `seriesRepository.findByMangaDexUuid()` before updating, and skips with a warning if the UUID is already assigned to another series.
 - **External redirect chapters cause infinite re-queue** — MangaDex chapters that are external redirect links (`pages=0`) could never be downloaded by gallery-dl but were only blacklisted after 3 failed attempts. Now immediately auto-blacklisted on first encounter without a download attempt. Normal chapters keep the 3-failure threshold to avoid false blacklisting during MangaDex downtime.
 

@@ -45,15 +45,7 @@ Download manga from MangaDex and other manga/image sites via [gallery-dl](https:
 - **Automatic publisher detection** - derives publisher from source site (MangaDex, Mangahere, etc.)
 - **Custom gallery-dl path** - point to a local gallery-dl checkout for latest extractors
 
-```
-POST /api/v1/downloads
-{
-  "url": "https://mangadex.org/title/...",
-  "libraryId": "your-library-id"
-}
-```
-
-Any manga/image URL supported by gallery-dl works — not just MangaDex.
+Any manga/image URL supported by gallery-dl works — not just MangaDex. See [API Reference](docs/api-reference.md) for endpoints.
 
 ### Follow List Automation
 
@@ -111,11 +103,6 @@ Import your manga library from Tachiyomi or Mihon:
 - Adds URLs to your library's `follow.txt`
 - Duplicate detection prevents re-adding existing URLs
 
-```
-POST /api/v1/tachiyomi/import
-Content-Type: multipart/form-data
-```
-
 ### Tall Page Splitting
 
 Split long vertical webtoon pages into readable segments:
@@ -124,12 +111,6 @@ Split long vertical webtoon pages into readable segments:
 - Batch processing for entire libraries
 - Preserves original files (creates new split versions)
 - Similar to TachiyomiSY's "split tall images" feature
-
-```
-GET  /api/v1/media-management/oversized-pages
-POST /api/v1/media-management/oversized-pages/split/{bookId}
-POST /api/v1/media-management/oversized-pages/split-all
-```
 
 ### Enhanced Metadata
 
@@ -255,6 +236,11 @@ After this, official Komga starts normally.
 
 ### Docker (Recommended)
 
+| Image | Description |
+|-------|-------------|
+| `08shiro80/komga:latest` | Stable release |
+| `08shiro80/komga-private:latest` | Testing branch — may contain unstable or experimental changes |
+
 ```bash
 docker pull 08shiro80/komga:latest
 
@@ -288,10 +274,10 @@ docker compose up -d
 
 ### Updating gallery-dl in Docker
 
-To update gallery-dl to the latest version inside your running container:
+gallery-dl is installed via pip inside the Docker image. To update:
 
 ```bash
-docker exec komga pip install -U gallery-dl
+docker exec -u 0 komga pip3 install --break-system-packages -U gallery-dl
 ```
 
 ### JAR
