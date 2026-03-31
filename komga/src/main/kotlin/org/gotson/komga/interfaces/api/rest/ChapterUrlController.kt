@@ -8,7 +8,7 @@ import org.gotson.komga.domain.model.ChapterUrl
 import org.gotson.komga.domain.model.ChapterUrlBatchCheckResult
 import org.gotson.komga.domain.model.ChapterUrlCheckResult
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
-import org.gotson.komga.infrastructure.mangadex.MangaDexClient
+import org.gotson.komga.infrastructure.download.MangaDexApiClient
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -36,7 +36,7 @@ private val logger = KotlinLogging.logger {}
 @Tag(name = "Chapter URLs", description = "Chapter URL tracking for duplicate prevention")
 class ChapterUrlController(
   private val chapterUrlRepository: ChapterUrlRepository,
-  private val mangaDexClient: MangaDexClient,
+  private val mangaDexApiClient: MangaDexApiClient,
 ) {
   /**
    * Check if a single URL has been downloaded.
@@ -155,7 +155,7 @@ class ChapterUrlController(
 
     // Extract MangaDex ID
     val mangaId =
-      mangaDexClient.extractMangaId(mangaUrl)
+      MangaDexApiClient.extractMangaDexId(mangaUrl)
         ?: if (mangaUrl.matches(Regex("[a-f0-9-]{36}"))) mangaUrl else null
 
     if (mangaId == null) {
@@ -170,18 +170,15 @@ class ChapterUrlController(
       )
     }
 
-    // Get all available chapters from MangaDex
-    val availableChapters = mangaDexClient.getAllChapters(mangaId, lang)
+    val availableChapters = mangaDexApiClient.getChaptersForManga(mangaId, lang)
     logger.debug { "Found ${availableChapters.size} chapters on MangaDex" }
 
-    // Get downloaded URLs for this series
     val downloadedUrls = chapterUrlRepository.findUrlsBySeriesIdAndLang(seriesId, lang).toSet()
     logger.debug { "Found ${downloadedUrls.size} downloaded chapters in database" }
 
-    // Filter to only new chapters
     val newChapters =
       availableChapters.filter { chapter ->
-        chapter.url !in downloadedUrls
+        chapter.chapterUrl !in downloadedUrls
       }
 
     logger.info {
@@ -198,11 +195,11 @@ class ChapterUrlController(
       newChapters =
         newChapters.map {
           NewChapterDto(
-            url = it.url,
-            chapter = it.chapter,
-            volume = it.volume,
-            title = it.title,
-            lang = it.lang,
+            url = it.chapterUrl,
+            chapter = it.chapterNumber?.toDoubleOrNull() ?: 0.0,
+            volume = it.volume?.toIntOrNull(),
+            title = it.chapterTitle,
+            lang = it.language ?: lang,
             scanlationGroup = it.scanlationGroup,
           )
         },

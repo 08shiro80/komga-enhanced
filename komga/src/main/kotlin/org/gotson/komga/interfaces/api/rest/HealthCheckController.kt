@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
-import org.gotson.komga.infrastructure.mangadex.MangaDexClient
+import org.gotson.komga.infrastructure.download.MangaDexApiClient
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
@@ -24,7 +24,7 @@ private val logger = KotlinLogging.logger {}
 @RequestMapping("/api/v1/health", produces = [MediaType.APPLICATION_JSON_VALUE])
 class HealthCheckController(
   private val galleryDlWrapper: GalleryDlWrapper,
-  private val mangaDexClient: MangaDexClient,
+  private val mangaDexApiClient: MangaDexApiClient,
   private val dataSource: DataSource,
   private val komgaProperties: KomgaProperties,
 ) {
@@ -121,7 +121,7 @@ class HealthCheckController(
   private fun checkMangaDex(): ComponentHealth =
     try {
       // Simple connectivity test - search for a known manga
-      val testResult = mangaDexClient.searchManga("one piece", limit = 1)
+      val testResult = mangaDexApiClient.searchManga("one piece", limit = 1)
 
       if (testResult.isNotEmpty()) {
         ComponentHealth(

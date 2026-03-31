@@ -6,6 +6,27 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.3.1] - 2026-03-31 Hotfix
+
+### Bug Fixes
+- **MangaDex rate limiter caused 51s waits** — The per-minute limit (40 req/min) was far too restrictive for MangaDex's actual 5 req/sec limit. After ~40 requests (~8 seconds), the rate limiter would calculate a ~51 second wait. Removed the per-minute limit entirely; only the 5 req/sec limit remains.
+- **429 retry handler added phantom timestamps** — When a 429 response was received, the retry logic called `rateLimiter.waitIfNeeded()` again, which recorded a phantom request timestamp and could trigger the per-minute limit. Removed the redundant `waitIfNeeded()` call from all three 429 handlers.
+- **Two independent MangaDex rate limiters** — `MangaDexClient` and `MangaDexApiClient` each had their own rate limiting. Requests from both counted against MangaDex's IP-based limit but neither knew about the other. Merged into a single `MangaDexApiClient` with one shared `MangaDexRateLimiter`.
+
+### Improved
+- **Logs page defaults to live view** — The server logs page now auto-starts the live stream on load instead of requiring a manual click on the "Live" button.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `infrastructure/download/MangaDexRateLimiter.kt` | Removed per-minute limit, simplified to 5 req/sec only |
+| `infrastructure/download/MangaDexApiClient.kt` | Removed phantom `waitIfNeeded()` from 429 handlers, added `searchManga()` |
+| `interfaces/api/rest/ChapterUrlController.kt` | Switched from `MangaDexClient` to `MangaDexApiClient` |
+| `interfaces/api/rest/HealthCheckController.kt` | Switched from `MangaDexClient` to `MangaDexApiClient` |
+| `infrastructure/mangadex/MangaDexClient.kt` | **Deleted** — consolidated into `MangaDexApiClient` |
+| `komga-webui/src/views/LogsView.vue` | Auto-start live stream on mount |
+
+---
+
 ## [0.1.3] - 2026-03-27
 
 ### Bug Fixes

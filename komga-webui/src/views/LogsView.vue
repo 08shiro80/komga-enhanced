@@ -120,6 +120,7 @@ export default Vue.extend({
   mounted() {
     this.fetchLogLevel()
     this.fetchLogs()
+    this.startStream()
   },
   beforeDestroy() {
     this.stopStream()

@@ -124,7 +124,6 @@ class MangaDexApiClient(
       if (response.statusCode() == 429) {
         logger.warn { "MangaDex rate limited (429) for manga $mangaId, waiting 2s and retrying" }
         Thread.sleep(2000)
-        rateLimiter.waitIfNeeded()
         response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
       }
 
@@ -295,7 +294,6 @@ class MangaDexApiClient(
       if (response.statusCode() == 429) {
         logger.warn { "MangaDex rate limited (429) for chapter $chapterId, waiting 2s" }
         Thread.sleep(2000)
-        rateLimiter.waitIfNeeded()
         response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
       }
 
@@ -378,7 +376,6 @@ class MangaDexApiClient(
         if (response.statusCode() == 429) {
           logger.warn { "MangaDex rate limited (429) on feed, waiting 2s" }
           Thread.sleep(2000)
-          rateLimiter.waitIfNeeded()
           response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         }
 
@@ -444,6 +441,35 @@ class MangaDexApiClient(
     }
 
     return chapters
+  }
+
+  fun searchManga(
+    query: String,
+    limit: Int = 10,
+  ): List<Map<String, Any?>> {
+    try {
+      val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+      val url = "https://api.mangadex.org/manga?title=$encodedQuery&limit=$limit"
+      val request =
+        HttpRequest
+          .newBuilder()
+          .uri(URI.create(url))
+          .timeout(Duration.ofSeconds(10))
+          .GET()
+          .build()
+
+      rateLimiter.waitIfNeeded()
+      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      if (response.statusCode() != 200) return emptyList()
+
+      val jsonResponse = objectMapper.readValue<Map<String, Any?>>(response.body())
+
+      @Suppress("UNCHECKED_CAST")
+      return jsonResponse["data"] as? List<Map<String, Any?>> ?: emptyList()
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to search manga: $query" }
+      return emptyList()
+    }
   }
 
   fun downloadMangaCover(
