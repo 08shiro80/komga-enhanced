@@ -677,7 +677,9 @@
     "new": "புதிய",
     "saved_size": "சேமிக்கப்பட்டது {size}",
     "title": "நகல் பக்கங்கள்",
-    "unknown_size": "தெரியாத அளவு"
+    "unknown_size": "தெரியாத அளவு",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "கோப்பு ஆச்",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "பயனர் கணக்கை உருவாக்கவும்",
     "login": "விடுபதிகை",
-    "unclaimed_html": "இந்த கோம்கா சேவையகம் இன்னும் செயலில் இல்லை, அதை அணுக நீங்கள் ஒரு பயனர் கணக்கை உருவாக்க வேண்டும். <strong> பயனர் கணக்கை உருவாக்கு </strong> ஐக் சொடுக்கு செய்க."
+    "unclaimed_html": "இந்த கோம்கா சேவையகம் இன்னும் செயலில் இல்லை, அதை அணுக நீங்கள் ஒரு பயனர் கணக்கை உருவாக்க வேண்டும். <strong> பயனர் கணக்கை உருவாக்கு </strong> ஐக் சொடுக்கு செய்க.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "கருத்து",

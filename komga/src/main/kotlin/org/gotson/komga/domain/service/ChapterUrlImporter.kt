@@ -253,7 +253,8 @@ class ChapterUrlImporter(
       logger.debug { "mangaDexUuid $uuid already assigned to series ${existing.id}, skipping ${series.id}" }
       return
     }
-    seriesRepository.update(series.copy(mangaDexUuid = uuid), updateModifiedTime = false)
+    val fresh = seriesRepository.findByIdOrNull(series.id) ?: return
+    seriesRepository.update(fresh.copy(mangaDexUuid = uuid), updateModifiedTime = false)
     logger.info { "Set mangaDexUuid=$uuid on series ${series.id} (${series.name})" }
   }
 

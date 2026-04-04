@@ -672,7 +672,9 @@
     "new": "الجديدة",
     "saved_size": "حُفظ {size}",
     "title": "صفحات مكررة",
-    "unknown_size": "حجم مجهول"
+    "unknown_size": "حجم مجهول",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "رمز هاش الملف",
@@ -844,7 +846,8 @@
   "login": {
     "create_user_account": "إنشاء حساب مستخدم",
     "login": "تسجيل الدخول",
-    "unclaimed_html": "خادم Komga هذا غير نشط بعد، فأنت بحاجة إلى إنشاء حساب مستخدم لتتمكن من الوصول إليه. اختر بريد إلكتروني وكلمة مرور وانقر على إنشاء حساب مستخدم."
+    "unclaimed_html": "خادم Komga هذا غير نشط بعد، فأنت بحاجة إلى إنشاء حساب مستخدم لتتمكن من الوصول إليه. اختر بريد إلكتروني وكلمة مرور وانقر على إنشاء حساب مستخدم.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "تعليق",

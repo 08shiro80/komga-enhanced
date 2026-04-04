@@ -36,6 +36,7 @@ data class ChapterCheckResult(
   val url: String,
   val mangaId: String?,
   val title: String?,
+  val libraryId: String? = null,
   val apiChapterCount: Int,
   val downloadedChapterCount: Int,
   val filesystemChapterCount: Int,
@@ -163,7 +164,7 @@ class ChapterChecker(
           try {
             downloadExecutor.createDownload(
               sourceUrl = result.url,
-              libraryId = null,
+              libraryId = result.libraryId,
               title = result.title,
               createdBy = "chapter-checker",
               priority = 5,
@@ -212,6 +213,14 @@ class ChapterChecker(
 
       val mangaFolder = folderIndex[mangaId]
       val series = findSeriesForManga(mangaId, mangaFolder, libraries)
+      val libraryId =
+        series?.libraryId
+          ?: mangaFolder?.let { folder ->
+            libraries
+              .firstOrNull { lib ->
+                folder.absolutePath.startsWith(lib.path.toFile().absolutePath)
+              }?.id
+          }
       val knownChapterIds = getKnownChapterIds(series)
       val blacklistedChapterIds = getBlacklistedChapterIds(series)
       val allKnownIds = knownChapterIds + blacklistedChapterIds
@@ -236,6 +245,7 @@ class ChapterChecker(
         url = url,
         mangaId = mangaId,
         title = title,
+        libraryId = libraryId,
         apiChapterCount = apiChapterIds.size,
         downloadedChapterCount = knownChapterIds.size,
         filesystemChapterCount = filesystemCount,

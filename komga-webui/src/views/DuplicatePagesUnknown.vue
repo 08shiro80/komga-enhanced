@@ -56,12 +56,11 @@
           :key="i"
         >
           <page-hash-unknown-card
-            v-show="!hiddenElements.includes(element)"
             class="ma-2"
             :hash="element"
             @image-clicked="showDialogImage(element)"
             @matches-clicked="showDialogMatches(element)"
-            @created="pageHashCreated(element)"
+            @created="pageHashCreated"
           />
         </v-slide-x-transition>
 
@@ -70,22 +69,22 @@
       <v-row justify="center">
         <v-col cols="auto">
           <v-btn @click="actionRemaining(PageHashAction.IGNORE)"
-                 :disabled="remainingCount < 1"
-          >{{ $t('duplicate_pages.action_ignore_remaining', {count: remainingCount}) }}
+                 :disabled="elements.length < 1"
+          >{{ $t('duplicate_pages.action_ignore_remaining', {count: elements.length}) }}
           </v-btn>
         </v-col>
         <v-col cols="auto">
           <v-btn @click="confirmRemaining(PageHashAction.DELETE_MANUAL)"
-                 :disabled="remainingCount < 1"
+                 :disabled="elements.length < 1"
                  color="warning"
-          >{{ $t('duplicate_pages.action_manual_delete_remaining', {count: remainingCount}) }}
+          >{{ $t('duplicate_pages.action_manual_delete_remaining', {count: elements.length}) }}
           </v-btn>
         </v-col>
         <v-col cols="auto">
           <v-btn @click="confirmRemaining(PageHashAction.DELETE_AUTO)"
-                 :disabled="remainingCount < 1"
+                 :disabled="elements.length < 1"
                  color="warning"
-          >{{ $t('duplicate_pages.action_auto_delete_remaining', {count: remainingCount}) }}
+          >{{ $t('duplicate_pages.action_auto_delete_remaining', {count: elements.length}) }}
           </v-btn>
         </v-col>
       </v-row>
@@ -134,9 +133,9 @@
 
     <confirmation-dialog
       v-model="modalConfirmRemaining"
-      :title="$t(`duplicate_pages.action_${dialogConfirmI18n}_remaining`, {count: remainingCount})"
-      :body-html="$t(`duplicate_pages.confirm_${dialogConfirmI18n}_remaining`, {count: remainingCount})"
-      :button-confirm="$t(`duplicate_pages.action_${dialogConfirmI18n}_remaining`, {count: remainingCount})"
+      :title="$t(`duplicate_pages.action_${dialogConfirmI18n}_remaining`, {count: elements.length})"
+      :body-html="$t(`duplicate_pages.confirm_${dialogConfirmI18n}_remaining`, {count: elements.length})"
+      :button-confirm="$t(`duplicate_pages.action_${dialogConfirmI18n}_remaining`, {count: elements.length})"
       button-confirm-color="warning"
       @confirm="actionRemaining(confirmAction)"
     />
@@ -160,7 +159,6 @@ export default Vue.extend({
   data: function () {
     return {
       elements: [] as PageHashUnknownDto[],
-      hiddenElements: [] as PageHashUnknownDto[],
       totalElements: 0,
       page: 1,
       totalPages: undefined,
@@ -219,9 +217,6 @@ export default Vue.extend({
         this.loadData(this.page, this.sortActive)
       },
     },
-    remainingCount(): number {
-      return this.elements.length - this.hiddenElements.length
-    },
   },
   methods: {
     async loadData(page: number, sort: SortActive) {
@@ -235,7 +230,6 @@ export default Vue.extend({
       this.totalElements = itemsPage.totalElements
       this.totalPages = itemsPage.totalPages
       this.elements = itemsPage.content
-      this.hiddenElements = []
       if (this.page > this.totalPages) this.page = this.totalPages
     },
     setSort(key: string) {
@@ -257,11 +251,8 @@ export default Vue.extend({
       this.dialogMatchesPageHash = pageHash
       this.dialogMatches = true
     },
-    pageHashCreated(pageHash: PageHashUnknownDto) {
-      this.hiddenElements.push(pageHash)
-      if (this.elements.every(x => this.hiddenElements.includes(x))) {
-        this.loadData(this.page, this.sortActive)
-      }
+    pageHashCreated() {
+      this.loadData(this.page, this.sortActive)
     },
     confirmRemaining(action: PageHashAction) {
       this.confirmAction = action
@@ -269,15 +260,16 @@ export default Vue.extend({
       this.modalConfirmRemaining = true
     },
     async actionRemaining(action: PageHashAction) {
-      for (const h of this.elements) {
-        if (!this.hiddenElements.includes(h)) {
+      await Promise.all(
+        this.elements.map(h =>
           this.$komgaPageHashes.createOrUpdatePageHash({
             hash: h.hash,
             size: h.size,
             action: action,
-          }).then(() => this.pageHashCreated(h))
-        }
-      }
+          }),
+        ),
+      )
+      this.loadData(this.page, this.sortActive)
     },
   },
 })

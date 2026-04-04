@@ -28,6 +28,38 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 
 ---
 
+## Screenshots
+
+### Download Page
+
+![Download Page](https://github.com/user-attachments/assets/4cf6904a-a182-468c-a1ff-8b4118a378aa)
+
+> **New Download** triggers a one-time download only — it does not add the URL to your follow list.
+
+### Plugin Configuration
+
+![Plugin Configuration](https://github.com/user-attachments/assets/43463b26-c436-4dc2-8619-351c37e43843)
+![Plugin Configuration 2](https://github.com/user-attachments/assets/16de37ef-e2e9-465a-9298-c695ad58243b)
+![Save after edit](https://github.com/user-attachments/assets/57cb7b83-9aa2-4469-a720-bcc5eba92ab2)
+
+### Plugin Manager
+
+![Plugins](https://github.com/user-attachments/assets/b1a40557-dfc4-4e6e-88e3-d587fc7dafbe)
+
+### Manual Backups
+
+![Manual Backups](https://github.com/user-attachments/assets/b2f308be-806c-4f01-a6f5-5162b83a568f)
+
+### Live Logs with Debug Toggle
+
+![Live Logs](https://github.com/user-attachments/assets/24f65885-353f-45c6-85a8-a5afc7a2693e)
+
+### Color Themes
+
+![Color Themes](https://github.com/user-attachments/assets/f7e79d95-e66a-4a3c-98b7-0fff97a526c0)
+
+---
+
 ## Key Features
 
 ### Download System
@@ -45,7 +77,7 @@ Download manga from MangaDex and other manga/image sites via [gallery-dl](https:
 - **Automatic publisher detection** - derives publisher from source site (MangaDex, Mangahere, etc.)
 - **Custom gallery-dl path** - point to a local gallery-dl checkout for latest extractors
 
-Any manga/image URL supported by gallery-dl works — not just MangaDex. See [API Reference](docs/api-reference.md) for endpoints.
+Any manga/image URL supported by gallery-dl works — not just MangaDex. Simply paste the URL in the WebUI to start a download.
 
 ### Follow List Automation
 
@@ -54,7 +86,7 @@ Automatically check for new chapters from your favorite manga:
 1. Create a `follow.txt` file in your library root
 2. Add URLs (one per line) — MangaDex URLs get fast aggregate checking, other sites use gallery-dl
 3. Configure check interval (default: 24 hours)
-4. Fast parallel checking via MangaDex aggregate API (200 manga in under a minute)
+4. Fast parallel checking via MangaDex aggregate API (~200 manga in 2 minutes)
 5. New chapters download automatically
 
 ```
@@ -326,7 +358,7 @@ To use a local gallery-dl checkout (e.g. for latest extractors), set `gallery_dl
 
 ### Follow List Check Interval
 
-Configure via API or application properties:
+Configure via application properties:
 
 ```yaml
 komga:
@@ -398,6 +430,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 - [gallery-dl](https://github.com/mikf/gallery-dl) by mikf - Download engine
 - [MangaDex](https://mangadex.org) - Primary manga source and API
 - [AniList](https://anilist.co) - Metadata source
+- [Kitsu](https://kitsu.app) - Metadata source
 
 ---
 

@@ -677,7 +677,9 @@
     "new": "Новий",
     "saved_size": "Збережено {size}",
     "title": "Дублікати сторінок",
-    "unknown_size": "Невідомий розмір"
+    "unknown_size": "Невідомий розмір",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Хеш файлу",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Створити обліковий запис користувача",
     "login": "Увійти",
-    "unclaimed_html": "Цей сервер Komga ще не активний, вам потрібно створити обліковий запис користувача, щоб мати до нього доступ.<br><br>Виберіть <strong>електронну пошту</strong> та <strong>пароль</strong> і натисніть <strong>Створити обліковий запис користувача</strong>."
+    "unclaimed_html": "Цей сервер Komga ще не активний, вам потрібно створити обліковий запис користувача, щоб мати до нього доступ.<br><br>Виберіть <strong>електронну пошту</strong> та <strong>пароль</strong> і натисніть <strong>Створити обліковий запис користувача</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Коментар",

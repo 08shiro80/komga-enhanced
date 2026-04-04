@@ -677,7 +677,9 @@
     "new": "新規",
     "saved_size": "保存された{size}",
     "title": "重複ページ",
-    "unknown_size": "サイズ不明"
+    "unknown_size": "サイズ不明",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "ファイルハッシュ",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "ユーザアカウントを作成",
     "login": "ログイン",
-    "unclaimed_html": "この Komga サーバはまだ有効になっておらず、アクセスするためのユーザアカウントを作成する必要があります。<br><br><strong>メールアドレス</strong>と<strong>パスワード</strong>を選んで<strong>ユーザアカウントの作成</strong>を押してください。"
+    "unclaimed_html": "この Komga サーバはまだ有効になっておらず、アクセスするためのユーザアカウントを作成する必要があります。<br><br><strong>メールアドレス</strong>と<strong>パスワード</strong>を選んで<strong>ユーザアカウントの作成</strong>を押してください。",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "コメント",

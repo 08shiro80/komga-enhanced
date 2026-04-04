@@ -619,7 +619,9 @@
     "new": "Ny",
     "saved_size": "Sparte {size}",
     "title": "Dupliserte sider",
-    "unknown_size": "Ukjent størrelse"
+    "unknown_size": "Ukjent størrelse",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Fil-sjekksum",
@@ -807,7 +809,8 @@
   "login": {
     "create_user_account": "Opprett brukerkonto",
     "login": "Logg inn",
-    "unclaimed_html": "Denne Komga-tjeneren er ikke aktiv enda. Du må opprette en brukerkonto for å få tilgang til den.<br><br>Velg en<strong>e-post</strong> og et <strong>passord</strong> og klikk så på <strong>Opprett brukerkonto</strong>."
+    "unclaimed_html": "Denne Komga-tjeneren er ikke aktiv enda. Du må opprette en brukerkonto for å få tilgang til den.<br><br>Velg en<strong>e-post</strong> og et <strong>passord</strong> og klikk så på <strong>Opprett brukerkonto</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Kommentar",

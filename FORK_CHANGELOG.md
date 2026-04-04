@@ -6,6 +6,55 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.3.2] - 2026-04-04
+
+### Bug Fixes
+- **Duplicate pages known list not repaginating** — `pageHashRemoved()` called `loadData()` with no arguments (TypeError), so the list never reloaded after removing an item. Items from subsequent pages did not fill in. Fixed to pass correct `page`, `sort`, and `filter` args.
+- **Category change not reflected in known list** — Changing an item's action (ignore/auto/manual) only updated the chip in-place. Items whose new action no longer matched the active filter stayed visible. Now triggers a full page reload after any action change.
+- **Unknown list not repaginating after classification** — Classifying an item only hid it locally and reloaded only when the entire page was consumed. Now reloads immediately after each classification so items from the next page fill in. `actionRemaining` batches all requests via `Promise.all` and reloads once.
+
+### New Features
+- **"Remove all from list" button on Known page** — One-click button with confirmation dialog to remove all known page hash entries. Backed by new `DELETE /api/v1/page-hashes` endpoint.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `domain/persistence/PageHashRepository.kt` | Added `deleteAllKnown()` |
+| `infrastructure/jooq/main/PageHashDao.kt` | Implemented `deleteAllKnown()` |
+| `interfaces/api/rest/PageHashController.kt` | `DELETE /api/v1/page-hashes` endpoint |
+| `komga-webui/src/services/komga-pagehashes.service.ts` | `removeAllKnownHashes()` |
+| `komga-webui/src/views/DuplicatePagesKnown.vue` | Repagination fix, category-change fix, Remove All button |
+| `komga-webui/src/views/DuplicatePagesUnknown.vue` | Repagination fix, removed `hiddenElements`, `actionRemaining` uses `Promise.all` |
+| `komga-webui/src/locales/en.json` + `de.json` + 31 others | `action_remove_all`, `confirm_remove_all` keys |
+| `komga-webui/src/views/LoginView.vue` | Fix hardcoded German "Als Gast durchsuchen" → i18n key |
+| `komga-webui/src/locales/en.json` + `de.json` + 31 others | `login.browse_as_guest` key |
+
+### Bug Fixes (ChapterChecker)
+- **"No book" for auto-queued manga** — `ChapterChecker.checkAndQueueNewChapters()` always passed `libraryId = null` when queueing downloads. This caused downloads to go to `~/Downloads/komga/` instead of the library path, and suppressed the post-download scan (gated on `library != null`). Fixed by adding `libraryId` to `ChapterCheckResult` — resolved from `series.libraryId` when the series exists, or from the folder's parent library path otherwise.
+
+| Modified Files | Purpose |
+|---------------|---------|
+| `domain/service/ChapterChecker.kt` | `libraryId` field added to `ChapterCheckResult`, derived in `checkSingleUrl`, used in `checkAndQueueNewChapters()` |
+
+- **"No book" persists on library series card (display bug)** — `sortBooks()` used `books.size` for `bookCount` which counted soft-deleted books, causing incorrect counts. Also, `sortBooks()` was only called when new books were found in `scanSeriesFolder()`, so a `bookCount = 0` that ended up in the DB could never self-correct on subsequent scans. Fixed: count only non-deleted books; always call `sortBooks()` after every targeted folder scan.
+
+| Modified Files | Purpose |
+|---------------|---------|
+| `domain/service/SeriesLifecycle.kt` | `sortBooks()` counts only non-deleted books for `bookCount` |
+| `domain/service/LibraryContentLifecycle.kt` | `sortBooks()` called unconditionally in `scanSeriesFolder()` |
+| `domain/service/ChapterUrlImporter.kt` | `syncMangaDexUuid()` re-reads series from DB before update to avoid overwriting `bookCount=0` |
+| `domain/service/LibraryContentLifecycle.kt` | Full library scan now repairs existing series with `bookCount=0` that were missed by earlier bug |
+
+### Changed
+- **Suppress Windows connection-reset log spam** — Added `logback-spring.xml` to silence `[dispatcherServlet]` ERROR entries that fire when SSE/streaming clients disconnect abruptly (Windows: "Eine bestehende Verbindung wurde softwaregesteuert abgebrochen"). Not actionable; Spring MVC still logs real errors at the controller/service layer.
+- **Removed unused Conveyor packaging files** — Deleted `conveyor.ci.conf`, `conveyor.conf`, `conveyor.detect.conf`, `conveyor.msstore.ci.conf`, `conveyor.msstore.conf`. These are upstream distribution configs for native installers not used in this fork.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `komga/src/main/resources/logback-spring.xml` | Suppress dispatcher servlet connection-reset IOExceptions |
+| `conveyor*.conf` (5 files) | Deleted |
+
+---
+
 ## [0.1.3.1] - 2026-03-31 Hotfix
 
 ### Bug Fixes

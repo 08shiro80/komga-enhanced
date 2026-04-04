@@ -87,7 +87,7 @@
               min-width="250"
             >
               <v-icon left>mdi-eye</v-icon>
-              Als Gast durchsuchen
+              {{ $t('login.browse_as_guest') }}
             </v-btn>
           </v-col>
         </v-row>

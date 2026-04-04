@@ -664,7 +664,9 @@
     "new": "Nowy",
     "saved_size": "Zaoszczędzono {size}",
     "title": "Duplikaty stron",
-    "unknown_size": "Nieznany rozmiar"
+    "unknown_size": "Nieznany rozmiar",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Hash pliku",
@@ -860,7 +862,8 @@
   "login": {
     "create_user_account": "Utwórz konto użytkownika",
     "login": "Zaloguj się",
-    "unclaimed_html": "Serwer Komga nie jest jeszcze aktywny, musisz utworzyć konto użytkownika, by móc uzyskać do niego dostęp.<br><br>Wybierz <strong>e-mail</strong> oraz <strong>hasło</strong> i kliknij na <strong>Utwórz konto użytkownika</strong>."
+    "unclaimed_html": "Serwer Komga nie jest jeszcze aktywny, musisz utworzyć konto użytkownika, by móc uzyskać do niego dostęp.<br><br>Wybierz <strong>e-mail</strong> oraz <strong>hasło</strong> i kliknij na <strong>Utwórz konto użytkownika</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Komentarz",

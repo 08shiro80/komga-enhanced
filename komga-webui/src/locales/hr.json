@@ -677,7 +677,9 @@
     "new": "Nove",
     "saved_size": "Spremljeno {size}",
     "title": "Duple stranice",
-    "unknown_size": "Nepoznata veličina"
+    "unknown_size": "Nepoznata veličina",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Šifra datoteke",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Stvori korisnički račun",
     "login": "Prijavi se",
-    "unclaimed_html": "Ovaj Komga server još nije aktivan. Za pristup serveru moraš stvoriti korisnički račun.<br><br>Odaberi <strong>e-mail adresu</strong> i <strong>lozinku</strong> i pritisni na <strong>Stvori korisnički račun</strong>."
+    "unclaimed_html": "Ovaj Komga server još nije aktivan. Za pristup serveru moraš stvoriti korisnički račun.<br><br>Odaberi <strong>e-mail adresu</strong> i <strong>lozinku</strong> i pritisni na <strong>Stvori korisnički račun</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Komentar",

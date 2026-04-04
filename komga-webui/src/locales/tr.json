@@ -663,7 +663,9 @@
     "new": "Yeni",
     "saved_size": "{size} kazanıldı",
     "title": "Eş sayfalar",
-    "unknown_size": "Bilinmeyen boyut"
+    "unknown_size": "Bilinmeyen boyut",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Dosya hashi",
@@ -852,7 +854,8 @@
   "login": {
     "create_user_account": "Kullanıcı hesabı oluştur",
     "login": "Giriş yap",
-    "unclaimed_html": "Bu Komga sunucusu henüz aktif değil, ulaşmak için bir kullanıcı hesabı oluşturmalısınız.<br><br><strong>e-Posta</strong> ve güçlü bir <strong>şifre</strong> seçin, sonrasında <strong>Kullanıcı hesabı oluştur</strong> butonuna tıklayın."
+    "unclaimed_html": "Bu Komga sunucusu henüz aktif değil, ulaşmak için bir kullanıcı hesabı oluşturmalısınız.<br><br><strong>e-Posta</strong> ve güçlü bir <strong>şifre</strong> seçin, sonrasında <strong>Kullanıcı hesabı oluştur</strong> butonuna tıklayın.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Yorum",

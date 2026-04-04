@@ -563,7 +563,9 @@
     "matches_n": "Không có | 1 trùng | {count} trùng",
     "saved_size": "Giải phóng được {size}",
     "title": "Các trang bị trùng",
-    "unknown_size": "Kích thước không xác định"
+    "unknown_size": "Kích thước không xác định",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Tệp băm",
@@ -680,7 +682,8 @@
   "login": {
     "create_user_account": "Tạo tài khoản người dùng",
     "login": "Đăng nhập",
-    "unclaimed_html": "Máy chủ Komga này chưa hoạt động, bạn cần tạo tài khoản người dùng để có thể truy cập. <br><br> Chọn <strong> email </strong> và <strong> mật khẩu </strong> và nhấp vào <strong> Tạo tài khoản người dùng </strong>."
+    "unclaimed_html": "Máy chủ Komga này chưa hoạt động, bạn cần tạo tài khoản người dùng để có thể truy cập. <br><br> Chọn <strong> email </strong> và <strong> mật khẩu </strong> và nhấp vào <strong> Tạo tài khoản người dùng </strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Ghi chú",

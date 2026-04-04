@@ -676,7 +676,9 @@
     "new": "Нови",
     "saved_size": "Спестено {size}",
     "title": "Дублирани Страници",
-    "unknown_size": "Неизвестен размер"
+    "unknown_size": "Неизвестен размер",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Файлов хеш",
@@ -882,7 +884,8 @@
   "login": {
     "create_user_account": "Създаване на потребителски акаунт",
     "login": "Влезте",
-    "unclaimed_html": "Този сървър на Komga все още не е активен, трябва да създадете потребителски акаунт, за да имате достъп до него.<br><br> Изберете <strong>имейл</strong> и <strong>парола</strong> и кликнете върху <strong>Създаване на потребителски акаунт</strong>."
+    "unclaimed_html": "Този сървър на Komga все още не е активен, трябва да създадете потребителски акаунт, за да имате достъп до него.<br><br> Изберете <strong>имейл</strong> и <strong>парола</strong> и кликнете върху <strong>Създаване на потребителски акаунт</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Коментар",

@@ -677,7 +677,9 @@
     "new": "새로 추가됨",
     "saved_size": "{size} 절약됨",
     "title": "중복 페이지",
-    "unknown_size": "알 수 없는 크기"
+    "unknown_size": "알 수 없는 크기",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "파일 해시",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "사용자 계정 만들기",
     "login": "로그인",
-    "unclaimed_html": "Komga 서버가 아직 활성화 되지 않았습니다. 접속하려면 사용자 계정을 만들어야 합니다.<strong>이메일과 암호</strong>를 설정하고 <strong>사용자 계정 만들기</strong>를 클릭합니다."
+    "unclaimed_html": "Komga 서버가 아직 활성화 되지 않았습니다. 접속하려면 사용자 계정을 만들어야 합니다.<strong>이메일과 암호</strong>를 설정하고 <strong>사용자 계정 만들기</strong>를 클릭합니다.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "설명",

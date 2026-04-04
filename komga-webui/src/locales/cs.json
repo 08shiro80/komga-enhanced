@@ -677,7 +677,9 @@
     "new": "Nové",
     "saved_size": "Uloženo {size}",
     "title": "Duplicitní stránky",
-    "unknown_size": "Neznámá velikost"
+    "unknown_size": "Neznámá velikost",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Hash souboru",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Vytvořit uživatelský účet",
     "login": "Přihlásit se",
-    "unclaimed_html": "Tento Komga server ještě není aktivní, musíte si vytvořit uživatelský účet, abyste k němu měli přístup.<br><br>Vyberte <strong>e-mail</strong> a <strong>heslo</strong> a klikněte na <strong>Vytvořit uživatelský účet</strong>."
+    "unclaimed_html": "Tento Komga server ještě není aktivní, musíte si vytvořit uživatelský účet, abyste k němu měli přístup.<br><br>Vyberte <strong>e-mail</strong> a <strong>heslo</strong> a klikněte na <strong>Vytvořit uživatelský účet</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Komentář",

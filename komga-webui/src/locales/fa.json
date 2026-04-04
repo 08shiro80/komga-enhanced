@@ -563,7 +563,9 @@
     "matches_n": "بدون منطبق | 1 مسابقه | {count} منطبق",
     "saved_size": "ذخیره شده {size}",
     "title": "صفحات تکراری",
-    "unknown_size": "اندازه نامشخص"
+    "unknown_size": "اندازه نامشخص",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "هش فایل",
@@ -680,7 +682,8 @@
   "login": {
     "create_user_account": "حساب کاربری ایجاد کنید",
     "login": "ورود",
-    "unclaimed_html": "این سرور Komga هنوز فعال نیست، شما باید یک حساب کاربری ایجاد کنید تا بتوانید به آن دسترسی داشته باشید.<br><br>یک <strong>ایمیل</strong> و <strong>گذرواژه</strong> را انتخاب کنید و روی <strong>ایجاد حساب کاربری</strong> کلیک کنید."
+    "unclaimed_html": "این سرور Komga هنوز فعال نیست، شما باید یک حساب کاربری ایجاد کنید تا بتوانید به آن دسترسی داشته باشید.<br><br>یک <strong>ایمیل</strong> و <strong>گذرواژه</strong> را انتخاب کنید و روی <strong>ایجاد حساب کاربری</strong> کلیک کنید.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "اظهار نظر",

@@ -609,7 +609,9 @@
       "total_size": "Общий размер"
     },
     "info": "Удаление дубликатов страниц изменит ваши файлы. Сделайте резервную копию ваших файлов и используйте ручное удаление перед тем как использовать автоматическое удаление.",
-    "unknown_size": "Неизвестный размер"
+    "unknown_size": "Неизвестный размер",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Хеш-сумма файла",
@@ -769,7 +771,8 @@
   "login": {
     "create_user_account": "Создать учётную запись пользователя",
     "login": "Войти",
-    "unclaimed_html": "Этот сервер Komga еще не активtн: для доступа к нему необходимо создать учётную запись пользователя.<br><br>Выберите <strong>email</strong> и <strong>пароль</strong> и нажмите на <strong>Создать учетную запись пользователя</strong>."
+    "unclaimed_html": "Этот сервер Komga еще не активtн: для доступа к нему необходимо создать учётную запись пользователя.<br><br>Выберите <strong>email</strong> и <strong>пароль</strong> и нажмите на <strong>Создать учетную запись пользователя</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Комментарий",

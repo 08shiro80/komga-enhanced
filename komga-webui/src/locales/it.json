@@ -677,7 +677,9 @@
     "new": "Nuove",
     "saved_size": "Risparmiati {size}",
     "title": "Pagine duplicate",
-    "unknown_size": "Dimensione sconosciuta"
+    "unknown_size": "Dimensione sconosciuta",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "File hash",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Crea account utente",
     "login": "Accedi",
-    "unclaimed_html": "Questo server Komga non è ancora attivo, devi creare un account utente per potervi accedere.<br><br>Scegli un'<strong>e-mail</strong> e una <strong>password</strong> e clicca su <strong>Crea account utente</strong>."
+    "unclaimed_html": "Questo server Komga non è ancora attivo, devi creare un account utente per potervi accedere.<br><br>Scegli un'<strong>e-mail</strong> e una <strong>password</strong> e clicca su <strong>Crea account utente</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Commento",

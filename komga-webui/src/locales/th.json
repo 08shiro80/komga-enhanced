@@ -677,7 +677,9 @@
     "new": "ใหม่",
     "saved_size": "ประหยัดได้ {size}",
     "title": "หน้าที่ซ้ำกัน",
-    "unknown_size": "ไม่ทราบขนาด"
+    "unknown_size": "ไม่ทราบขนาด",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "แฮชไฟล์",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "สร้างบัญชีผู้ใช้",
     "login": "ลงชื่อเข้าใช้",
-    "unclaimed_html": "เซิร์ฟเวอร์ Komga นี้ยังไม่เปิดใช้งาน คุณต้องสร้างบัญชีผู้ใช้เพื่อเข้าถึง<br><br>เลือก <strong>อีเมล</strong> และ <strong>รหัสผ่าน</strong> แล้วคลิกที่ <strong>สร้างบัญชีผู้ใช้</strong>"
+    "unclaimed_html": "เซิร์ฟเวอร์ Komga นี้ยังไม่เปิดใช้งาน คุณต้องสร้างบัญชีผู้ใช้เพื่อเข้าถึง<br><br>เลือก <strong>อีเมล</strong> และ <strong>รหัสผ่าน</strong> แล้วคลิกที่ <strong>สร้างบัญชีผู้ใช้</strong>",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "ความคิดเห็น",

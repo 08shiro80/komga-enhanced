@@ -675,7 +675,9 @@
     "new": "Nieuw",
     "saved_size": "{size} bespaard",
     "title": "Dubbele pagina's",
-    "unknown_size": "Onbekende grootte"
+    "unknown_size": "Onbekende grootte",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Bestand hash",
@@ -876,7 +878,8 @@
   "login": {
     "create_user_account": "Maak gebruikersaccount aan",
     "login": "Aanmelden",
-    "unclaimed_html": "Deze Komga server is nog niet actief, u moet een gebruikersaccount aanmaken om toegang te krijgen.<br><br>Kies een <strong>e-mail</strong> en <strong>wachtwoord</strong> en klik op <strong>Gebruikersaccount aanmaken</strong>."
+    "unclaimed_html": "Deze Komga server is nog niet actief, u moet een gebruikersaccount aanmaken om toegang te krijgen.<br><br>Kies een <strong>e-mail</strong> en <strong>wachtwoord</strong> en klik op <strong>Gebruikersaccount aanmaken</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Opmerking",

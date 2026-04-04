@@ -654,7 +654,9 @@
     "action_delete_manual": "Manuelles Löschen",
     "action_delete_matches": "Treffer löschen",
     "action_ignore": "Ignorieren",
+    "action_remove_all": "Alle aus der Liste entfernen",
     "action_ignore_remaining": "Noch ({count}) ignorierte übrig",
+    "confirm_remove_all": "Alle {count} bekannten Seiten-Hashes werden aus der Liste entfernt. Dies kann nicht rückgängig gemacht werden.",
     "action_manual_delete_remaining": "Noch ({count}) manuell zu löschende übrig",
     "confirm_auto_delete_remaining": "Alle verbleibenden Seiten mit dem Hash der Seite ({count}) werden zur automatischen Löschung markiert.",
     "confirm_manual_delete_remaining": "Alle verbleibenden Seiten mit dem Hash der Seite ({count}) werden zur manuellen Löschung markiert.",
@@ -882,6 +884,7 @@
     "recommended": "Empfehlungen"
   },
   "login": {
+    "browse_as_guest": "Als Gast durchsuchen",
     "create_user_account": "Benutzerkonto erstellen",
     "login": "Anmelden",
     "unclaimed_html": "Dieser Komga-Server ist noch nicht bereit. Sie müssen zuerst einen Benutzerkonto anlegen, um sich anmelden zu können.<br><br>Hinterlegen Sie eine <strong>E-Mail-Adresse</strong> und vergeben Sie ein <strong>Passwort</strong>. Klicken Sie dann auf <strong>Benutzerkonto erstellen</strong>."

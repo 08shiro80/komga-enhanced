@@ -517,7 +517,9 @@
       "size": "Grando",
       "total_size": "Totala grando"
     },
-    "unknown_size": "Nesciata grando"
+    "unknown_size": "Nesciata grando",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Haketaĵo de dosiero",
@@ -630,7 +632,8 @@
   "login": {
     "create_user_account": "Krei konton de uzanto",
     "login": "Saluti",
-    "unclaimed_html": "Ĉi tiu Komga-servilo ankoraŭ ne aktivas; vi devas krei konton de uzanto por uzi ĝin.<br><br>Elektu <strong>retpoŝtan adreson</strong> kaj <strong>pasvorton</strong> kaj alklaku la butonon <strong>Krei konton de uzanto</strong>."
+    "unclaimed_html": "Ĉi tiu Komga-servilo ankoraŭ ne aktivas; vi devas krei konton de uzanto por uzi ĝin.<br><br>Elektu <strong>retpoŝtan adreson</strong> kaj <strong>pasvorton</strong> kaj alklaku la butonon <strong>Krei konton de uzanto</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Komento",

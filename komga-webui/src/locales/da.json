@@ -647,7 +647,9 @@
     "new": "Ny",
     "saved_size": "Sparet {size}",
     "title": "Dublerede sider",
-    "unknown_size": "Ukendt størrelse"
+    "unknown_size": "Ukendt størrelse",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Fil hash",
@@ -836,7 +838,8 @@
   "login": {
     "create_user_account": "Opret en konto",
     "login": "Log ind",
-    "unclaimed_html": "Denne Komga-server er endnu ikke aktiv, du skal oprette en brugerkonto for at kunne få adgang til den.<br><br>Vælg en <strong>email</strong> og <strong>password</strong> og klik på <strong> Opret brugerkonto</strong>."
+    "unclaimed_html": "Denne Komga-server er endnu ikke aktiv, du skal oprette en brugerkonto for at kunne få adgang til den.<br><br>Vælg en <strong>email</strong> og <strong>password</strong> og klik på <strong> Opret brugerkonto</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Kommentér",

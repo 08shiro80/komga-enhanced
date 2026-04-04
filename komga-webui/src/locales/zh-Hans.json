@@ -677,7 +677,9 @@
     "new": "新增",
     "saved_size": "节省了 {size}",
     "title": "重复页面",
-    "unknown_size": "未知大小"
+    "unknown_size": "未知大小",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "文件哈希值",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "创建帐户",
     "login": "登录",
-    "unclaimed_html": "该 Komga 服务器尚未激活，您需要创建一个用户帐户才能访问它。<br><br>选择一个 <strong>邮箱</strong> 和 <strong>密码</strong> 然后点击 <strong>创建账户</strong>。"
+    "unclaimed_html": "该 Komga 服务器尚未激活，您需要创建一个用户帐户才能访问它。<br><br>选择一个 <strong>邮箱</strong> 和 <strong>密码</strong> 然后点击 <strong>创建账户</strong>。",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "注释",

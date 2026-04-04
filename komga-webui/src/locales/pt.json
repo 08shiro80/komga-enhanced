@@ -677,7 +677,9 @@
     "new": "Novo",
     "saved_size": "Economizado {size}",
     "title": "Páginas duplicadas",
-    "unknown_size": "Tamanho desconhecido"
+    "unknown_size": "Tamanho desconhecido",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Hash de ficheiro",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Criar conta de utilizador",
     "login": "Entrar",
-    "unclaimed_html": "Este servidor Komga ainda não está ativo, terá de criar uma conta de utilizador para o poder aceder.<br><br>Escolha um <strong>email</strong> e <strong>senha</strong> e clique em <strong>Criar conta de utilizador</strong>."
+    "unclaimed_html": "Este servidor Komga ainda não está ativo, terá de criar uma conta de utilizador para o poder aceder.<br><br>Escolha um <strong>email</strong> e <strong>senha</strong> e clique em <strong>Criar conta de utilizador</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Comentário",

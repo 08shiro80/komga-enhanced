@@ -236,10 +236,17 @@ class LibraryContentLifecycle(
       }
 
       // for all series where books have been removed or added, trigger a sort and refresh metadata
+      val sortedIds = seriesToSortAndRefresh.map { it.id }.toSet()
       seriesToSortAndRefresh.distinctBy { it.id }.forEach {
         seriesLifecycle.sortBooks(it)
         taskEmitter.refreshSeriesMetadata(it.id)
       }
+
+      // repair series with bookCount=0 that were not already sorted above
+      seriesRepository
+        .findAllByLibraryId(library.id)
+        .filter { it.bookCount == 0 && it.deletedDate == null && it.id !in sortedIds }
+        .forEach { seriesLifecycle.sortBooks(it) }
 
       val existingSidecars = sidecarRepository.findAll()
       scanResult.sidecars.forEach { newSidecar ->
@@ -335,7 +342,6 @@ class LibraryContentLifecycle(
     if (newBooks.isNotEmpty()) {
       logger.info { "Adding ${newBooks.size} new books to series ${series.name}" }
       seriesLifecycle.addBooks(series, newBooks)
-      seriesLifecycle.sortBooks(series)
       taskEmitter.refreshSeriesMetadata(series.id)
 
       newBooks.forEach { book ->
@@ -344,6 +350,7 @@ class LibraryContentLifecycle(
     } else {
       logger.info { "No new books in $seriesPath, checking chapter URLs" }
     }
+    seriesLifecycle.sortBooks(series)
 
     taskEmitter.refreshSeriesLocalArtwork(series.id)
 

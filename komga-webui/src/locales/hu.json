@@ -677,7 +677,9 @@
     "new": "Új",
     "saved_size": "{size} megtakarítva",
     "title": "Duplikált oldalak",
-    "unknown_size": "Ismeretlen méret"
+    "unknown_size": "Ismeretlen méret",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Fájl hash",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Felhasználói fiók létrehozása",
     "login": "Bejelentkezés",
-    "unclaimed_html": "Ez a Komga szerver még nem aktív, létre kell hoznod egy felhasználói fiókot az eléréshez.<br><br>Válassz egy <strong>e-mail címet</strong> és egy <strong>jelszót</strong> majd kattings a <strong>Felhasználói fiók létrehozása</strong> gombra."
+    "unclaimed_html": "Ez a Komga szerver még nem aktív, létre kell hoznod egy felhasználói fiókot az eléréshez.<br><br>Válassz egy <strong>e-mail címet</strong> és egy <strong>jelszót</strong> majd kattings a <strong>Felhasználói fiók létrehozása</strong> gombra.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Megjegyzés",

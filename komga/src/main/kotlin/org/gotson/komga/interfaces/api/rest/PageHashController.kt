@@ -118,6 +118,13 @@ class PageHashController(
     }
   }
 
+  @Operation(summary = "Remove all known page hash entries")
+  @DeleteMapping
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  fun deleteAllKnownPageHashes() {
+    pageHashRepository.deleteAllKnown()
+  }
+
   @Operation(summary = "Remove known page hash entry")
   @DeleteMapping("{pageHash}")
   @ResponseStatus(HttpStatus.NO_CONTENT)

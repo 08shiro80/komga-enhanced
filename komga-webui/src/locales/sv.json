@@ -663,7 +663,9 @@
     "new": "Ny",
     "saved_size": "Sparat {size}",
     "title": "Duplicerade sidor",
-    "unknown_size": "Okänd storlek"
+    "unknown_size": "Okänd storlek",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Filhash",
@@ -845,7 +847,8 @@
   "login": {
     "create_user_account": "Skapa användarkonto",
     "login": "Logga in",
-    "unclaimed_html": "Denna Komga-server är ännu inte aktiv, du måste skapa ett användarkonto för att få åtkomst till den.<br><br>Välj en <strong>e-post</strong> och ett <strong>lösenord</strong> och klicka på <strong>Skapa användarkonto</strong>."
+    "unclaimed_html": "Denna Komga-server är ännu inte aktiv, du måste skapa ett användarkonto för att få åtkomst till den.<br><br>Välj en <strong>e-post</strong> och ett <strong>lösenord</strong> och klicka på <strong>Skapa användarkonto</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Kommentar",

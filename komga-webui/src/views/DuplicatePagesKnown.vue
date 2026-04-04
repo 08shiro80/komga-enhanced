@@ -14,6 +14,18 @@
         />
       </v-col>
 
+      <v-col cols="auto">
+        <v-btn
+          v-if="totalElements > 0"
+          color="error"
+          small
+          outlined
+          @click="modalConfirmRemoveAll = true"
+        >
+          {{ $t('duplicate_pages.action_remove_all') }}
+        </v-btn>
+      </v-col>
+
       <v-spacer/>
 
       <v-col>
@@ -115,6 +127,15 @@
       </v-card>
     </v-dialog>
 
+    <confirmation-dialog
+      v-model="modalConfirmRemoveAll"
+      :title="$t('duplicate_pages.action_remove_all')"
+      :body-html="$t('duplicate_pages.confirm_remove_all', {count: totalElements})"
+      :button-confirm="$t('duplicate_pages.action_remove_all')"
+      button-confirm-color="error"
+      @confirm="removeAllHashes"
+    />
+
   </v-container>
 </template>
 
@@ -126,10 +147,11 @@ import PageHashKnownCard from '@/components/PageHashKnownCard.vue'
 import {PageHashAction} from '@/types/enum-pagehashes'
 import PageHashMatchesTable from '@/components/PageHashMatchesTable.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog.vue'
 
 export default Vue.extend({
   name: 'DuplicatePagesKnown',
-  components: {EmptyState, PageHashKnownCard, PageHashMatchesTable},
+  components: {ConfirmationDialog, EmptyState, PageHashKnownCard, PageHashMatchesTable},
   data: function () {
     return {
       pageHashKnownThumbnailUrl,
@@ -143,6 +165,7 @@ export default Vue.extend({
       dialogMatches: false,
       dialogImagePageHash: {} as PageHashKnownDto,
       dialogMatchesPageHash: {} as PageHashDto,
+      modalConfirmRemoveAll: false,
     }
   },
   async mounted() {
@@ -221,18 +244,15 @@ export default Vue.extend({
       this.dialogMatchesPageHash = pageHash
       this.dialogMatches = true
     },
-    pageHashUpdated(updated: PageHashKnownDto) {
-      this.elements.find(x => {
-          if (x.hash === updated.hash) {
-            x.action = updated.action
-            return true
-          }
-          return false
-        },
-      )
+    pageHashUpdated() {
+      this.loadData(this.page, this.sortActive, this.filterActive)
     },
     pageHashRemoved() {
-      this.loadData()
+      this.loadData(this.page, this.sortActive, this.filterActive)
+    },
+    async removeAllHashes() {
+      await this.$komgaPageHashes.removeAllKnownHashes()
+      this.loadData(1, this.sortActive, this.filterActive)
     },
   },
 })

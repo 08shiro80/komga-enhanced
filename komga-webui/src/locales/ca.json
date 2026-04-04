@@ -619,7 +619,9 @@
     "new": "Nou",
     "saved_size": "S'ha estalviat {size}",
     "title": "Duplica les pàgines",
-    "unknown_size": "Mida desconeguda"
+    "unknown_size": "Mida desconeguda",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Empremta del fitxer",
@@ -804,7 +806,8 @@
   "login": {
     "create_user_account": "Crea un compte d'usuari",
     "login": "Inicia la sessió",
-    "unclaimed_html": "El servidor Komga encara no és actiu, cal crear un compte d'usuari per poder-hi accedir.<br><br>Trieu un <strong>correu electrònic</strong> i una <strong>contrasenya</strong> i feu clic a <strong>Crea un compte d'usuari</strong>."
+    "unclaimed_html": "El servidor Komga encara no és actiu, cal crear un compte d'usuari per poder-hi accedir.<br><br>Trieu un <strong>correu electrònic</strong> i una <strong>contrasenya</strong> i feu clic a <strong>Crea un compte d'usuari</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Comentari",

@@ -677,7 +677,9 @@
     "new": "Nouveau",
     "saved_size": "{size} économisés",
     "title": "Pages en doublon",
-    "unknown_size": "Taille inconnue"
+    "unknown_size": "Taille inconnue",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Empreinte du fichier",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Créer un compte utilisateur",
     "login": "Se connecter",
-    "unclaimed_html": "Ce serveur Komga n'est pas encore actif, vous devez créer un compte utilisateur afin d'y accéder.<br><br>Choisissez un <strong>e-mail</strong> et un <strong>mot de passe</strong> puis cliquez sur <strong>Créer un compte utilisateur</strong>."
+    "unclaimed_html": "Ce serveur Komga n'est pas encore actif, vous devez créer un compte utilisateur afin d'y accéder.<br><br>Choisissez un <strong>e-mail</strong> et un <strong>mot de passe</strong> puis cliquez sur <strong>Créer un compte utilisateur</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Commentaire",

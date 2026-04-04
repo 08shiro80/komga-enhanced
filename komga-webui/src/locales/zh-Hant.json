@@ -677,7 +677,9 @@
     "new": "新增",
     "saved_size": "節省了 {size}",
     "title": "重複頁面",
-    "unknown_size": "未知大小"
+    "unknown_size": "未知大小",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "檔案雜湊",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "創建帳戶",
     "login": "登入",
-    "unclaimed_html": "該 Komga 伺服器尚未啟用，您需要創建一個使用者帳戶才能存取它。<br><br>選擇一個 <strong>信箱</strong> 和 <strong>密碼</strong> 然後點擊 <strong>創建帳戶</strong>。"
+    "unclaimed_html": "該 Komga 伺服器尚未啟用，您需要創建一個使用者帳戶才能存取它。<br><br>選擇一個 <strong>信箱</strong> 和 <strong>密碼</strong> 然後點擊 <strong>創建帳戶</strong>。",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "註釋",

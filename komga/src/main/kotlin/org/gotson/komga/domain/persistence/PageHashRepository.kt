@@ -37,4 +37,6 @@ interface PageHashRepository {
   fun update(pageHash: PageHashKnown)
 
   fun deleteKnown(pageHash: String)
+
+  fun deleteAllKnown()
 }

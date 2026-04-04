@@ -677,7 +677,9 @@
     "new": "Baru",
     "saved_size": "{size} terbebas",
     "title": "Halaman Duplikat",
-    "unknown_size": "Ukuran tidak diketahui"
+    "unknown_size": "Ukuran tidak diketahui",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "File hash",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Buat akun pengguna",
     "login": "Masuk",
-    "unclaimed_html": "Server Komga ini belum aktif, Anda perlu membuat akun pengguna untuk dapat mengaksesnya.<br><br>Pilih <strong>email</strong> dan <strong>sandi</strong> lalu klik <strong> Buat akun pengguna</strong>."
+    "unclaimed_html": "Server Komga ini belum aktif, Anda perlu membuat akun pengguna untuk dapat mengaksesnya.<br><br>Pilih <strong>email</strong> dan <strong>sandi</strong> lalu klik <strong> Buat akun pengguna</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Komentar",

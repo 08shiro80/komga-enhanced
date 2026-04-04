@@ -677,7 +677,9 @@
     "new": "Nové",
     "saved_size": "Ušetrené {size}",
     "title": "Duplicitné strany",
-    "unknown_size": "Neznáma veľkosť"
+    "unknown_size": "Neznáma veľkosť",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Hash súboru",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Vytvoriť používateľský účet",
     "login": "Prihlásiť sa",
-    "unclaimed_html": "Tento server Komga ešte nie je aktívny, aby ste mali k nemu prístup, musíte si vytvoriť používateľský účet. <br><br>Zvoľte si <strong>e-mailovú adresu</strong> a <strong>heslo</strong> a kliknite na <strong>Vytvoriť používateľský účet</strong>."
+    "unclaimed_html": "Tento server Komga ešte nie je aktívny, aby ste mali k nemu prístup, musíte si vytvoriť používateľský účet. <br><br>Zvoľte si <strong>e-mailovú adresu</strong> a <strong>heslo</strong> a kliknite na <strong>Vytvoriť používateľský účet</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Komentár",

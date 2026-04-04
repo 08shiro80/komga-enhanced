@@ -677,7 +677,9 @@
     "new": "Uusi",
     "saved_size": "Säästetty {size}",
     "title": "Sivujen kaksoiskappaleita",
-    "unknown_size": "Tuntematon koko"
+    "unknown_size": "Tuntematon koko",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
   },
   "duplicates": {
     "file_hash": "Tiedoston tarkiste",
@@ -883,7 +885,8 @@
   "login": {
     "create_user_account": "Luo käyttäjätili",
     "login": "Kirjaudu sisään",
-    "unclaimed_html": "Tämä Komga-palvelin ei ole vielä aktiivinen. Sinun täytyy luoda käyttäjätili voidaksesi käyttää sitä.<br><br>Valitse <strong>sähköpostiosoite</strong> ja <strong>salasana</strong>, sitten klikkaa <strong>Luo käyttäjätunnus</strong>."
+    "unclaimed_html": "Tämä Komga-palvelin ei ole vielä aktiivinen. Sinun täytyy luoda käyttäjätili voidaksesi käyttää sitä.<br><br>Valitse <strong>sähköpostiosoite</strong> ja <strong>salasana</strong>, sitten klikkaa <strong>Luo käyttäjätunnus</strong>.",
+    "browse_as_guest": "Browse as guest"
   },
   "media_analysis": {
     "comment": "Kommentti",

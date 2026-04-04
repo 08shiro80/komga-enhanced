@@ -657,6 +657,8 @@
     "action_delete_matches": "Delete matches",
     "action_ignore": "Ignore",
     "action_remove": "Remove from list",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone.",
     "action_ignore_remaining": "Ignore remaining ({count})",
     "action_manual_delete_remaining": "Manual delete remaining ({count})",
     "confirm_auto_delete_remaining": "All of the remaining page hashes on this page ({count}) will be marked for automatic deletion.",
@@ -888,6 +890,7 @@
     "recommended": "Recommended"
   },
   "login": {
+    "browse_as_guest": "Browse as guest",
     "create_user_account": "Create user account",
     "login": "Sign in",
     "unclaimed_html": "This Komga server is not yet active, you need to create a user account to be able to access it.<br/><br/>Choose an <strong>email</strong> and <strong>password</strong> and click on <strong>Create user account</strong>."
