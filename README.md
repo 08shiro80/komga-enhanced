@@ -304,6 +304,8 @@ services:
 docker compose up -d
 ```
 
+> **VLAN users:** If your Docker host uses VLANs and the container has no internet access, add `network_mode: bridge` to your compose service. Docker's default networking can fail to route traffic correctly in VLAN setups.
+
 ### Updating gallery-dl in Docker
 
 gallery-dl is installed via pip inside the Docker image. To update:

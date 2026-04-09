@@ -161,6 +161,7 @@ export interface OversizedPageDto {
   pageNumber: number,
   width: number,
   height: number,
+  ratio: number,
   fileSize: number,
   mediaType: string,
 }

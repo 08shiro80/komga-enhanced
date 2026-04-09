@@ -8,12 +8,14 @@ data class OversizedPageDto(
   val pageNumber: Int,
   val width: Int,
   val height: Int,
+  val ratio: Double,
   val fileSize: Long,
   val mediaType: String,
 )
 
 data class SplitRequestDto(
-  val maxHeight: Int = 2000,
+  val maxHeight: Int? = null,
+  val maxRatio: Double? = null,
   val bookIds: List<String>? = null,
 )
 

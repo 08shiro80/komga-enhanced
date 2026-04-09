@@ -6,6 +6,28 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.3.3] - 2026-04-09
+
+### Changed
+- **Oversized Pages: ratio-based detection and splitting** — Replaced fixed pixel thresholds (`minWidth`/`minHeight`/`maxHeight`) with aspect ratio (`height ÷ width`). Detection uses `minRatio` (find pages taller than N:1), splitting uses `maxRatio` (split into parts of at most N:1). Works consistently at any resolution. UI now offers presets (Webtoon 3:1, Moderate 2:1, Aggressive 1.5:1, Custom) instead of manual pixel inputs. Table shows ratio column and split preview. Removed "Total Pixels" and "Media Type" columns.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `domain/service/PageSplitter.kt` | `maxRatio` parameter, per-page `effectiveMaxHeight` from ratio × width |
+| `interfaces/api/rest/OversizedPagesController.kt` | `minRatio`/`maxRatio` query params, ratio-based filtering and split-all |
+| `interfaces/api/rest/dto/OversizedPageDto.kt` | Added `ratio` field, `SplitRequestDto` now has `maxRatio` |
+| `komga-webui/src/views/OversizedPages.vue` | Preset selector, ratio inputs, ratio column, split preview column |
+| `komga-webui/src/services/komga-books.service.ts` | `getOversizedPages()` takes `minRatio` instead of `minWidth`/`minHeight` |
+| `komga-webui/src/types/komga-books.ts` | `OversizedPageDto.ratio` field |
+
+### Docs
+- **README: VLAN Docker note** — Added tip for Docker hosts using VLANs: `network_mode: bridge` may be needed for internet access.
+
+### Housekeeping
+- **Deleted `apple.cer`** — Apple certificate file that shouldn't be in the repository.
+
+---
+
 ## [0.1.3.2] - 2026-04-04
 
 ### Bug Fixes

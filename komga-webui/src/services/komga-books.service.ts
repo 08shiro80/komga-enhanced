@@ -353,11 +353,10 @@ export default class KomgaBooksService {
     }
   }
 
-  async getOversizedPages(minWidth?: number, minHeight?: number, pageRequest?: PageRequest): Promise<Page<OversizedPageDto>> {
+  async getOversizedPages(minRatio?: number, pageRequest?: PageRequest): Promise<Page<OversizedPageDto>> {
     try {
       const params = {...pageRequest} as any
-      if (minWidth) params.minWidth = minWidth
-      if (minHeight) params.minHeight = minHeight
+      if (minRatio) params.minRatio = minRatio
 
       return (await this.http.get('/api/v1/media-management/oversized-pages', {
         params: params,

@@ -43,13 +43,16 @@ class OversizedPagesController(
   @GetMapping
   @PageableAsQueryParam
   fun getOversizedPages(
-    @RequestParam(name = "minWidth", defaultValue = "4000") minWidth: Int,
-    @RequestParam(name = "minHeight", defaultValue = "4000") minHeight: Int,
+    @RequestParam(name = "minWidth", required = false) minWidth: Int?,
+    @RequestParam(name = "minHeight", required = false) minHeight: Int?,
+    @RequestParam(name = "minRatio", required = false) minRatio: Double?,
     @Parameter(hidden = true) page: Pageable,
   ): Page<OversizedPageDto> {
-    // Get all books and check their pages for oversized dimensions
-    val allBooks = bookRepository.findAll()
+    val useRatio = minRatio != null
+    val effectiveMinWidth = minWidth ?: 4000
+    val effectiveMinHeight = minHeight ?: 4000
 
+    val allBooks = bookRepository.findAll()
     val oversizedPages = mutableListOf<OversizedPageDto>()
 
     for (book in allBooks) {
@@ -58,28 +61,37 @@ class OversizedPagesController(
 
       media.pages.forEachIndexed { index, bookPage ->
         val dimension = bookPage.dimension
-        if (dimension != null && (dimension.width >= minWidth || dimension.height >= minHeight)) {
-          oversizedPages.add(
-            OversizedPageDto(
-              bookId = book.id,
-              bookName = book.name,
-              seriesId = book.seriesId,
-              seriesTitle = series?.name ?: "",
-              pageNumber = index + 1,
-              width = dimension.width,
-              height = dimension.height,
-              fileSize = bookPage.fileSize ?: 0L,
-              mediaType = bookPage.mediaType,
-            ),
-          )
+        if (dimension != null && dimension.width > 0) {
+          val ratio = dimension.height.toDouble() / dimension.width.toDouble()
+          val matches =
+            if (useRatio) {
+              ratio >= minRatio!!
+            } else {
+              dimension.width >= effectiveMinWidth || dimension.height >= effectiveMinHeight
+            }
+
+          if (matches) {
+            oversizedPages.add(
+              OversizedPageDto(
+                bookId = book.id,
+                bookName = book.name,
+                seriesId = book.seriesId,
+                seriesTitle = series?.name ?: "",
+                pageNumber = index + 1,
+                width = dimension.width,
+                height = dimension.height,
+                ratio = Math.round(ratio * 100.0) / 100.0,
+                fileSize = bookPage.fileSize ?: 0L,
+                mediaType = bookPage.mediaType,
+              ),
+            )
+          }
         }
       }
     }
 
-    // Sort by dimensions (largest first)
-    oversizedPages.sortByDescending { it.width * it.height }
+    oversizedPages.sortByDescending { it.ratio }
 
-    // Paginate results manually
     val start = (page.pageNumber * page.pageSize).coerceAtMost(oversizedPages.size)
     val end = ((page.pageNumber + 1) * page.pageSize).coerceAtMost(oversizedPages.size)
     val pageContent =
@@ -100,13 +112,14 @@ class OversizedPagesController(
   @PostMapping("split/{bookId}")
   fun splitTallPages(
     @PathVariable bookId: String,
-    @RequestParam(name = "maxHeight", defaultValue = "2000") maxHeight: Int,
+    @RequestParam(name = "maxHeight", required = false) maxHeight: Int?,
+    @RequestParam(name = "maxRatio", required = false) maxRatio: Double?,
   ): SplitResultDto {
     val book =
       bookRepository.findByIdOrNull(bookId)
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found: $bookId")
 
-    val result = pageSplitter.splitTallPages(book, maxHeight)
+    val result = pageSplitter.splitTallPages(book, maxHeight = maxHeight, maxRatio = maxRatio ?: if (maxHeight == null) 1.5 else null)
     return result.toDto()
   }
 
@@ -124,18 +137,26 @@ class OversizedPagesController(
     // Find all books with pages exceeding the height threshold
     val allBooks = bookRepository.findAll()
 
+    val effectiveMaxHeight = request.maxHeight
+    val effectiveMaxRatio = request.maxRatio ?: if (effectiveMaxHeight == null) 1.5 else null
+
     for (book in allBooks) {
       val media = mediaRepository.findByIdOrNull(book.id) ?: continue
 
       val hasOversizedPages =
         media.pages.any { page ->
           val dimension = page.dimension
-          dimension != null && dimension.height > request.maxHeight
+          if (dimension == null || dimension.width == 0) return@any false
+          if (effectiveMaxRatio != null) {
+            dimension.height.toDouble() / dimension.width.toDouble() > effectiveMaxRatio
+          } else {
+            dimension.height > (effectiveMaxHeight ?: 2000)
+          }
         }
 
       if (hasOversizedPages) {
         try {
-          val result = pageSplitter.splitTallPages(book, request.maxHeight)
+          val result = pageSplitter.splitTallPages(book, maxHeight = effectiveMaxHeight, maxRatio = effectiveMaxRatio)
           results.add(result.toDto())
         } catch (e: Exception) {
           results.add(

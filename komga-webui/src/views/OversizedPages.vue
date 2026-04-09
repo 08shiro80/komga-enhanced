@@ -19,48 +19,56 @@
           <v-row>
             <v-col cols="12">
               <v-alert type="info" dismissible text class="body-2">
-                Scan for pages with very high resolutions. You can split tall images into multiple pages
-                (like TachiyomiSY's "split tall images" feature).
+                Scan for tall pages (webtoon strips, long scrolling pages) and split them into
+                multiple readable pages. Uses aspect ratio (height &divide; width) instead of
+                fixed pixel values &mdash; works at any resolution.
               </v-alert>
             </v-col>
           </v-row>
-          <v-row>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field
-                v-model.number="filterMinWidth"
-                label="Min Width (px)"
-                type="number"
+          <v-row align="center">
+            <v-col cols="12" sm="6" md="3">
+              <v-select
+                v-model="selectedPreset"
+                :items="presets"
+                item-text="label"
+                item-value="key"
+                label="Preset"
                 filled
                 dense
-                :min="1000"
-                :max="20000"
+                @change="applyPreset"
               />
             </v-col>
-            <v-col cols="12" sm="6" md="2">
+            <v-col cols="12" sm="3" md="2">
               <v-text-field
-                v-model.number="filterMinHeight"
-                label="Min Height (px)"
+                v-model.number="detectRatio"
+                label="Detect ratio"
                 type="number"
                 filled
                 dense
-                :min="1000"
-                :max="20000"
-              />
-            </v-col>
-            <v-col cols="12" sm="6" md="2">
-              <v-text-field
-                v-model.number="splitMaxHeight"
-                label="Split Height (px)"
-                type="number"
-                filled
-                dense
-                :min="500"
-                :max="10000"
-                hint="Max height per page when splitting"
+                step="0.5"
+                :min="1.5"
+                :max="20"
+                hint="Find pages taller than N:1"
                 persistent-hint
+                @input="selectedPreset = 'custom'"
               />
             </v-col>
-            <v-col cols="12" sm="6" md="4" class="d-flex align-center">
+            <v-col cols="12" sm="3" md="2">
+              <v-text-field
+                v-model.number="splitRatio"
+                label="Split ratio"
+                type="number"
+                filled
+                dense
+                step="0.5"
+                :min="1"
+                :max="10"
+                hint="Max height per part (N &times; width)"
+                persistent-hint
+                @input="selectedPreset = 'custom'"
+              />
+            </v-col>
+            <v-col cols="12" sm="6" md="5" class="d-flex align-center">
               <v-btn color="primary" @click="loadPages" class="mr-2">
                 <v-icon left>mdi-magnify</v-icon>
                 Search
@@ -102,11 +110,15 @@
       </template>
 
       <template v-slot:item.dimensions="{ item }">
-        {{ item.width }} x {{ item.height }}
+        {{ item.width }} &times; {{ item.height }}
       </template>
 
-      <template v-slot:item.totalPixels="{ item }">
-        {{ formatNumber(item.width * item.height) }}
+      <template v-slot:item.ratio="{ item }">
+        {{ item.ratio }}:1
+      </template>
+
+      <template v-slot:item.splitPreview="{ item }">
+        {{ Math.ceil(item.height / (item.width * splitRatio)) }} parts
       </template>
 
       <template v-slot:item.fileSize="{ item }">
@@ -128,7 +140,8 @@
           Split All Tall Pages?
         </v-card-title>
         <v-card-text class="pt-4">
-          <p>This will split all pages taller than <strong>{{ splitMaxHeight }}px</strong> into multiple pages.</p>
+          <p>This will split all pages with ratio above <strong>{{ detectRatio }}:1</strong>
+            into parts of max <strong>{{ splitRatio }}:1</strong>.</p>
           <p class="mb-0">This operation modifies your book files and cannot be undone.</p>
         </v-card-text>
         <v-card-actions>
@@ -195,6 +208,20 @@ interface SplitResult {
   message: string
 }
 
+interface Preset {
+  key: string
+  label: string
+  detect: number
+  split: number
+}
+
+const PRESETS: Preset[] = [
+  {key: 'webtoon', label: 'Webtoon / Long Strip', detect: 3, split: 1.5},
+  {key: 'moderate', label: 'Moderate', detect: 2, split: 1.5},
+  {key: 'aggressive', label: 'Aggressive', detect: 1.5, split: 1.2},
+  {key: 'custom', label: 'Custom', detect: 0, split: 0},
+]
+
 export default Vue.extend({
   name: 'OversizedPages',
   data: function () {
@@ -207,9 +234,10 @@ export default Vue.extend({
       options: {
         itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
       } as any,
-      filterMinWidth: 4000,
-      filterMinHeight: 4000,
-      splitMaxHeight: 2000,
+      selectedPreset: 'webtoon',
+      detectRatio: 3,
+      splitRatio: 1.5,
+      presets: PRESETS,
       splitResults: [] as SplitResult[],
       showResultsDialog: false,
       showConfirmDialog: false,
@@ -231,15 +259,22 @@ export default Vue.extend({
       return [
         {text: 'Series', value: 'seriesTitle'},
         {text: 'Book', value: 'bookName'},
-        {text: 'Page #', value: 'pageNumber', width: '100px'},
+        {text: 'Page #', value: 'pageNumber', width: '80px'},
         {text: 'Dimensions', value: 'dimensions', sortable: false},
-        {text: 'Total Pixels', value: 'totalPixels', sortable: false},
+        {text: 'Ratio', value: 'ratio', width: '90px'},
+        {text: 'Split into', value: 'splitPreview', sortable: false, width: '100px'},
         {text: 'File Size', value: 'fileSize'},
-        {text: 'Media Type', value: 'mediaType'},
       ]
     },
   },
   methods: {
+    applyPreset(key: string) {
+      const preset = PRESETS.find(p => p.key === key)
+      if (preset && preset.key !== 'custom') {
+        this.detectRatio = preset.detect
+        this.splitRatio = preset.split
+      }
+    },
     async loadPages() {
       this.loading = true
 
@@ -257,8 +292,7 @@ export default Vue.extend({
 
       try {
         const page = await this.$komgaBooks.getOversizedPages(
-          this.filterMinWidth,
-          this.filterMinHeight,
+          this.detectRatio,
           pageRequest,
         )
         this.oversizedPages = page.content
@@ -275,7 +309,6 @@ export default Vue.extend({
       this.splitting = true
       this.splitResults = []
 
-      // Get unique book IDs
       const uniqueBookIds = [...new Set(this.selectedPages.map(p => p.bookId))]
 
       for (const bookId of uniqueBookIds) {
@@ -283,7 +316,7 @@ export default Vue.extend({
           const response = await this.$http.post(
             `/api/v1/media-management/oversized-pages/split/${bookId}`,
             null,
-            { params: { maxHeight: this.splitMaxHeight } },
+            {params: {maxRatio: this.splitRatio}},
           )
           this.splitResults.push(response.data)
         } catch (e: any) {
@@ -315,7 +348,7 @@ export default Vue.extend({
       try {
         const response = await this.$http.post(
           '/api/v1/media-management/oversized-pages/split-all',
-          { maxHeight: this.splitMaxHeight },
+          {maxRatio: this.splitRatio},
         )
         this.splitResults = response.data
       } catch (e: any) {
@@ -334,9 +367,6 @@ export default Vue.extend({
       const sizes = ['B', 'KB', 'MB', 'GB']
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
-    },
-    formatNumber(num: number): string {
-      return num.toLocaleString()
     },
   },
 })
