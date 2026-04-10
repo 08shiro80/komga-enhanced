@@ -103,10 +103,10 @@ class GalleryDlWrapper(
   fun getChapterInfo(url: String): MangaInfo {
     val mangadexId = extractMangaDexId(url)
     if (mangadexId != null) {
-      logger.info { "Detected MangaDex URL, fetching metadata from API for manga ID: $mangadexId" }
+      logger.debug { "Detected MangaDex URL, fetching metadata from API for manga ID: $mangadexId" }
       val apiMetadata = mangaDexApiClient.fetchMangaDexMetadata(mangadexId)
       if (apiMetadata != null) {
-        logger.info { "Using MangaDex API metadata: ${apiMetadata.title}" }
+        logger.debug { "Using MangaDex API metadata: ${apiMetadata.title}" }
         return apiMetadata.copy(sourceUrl = url)
       }
       logger.warn { "MangaDex API fetch failed, falling back to gallery-dl metadata" }
@@ -176,7 +176,7 @@ class GalleryDlWrapper(
       if (mangaInfo.title.isBlank() || mangaInfo.title == "Unknown") {
         val fallback = deriveTitleFromUrl(url)
         if (fallback != null) {
-          logger.info { "No title in metadata, using URL-derived title: $fallback" }
+          logger.debug { "No title in metadata, using URL-derived title: $fallback" }
           return mangaInfo.copy(title = fallback)
         }
         val errorMsg = "Failed to extract manga title from URL: $url"
@@ -363,7 +363,7 @@ class GalleryDlWrapper(
           if (existingCoverFile != null && !coverChanged) {
             logger.debug { "Cover already exists and unchanged, skipping download" }
           } else {
-            logger.info { "Downloading cover image" }
+            logger.debug { "Downloading cover image" }
             mangaDexApiClient.downloadMangaCover(mangaDexId, mangaInfo.coverFilename!!, destinationPath)
           }
         } else {
@@ -375,7 +375,7 @@ class GalleryDlWrapper(
 
       val allChapters =
         if (mangaDexId != null) {
-          logger.info { "Fetching chapter list for $mangaDexId" }
+          logger.debug { "Fetching chapter list for $mangaDexId" }
           getChaptersForManga(mangaDexId)
         } else {
           logger.warn { "Not a MangaDex URL, falling back to single download" }
@@ -397,7 +397,7 @@ class GalleryDlWrapper(
           emptySet()
         }
       val knownUrls = dbUrls + cbzUrls
-      logger.info { "Known chapter URLs: ${knownUrls.size} (db: ${dbUrls.size}, cbz: ${cbzUrls.size})" }
+      logger.debug { "Known chapter URLs: ${knownUrls.size} (db: ${dbUrls.size}, cbz: ${cbzUrls.size})" }
 
       val blacklistedUrls =
         if (komgaSeriesId != null) {
@@ -441,7 +441,7 @@ class GalleryDlWrapper(
                   chapterTitle = old.chapterTitle,
                 ),
               )
-              logger.info { "Auto-blacklisted same-group duplicate: ch.${old.chapterNumber} [${old.scanlationGroup}] ${old.chapterUrl}" }
+              logger.debug { "Auto-blacklisted same-group duplicate: ch.${old.chapterNumber} [${old.scanlationGroup}] ${old.chapterUrl}" }
             } catch (e: Exception) {
               logger.debug(e) { "Blacklist insert failed (likely duplicate): ${old.chapterUrl}" }
             }
@@ -454,7 +454,7 @@ class GalleryDlWrapper(
       val skippedByBlacklist = allChapters.count { it.chapterUrl in blacklistedUrls }
       val skippedCount = allChapters.size - filteredChapters.size
       if (skippedCount > 0) {
-        logger.info {
+        logger.debug {
           "Resuming download: $skippedCount/${allChapters.size} chapters already done, ${filteredChapters.size} remaining " +
             "(by URL: $skippedByUrl, by blacklist: $skippedByBlacklist, same-group duplicates: ${sameGroupDuplicates.size})"
         }
@@ -465,7 +465,7 @@ class GalleryDlWrapper(
 
         updateExistingCbzChapterUrls(destDir, allChapters, knownUrls, mangaInfo)
       } else {
-        logger.info { "No existing chapters found, downloading all ${allChapters.size} chapters" }
+        logger.debug { "No existing chapters found, downloading all ${allChapters.size} chapters" }
       }
 
       val filesDownloaded = AtomicInteger(0)
@@ -502,7 +502,7 @@ class GalleryDlWrapper(
             emptyMap()
           }
 
-        logger.info { "Starting bulk download: $url (chapter mapping: ${galleryDlChapterMap.size} chapters)" }
+        logger.debug { "Starting bulk download: $url (chapter mapping: ${galleryDlChapterMap.size} chapters)" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Starting download: $url")
 
         val process =
@@ -666,7 +666,7 @@ class GalleryDlWrapper(
 
         chapterMatcher.normalizeDoubleBracketFilenames(destDir)
       } else if (filteredChapters.isEmpty()) {
-        logger.info { "All ${allChapters.size} chapters already downloaded, nothing to do" }
+        logger.debug { "All ${allChapters.size} chapters already downloaded, nothing to do" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "All chapters already downloaded, skipping: $url")
         deleteQuietly(configFile)
       } else {
@@ -679,14 +679,14 @@ class GalleryDlWrapper(
         val autoBlacklisted = filteredChapters.size - totalChapters - externalRedirects
         val resumeInfo = if (skippedCount > 0) " (resuming, $skippedCount already done)" else ""
         val externalInfo = if (externalRedirects > 0) " ($externalRedirects external redirects)" else ""
-        logger.info { "Downloading $totalChapters chapters$resumeInfo${if (autoBlacklisted > 0) " ($autoBlacklisted auto-blacklisted)" else ""}$externalInfo" }
+        logger.debug { "Downloading $totalChapters chapters$resumeInfo${if (autoBlacklisted > 0) " ($autoBlacklisted auto-blacklisted)" else ""}$externalInfo" }
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Downloading $totalChapters chapters$resumeInfo: $url")
 
         var downloadIndex = 0
         filteredChapters.forEachIndexed { index, chapter ->
           if (isCancelled()) {
             saveChapterFailures(failuresFile, chapterFailures)
-            logger.info { "Download cancelled before chapter ${downloadIndex + 1}/$totalChapters, stopping" }
+            logger.debug { "Download cancelled before chapter ${downloadIndex + 1}/$totalChapters, stopping" }
             deleteQuietly(configFile)
             return DownloadResult(
               success = true,
@@ -715,7 +715,7 @@ class GalleryDlWrapper(
                     chapterTitle = chapter.chapterTitle,
                   ),
                 )
-                logger.info { "Auto-blacklisted external redirect chapter $chapterNum (pages=0): ${chapter.chapterUrl}" }
+                logger.debug { "Auto-blacklisted external redirect chapter $chapterNum (pages=0): ${chapter.chapterUrl}" }
               } catch (e: Exception) {
                 logger.debug(e) { "Blacklist insert failed (likely duplicate): ${chapter.chapterUrl}" }
               }
@@ -741,7 +741,7 @@ class GalleryDlWrapper(
                     chapterTitle = chapter.chapterTitle,
                   ),
                 )
-                logger.info { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
+                logger.debug { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
               } catch (e: Exception) {
                 logger.debug(e) { "Blacklist insert failed (likely duplicate): ${chapter.chapterUrl}" }
               }
@@ -752,7 +752,7 @@ class GalleryDlWrapper(
           }
 
           downloadIndex++
-          logger.info { "Downloading chapter $chapterNum ($downloadIndex/$totalChapters): ${chapter.chapterUrl}" }
+          logger.debug { "Downloading chapter $chapterNum ($downloadIndex/$totalChapters): ${chapter.chapterUrl}" }
 
           val chapterCommand =
             galleryDlProcess.getCommand(gdlPath).toMutableList().apply {
@@ -910,7 +910,7 @@ class GalleryDlWrapper(
           ?.map { it.absolutePath }
           ?: emptyList()
 
-      logger.info { "Found ${downloadedFiles.size} CBZ files in ${destDir.absolutePath}" }
+      logger.debug { "Found ${downloadedFiles.size} CBZ files in ${destDir.absolutePath}" }
 
       try {
         destDir
@@ -932,7 +932,7 @@ class GalleryDlWrapper(
         )
       }
 
-      logger.info { "Download completed: ${downloadedFiles.size} files (manga: ${mangaInfo.title})" }
+      logger.debug { "Download completed: ${downloadedFiles.size} files (manga: ${mangaInfo.title})" }
       logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "Download completed successfully: ${downloadedFiles.size} files downloaded from $url")
 
       return DownloadResult(
@@ -1197,11 +1197,11 @@ class GalleryDlWrapper(
               )
             addComicInfoToCbzWithChapterInfo(cbzFile.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
             repaired++
-            logger.info { "Repaired: ${cbzFile.name}" }
+            logger.debug { "Repaired: ${cbzFile.name}" }
           } else {
             addComicInfoToCbz(cbzFile.toPath(), mangaInfo)
             repaired++
-            logger.info { "Repaired (series-only): ${cbzFile.name}" }
+            logger.debug { "Repaired (series-only): ${cbzFile.name}" }
           }
         } catch (e: Exception) {
           logger.warn(e) { "Failed to repair ${cbzFile.name}" }

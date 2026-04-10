@@ -6,6 +6,45 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.3.4] - 2026-04-10
+
+### Bug Fixes
+- **Oversized Pages: "Split Selected" ignored the selection** — Clicking "Split Selected" only sent the unique `bookId`s to `POST /api/v1/media-management/oversized-pages/split/{bookId}` with no page list. The backend then re-scanned the entire book by ratio and split *every* matching page, not just the selected one — so selecting a single oversized page could split 10+ other pages in the same book as a side effect. Frontend now groups selected rows by `bookId` and passes `pageNumbers[]`; backend `PageSplitter.splitTallPages(..., pageNumbers: Set<Int>?)` respects the set verbatim (ratio filters are bypassed for explicit selections since the UI already vetted them, sanity filters still apply).
+
+### New Features
+- **Oversized Pages: Double Page preset** — New `Double Page` preset detects wide images that contain two facing pages (e.g. manga spreads) and splits them horizontally into single pages. Detection uses `width ÷ height` ratio (default 1.3:1), splitting creates parts with max width = `splitRatio × height` (default 1.0, i.e. 2 parts for a 2:1 spread). Tall-mode presets (Webtoon/Moderate/Aggressive) and wide-mode (Double Page) are fully isolated: selecting Webtoon never lists double pages and vice versa. Backend accepts `mode=tall|wide` on `GET /api/v1/media-management/oversized-pages` and both split endpoints.
+- **Oversized Pages: image preview** — Each row now shows a thumbnail column and a preview action. Clicking the thumbnail or the preview icon opens a dialog with the full image, dimensions and ratio, so you can verify a page before splitting or ignoring it. Pattern mirrors the Duplicate Pages preview flow.
+- **Oversized Pages: ignore list** — Pages you don't want to split can be marked as ignored (per-row icon, batch "Ignore Selected" button, or from the preview dialog). Ignored entries are persisted in a new `IGNORED_OVERSIZED_PAGE` table keyed by `(bookId, pageNumber, mode)` so tall and wide lists keep independent ignore states. A "Show ignored" toggle brings them back into view. After a successful split, ignored entries for that book+mode are cleared automatically since page numbers shift.
+- **Oversized Pages: sanity filter for divider strips** — Webtoon divider/banner images with pathological dimensions (e.g. `720×1`, `1200×15`, `1200×25`) were matched by Double Page detection because their `width÷height` ratio is astronomical. Added two hard filters shared by the listing endpoint, `split-all`, and `PageSplitter`: images with either side below `MIN_VALID_DIMENSION = 50 px` are rejected outright, and in WIDE mode the ratio is capped at `MAX_WIDE_RATIO = 10.0` (real double pages are ~2:1, so anything beyond 10:1 is a strip, not a spread).
+- **Post-download scan honors library analysis settings** — `LibraryContentLifecycle.scanSeriesFolder` (triggered after gallery-dl downloads) used to emit `analyzeBook` only, so newly downloaded books bypassed `hashFiles`, `hashPages`, `hashKoreader`, `repairExtensions`, `FindBooksToConvert` and `FindDuplicatePagesToDelete` — exactly the same per-library toggles that a normal `ScanLibrary` task honors. Now the targeted scan emits the same post-scan task set as `ScanLibrary` (all emitters already filter internally by library flag and book state, so existing books are not re-processed).
+- **Oversized Pages: delete pages from book** — New delete action for unwanted frames (webtoon divider strips, blank pages, garbage frames) that are not duplicates and therefore cannot be removed via Duplicate Pages. Delete icon per row, "Delete Selected" batch button, and a "Delete this page" action in the preview dialog — all routed through a confirmation dialog since the operation is destructive. Backend adds `BookPageEditor.removePagesByNumber(book, pageNumbers)` (mirrors `removeHashedPages` but keys by 1-indexed page number instead of precomputed hash) plus `POST /api/v1/media-management/oversized-pages/delete-page` and `/delete-pages-batch` endpoints. The ignore list for the affected book+mode is cleared after a successful delete since page numbers shift, and if page 1 is removed the thumbnail is regenerated.
+- **Split logging: quieter success path, richer errors** — Per-page `Splitting image 855x2641 into 3 parts …` in `ImageSplitter` (both tall and wide) and the redundant `Replaced original file with split version` in `PageSplitter` were at INFO level, producing one line per split page (e.g. 11 lines for an 11-page split). Demoted to DEBUG so only the per-book summary (`Found N pages to split`, `Successfully split N pages`) remains at INFO. When a single page fails to split, a new per-page `WARN` log names the offending page and its dimensions before the outer error handler triggers the rollback — so failures are easier to diagnose.
+- **Download logging: demoted to DEBUG** — `GalleryDlWrapper` previously logged every chapter download step at INFO (`Downloading chapter 36 (49/58): …`, `Starting bulk download`, `Known chapter URLs`, `Auto-blacklisted …`, `Download completed`, `Repaired: …`, etc.), duplicating the progress information already shown in the WebUI download panel. All ~20 INFO-level calls demoted to DEBUG; `logger.warn`/`logger.error` left untouched so failures (timeouts, exit codes, missing CBZs, API errors) still surface in the main log.
+
+### UI Improvements
+- **Oversized Pages: more rows-per-page options** — Added `250` and `500` to `itemsPerPage` selector alongside existing `20/50/100`.
+- **Oversized Pages: fix Split Selected count** — `item-key` was `bookId`, so Vuetify deduplicated rows when multiple pages from the same book appeared on one page — selecting all 100 rows ended up with fewer entries in `selectedPages`. Switched to composite `rowKey = bookId_pageNumber`; "Split Selected (N)" now reflects the real row count.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `infrastructure/image/ImageSplitter.kt` | New `splitWideImage()` — horizontal slicing by `targetWidth` |
+| `domain/service/PageSplitter.kt` | `SplitMode` enum (`TALL`/`WIDE`), `mode` param dispatches to `splitWideImage`/`splitTallImage`; `PageToSplit.effectiveMax` replaces `effectiveMaxHeight`; `MIN_VALID_DIMENSION`/`MAX_WIDE_RATIO` sanity filters; per-page WARN on split failure; quieter INFO on success path |
+| `infrastructure/image/ImageSplitter.kt` | `Splitting image …` logs demoted from INFO to DEBUG (both tall and wide) |
+| `interfaces/api/rest/OversizedPagesController.kt` | `mode` query/body param on list, `split/{bookId}` and `split-all`; `includeIgnored` filter; ignore/unignore/ignore-batch endpoints; delete-page/delete-pages-batch endpoints; auto-cleanup after successful split/delete; shares `PageSplitter` sanity filters |
+| `domain/service/BookPageEditor.kt` | New `removePagesByNumber(book, pageNumbers)` method that removes pages by 1-indexed position (no fileHash required), logs `BookConverted` historical event |
+| `interfaces/api/rest/dto/OversizedPageDto.kt` | `SplitRequestDto.mode` field; `IgnoreOversizedPageRequestDto`, `IgnoreOversizedPagesRequestDto`, `IgnoredPageKeyDto`; `DeleteOversizedPageRequestDto`, `DeleteOversizedPagesRequestDto`, `DeletePagesResultDto` |
+| `domain/model/IgnoredOversizedPage.kt` | New domain model for ignored pages |
+| `domain/persistence/IgnoredOversizedPageRepository.kt` | New repository interface |
+| `infrastructure/jooq/main/IgnoredOversizedPageDao.kt` | jOOQ DAO implementing `IgnoredOversizedPageRepository` |
+| `flyway/resources/db/migration/fork/sqlite/V20260401000000__ignored_oversized_pages.sql` | New `IGNORED_OVERSIZED_PAGE` table with composite PK on `(BOOK_ID, PAGE_NUMBER, MODE)` |
+| `komga-webui/src/views/OversizedPages.vue` | `Double Page` preset + mode-aware labels/hints/dialog; `rowKey` composite key; rows-per-page `[20,50,100,250,500]`; thumbnail column; preview dialog; per-row and batch ignore buttons; "Show ignored" toggle; per-row and batch delete buttons with confirmation dialog; "Delete this page" action in preview dialog |
+| `komga-webui/src/services/komga-books.service.ts` | `getOversizedPages()` takes `mode` + `includeIgnored`; new `ignoreOversizedPage()`, `ignoreOversizedPagesBatch()`, `unignoreOversizedPage()`, `deleteOversizedPage()`, `deleteOversizedPagesBatch()` |
+| `domain/service/LibraryContentLifecycle.kt` | `scanSeriesFolder` now mirrors `ScanLibrary` post-scan tasks (`repairExtensions`, `findBooksToConvert`, `findBooksWithMissingPageHash`, `findDuplicatePagesToDelete`, `hashBooksWithoutHash`, `hashBooksWithoutHashKoreader`) |
+| `infrastructure/download/GalleryDlWrapper.kt` | All INFO download-progress logs demoted to DEBUG (20 call sites); warn/error untouched |
+| `gradle.properties` | Fork version bump to `0.1.3.4` |
+
+---
+
 ## [0.1.3.3] - 2026-04-09
 
 ### Changed

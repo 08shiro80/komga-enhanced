@@ -3,30 +3,12 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      komga_version:
-        description: 'Upstream Komga version (auto-read from gradle.properties if empty)'
-        type: string
-        required: false
-        default: ''
-      fork_version:
-        description: 'Fork version (auto-read from gradle.properties if empty)'
-        type: string
-        required: false
-        default: ''
       release_notes:
         description: Release notes (use \n for newlines)
         type: string
         required: false
-      github_release:
-        description: 'Create Github Release'
-        default: true
-        type: boolean
-      docker_release:
-        description: 'Push Docker images'
-        default: false
-        type: boolean
       docker_private:
-        description: 'Push to private Docker repo (08shiro80/komga-private) instead of public'
+        description: 'Test build: push to private Docker repo (08shiro80/komga-private) only, skip tag and GitHub Release'
         default: false
         type: boolean
 
@@ -51,28 +33,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          KOMGA_VER="${{ inputs.komga_version }}"
-          FORK_VER="${{ inputs.fork_version }}"
-          if [ -z "$KOMGA_VER" ]; then
-            KOMGA_VER=$(grep '^baseVersion=' gradle.properties | cut -d= -f2)
-          fi
-          if [ -z "$FORK_VER" ]; then
-            FORK_VER=$(grep '^forkVersion=' gradle.properties | cut -d= -f2)
-          fi
+          KOMGA_VER=$(grep '^baseVersion=' gradle.properties | cut -d= -f2)
+          FORK_VER=$(grep '^forkVersion=' gradle.properties | cut -d= -f2)
           CURRENT=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "0.0.0")
           NEXT="${KOMGA_VER}-fork-${FORK_VER}"
           echo "version_current=$CURRENT" >> $GITHUB_OUTPUT
           echo "version_next=$NEXT" >> $GITHUB_OUTPUT
-          echo "komga_version=$KOMGA_VER" >> $GITHUB_OUTPUT
-          echo "fork_version=$FORK_VER" >> $GITHUB_OUTPUT
           echo "Previous version: $CURRENT"
           echo "New version: $NEXT"
-
-      - name: Update version in gradle.properties
-        run: |
-          sed -i -e "s/^baseVersion=.*/baseVersion=${{ steps.versions.outputs.komga_version }}/" gradle.properties
-          sed -i -e "s/^forkVersion=.*/forkVersion=${{ steps.versions.outputs.fork_version }}/" gradle.properties
-          sed -i -e "s/^version=.*/version=${{ steps.versions.outputs.version_next }}/" gradle.properties
 
       - uses: actions/setup-node@v6
         with:
@@ -88,15 +56,12 @@ jobs:
           distribution: 'temurin'
 
       - name: Set up QEMU
-        if: inputs.docker_release || inputs.docker_private
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        if: inputs.docker_release || inputs.docker_private
         uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
-        if: inputs.docker_release || inputs.docker_private
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -109,20 +74,6 @@ jobs:
         run: ./gradlew :komga:prepareThymeLeaf :komga:bootJar
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-
-      - name: Commit version change via API (verified)
-        if: ${{ !inputs.docker_private }}
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          FILE_SHA=$(gh api repos/${{ github.repository }}/contents/gradle.properties --jq '.sha')
-          NEW_CONTENT=$(base64 -w 0 gradle.properties)
-          gh api repos/${{ github.repository }}/contents/gradle.properties \
-            -X PUT \
-            -f message="chore(release): ${{ steps.versions.outputs.version_next }}" \
-            -f content="$NEW_CONTENT" \
-            -f sha="$FILE_SHA" \
-            -f branch="${{ github.ref_name }}"
 
       - name: Create tag via API (verified)
         if: ${{ !inputs.docker_private }}
@@ -152,16 +103,8 @@ jobs:
             -f ref="refs/tags/${VERSION}" \
             -f sha="$TAG_SHA"
 
-      - name: Prepare release JAR
-        id: prepare_jar
-        run: |
-          VERSION="${{ steps.versions.outputs.version_next }}"
-          JAR_PATH="komga/build/libs/komga-${VERSION}.jar"
-          echo "jar_path=$JAR_PATH" >> $GITHUB_OUTPUT
-          echo "jar_name=komga-${VERSION}.jar" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
-        if: inputs.github_release && !inputs.docker_private
+        if: ${{ !inputs.docker_private }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.versions.outputs.version_next }}
@@ -171,27 +114,20 @@ jobs:
 
             **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.versions.outputs.version_current }}...${{ steps.versions.outputs.version_next }}
           files: |
-            ${{ steps.prepare_jar.outputs.jar_path }}
+            komga/build/libs/komga-${{ steps.versions.outputs.version_next }}.jar
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare Docker build
-        if: inputs.docker_release || inputs.docker_private
         run: |
-          JAR_PATH="${{ steps.prepare_jar.outputs.jar_path }}"
-          JAR_NAME="${{ steps.prepare_jar.outputs.jar_name }}"
-
-          # Create build context
+          JAR_NAME="komga-${{ steps.versions.outputs.version_next }}.jar"
           mkdir -p docker-build/assembly
-          cp "${JAR_PATH}" docker-build/assembly/
-
-          # Create Dockerfile from template
+          cp "komga/build/libs/${JAR_NAME}" docker-build/assembly/
           sed "s/{{distributionArtifactFile}}/${JAR_NAME}/g" komga/docker/Dockerfile.tpl > docker-build/Dockerfile
 
       - name: Build and push Docker images
-        if: inputs.docker_release || inputs.docker_private
         uses: docker/build-push-action@v7
         with:
           context: docker-build

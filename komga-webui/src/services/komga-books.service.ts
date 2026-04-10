@@ -353,10 +353,12 @@ export default class KomgaBooksService {
     }
   }
 
-  async getOversizedPages(minRatio?: number, pageRequest?: PageRequest): Promise<Page<OversizedPageDto>> {
+  async getOversizedPages(minRatio?: number, mode?: string, includeIgnored?: boolean, pageRequest?: PageRequest): Promise<Page<OversizedPageDto>> {
     try {
       const params = {...pageRequest} as any
       if (minRatio) params.minRatio = minRatio
+      if (mode) params.mode = mode
+      if (includeIgnored) params.includeIgnored = includeIgnored
 
       return (await this.http.get('/api/v1/media-management/oversized-pages', {
         params: params,
@@ -364,6 +366,86 @@ export default class KomgaBooksService {
       })).data
     } catch (e) {
       let msg = 'An error occurred while trying to retrieve oversized pages'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async ignoreOversizedPage(bookId: string, pageNumber: number, mode: string) {
+    try {
+      await this.http.post('/api/v1/media-management/oversized-pages/ignore', {
+        bookId,
+        pageNumber,
+        mode,
+      })
+    } catch (e) {
+      let msg = 'An error occurred while trying to ignore oversized page'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async ignoreOversizedPagesBatch(mode: string, pages: {bookId: string, pageNumber: number}[]) {
+    try {
+      await this.http.post('/api/v1/media-management/oversized-pages/ignore-batch', {
+        mode,
+        pages,
+      })
+    } catch (e) {
+      let msg = 'An error occurred while trying to ignore oversized pages'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async unignoreOversizedPage(bookId: string, pageNumber: number, mode: string) {
+    try {
+      await this.http.delete('/api/v1/media-management/oversized-pages/ignore', {
+        data: {
+          bookId,
+          pageNumber,
+          mode,
+        },
+      })
+    } catch (e) {
+      let msg = 'An error occurred while trying to remove ignored page'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async deleteOversizedPage(bookId: string, pageNumber: number, mode: string) {
+    try {
+      return (await this.http.post('/api/v1/media-management/oversized-pages/delete-page', {
+        bookId,
+        pageNumber,
+        mode,
+      })).data
+    } catch (e) {
+      let msg = 'An error occurred while trying to delete oversized page'
+      if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async deleteOversizedPagesBatch(mode: string, pages: {bookId: string, pageNumber: number}[]) {
+    try {
+      return (await this.http.post('/api/v1/media-management/oversized-pages/delete-pages-batch', {
+        mode,
+        pages,
+      })).data
+    } catch (e) {
+      let msg = 'An error occurred while trying to delete oversized pages'
       if (e.response.data.message) {
         msg += `: ${e.response.data.message}`
       }

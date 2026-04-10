@@ -185,4 +185,129 @@ class BookPageEditor(
 
     return if (pagesToDelete.any { it.pageNumber == 1 }) BookAction.GENERATE_THUMBNAIL else null
   }
+
+  /**
+   * Removes pages from a book archive by 1-indexed page number. Unlike [removeHashedPages],
+   * this does not require a precomputed page hash and is used by the Oversized Pages tool to
+   * drop unwanted pages (divider strips, garbage frames) that have no duplicate counterpart.
+   */
+  fun removePagesByNumber(
+    book: Book,
+    pageNumbers: Set<Int>,
+  ): BookAction? {
+    if (pageNumbers.isEmpty()) return null
+
+    if (failedPageRemoval.contains(book.id)) {
+      logger.info { "Book page removal already failed before, skipping" }
+      return null
+    }
+
+    fileSystemScanner.scanFile(book.path)?.let { scannedBook ->
+      if (scannedBook.fileLastModified.notEquals(book.fileLastModified)) {
+        logger.info { "Book has changed on disk, skipping. Db: ${book.fileLastModified}. Scanned: ${scannedBook.fileLastModified}" }
+        return null
+      }
+    } ?: throw FileNotFoundException("File not found: ${book.path}")
+
+    val media = mediaRepository.findById(book.id)
+
+    if (!convertibleTypes.contains(media.mediaType))
+      throw MediaUnsupportedException("${media.mediaType} cannot be converted. Must be one of $convertibleTypes")
+
+    if (media.status != Media.Status.READY)
+      throw MediaNotReadyException()
+
+    val pagesToKeep = media.pages.filterIndexed { index, _ -> (index + 1) !in pageNumbers }
+    val removedCount = media.pages.size - pagesToKeep.size
+    if (removedCount == 0) {
+      logger.info { "No matching pages to remove for book: $book (requested ${pageNumbers.size})" }
+      return null
+    }
+
+    logger.info { "Start removal of $removedCount pages for book: $book" }
+    logger.debug { "Pages to delete by number: $pageNumbers" }
+
+    val originalComment =
+      try {
+        ZipFile(book.path.toFile()).use { it.comment }
+      } catch (_: Exception) {
+        null
+      }
+
+    val tempFile = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, book.path.parent.toFile()).toPath()
+    logger.info { "Creating new file: $tempFile" }
+    ZipArchiveOutputStream(tempFile.outputStream()).use { zipStream ->
+      zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
+      zipStream.setLevel(Deflater.NO_COMPRESSION)
+      if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
+
+      pagesToKeep
+        .map { it.fileName }
+        .union(media.files.map { it.fileName })
+        .forEach { entry ->
+          zipStream.putArchiveEntry(ZipArchiveEntry(entry))
+          zipStream.write(bookAnalyzer.getFileContent(BookWithMedia(book, media), entry))
+          zipStream.closeArchiveEntry()
+        }
+    }
+
+    val createdBook =
+      fileSystemScanner
+        .scanFile(tempFile)
+        ?.copy(
+          id = book.id,
+          seriesId = book.seriesId,
+          libraryId = book.libraryId,
+        )
+        ?: throw IllegalStateException("Newly created book could not be scanned: $tempFile")
+
+    val createdMedia = bookAnalyzer.analyze(createdBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
+
+    try {
+      when {
+        createdMedia.status != Media.Status.READY
+        -> throw BookConversionException("Created file could not be analyzed, aborting page removal")
+
+        createdMedia.mediaType != MediaType.ZIP.type
+        -> throw BookConversionException("Created file is not a zip file, aborting page removal")
+
+        !createdMedia.pages
+          .map { FilenameUtils.getName(it.fileName) to it.mediaType }
+          .containsAll(pagesToKeep.map { FilenameUtils.getName(it.fileName) to it.mediaType })
+        -> throw BookConversionException("Created file does not contain all pages to keep from existing file, aborting conversion")
+
+        !createdMedia.files
+          .map { FilenameUtils.getName(it.fileName) }
+          .containsAll(media.files.map { FilenameUtils.getName(it.fileName) })
+        -> throw BookConversionException("Created file does not contain all files from existing file, aborting page removal")
+      }
+    } catch (e: BookConversionException) {
+      tempFile.deleteIfExists()
+      failedPageRemoval += book.id
+      throw e
+    }
+
+    tempFile.moveTo(book.path, true)
+    val newBook =
+      fileSystemScanner
+        .scanFile(book.path)
+        ?.copy(
+          id = book.id,
+          seriesId = book.seriesId,
+          libraryId = book.libraryId,
+        )
+        ?: throw IllegalStateException("Newly created book could not be scanned after replacing existing one: ${book.path}")
+
+    val mediaWithHashes = createdMedia.copy(pages = createdMedia.pages.restoreHashFrom(media.pages))
+
+    transactionTemplate.executeWithoutResult {
+      bookRepository.update(newBook)
+      mediaRepository.update(mediaWithHashes)
+    }
+
+    historicalEventRepository.insert(HistoricalEvent.BookConverted(newBook, book))
+    eventPublisher.publishEvent(DomainEvent.BookUpdated(newBook))
+
+    return if (1 in pageNumbers) BookAction.GENERATE_THUMBNAIL else null
+  }
 }

@@ -1,6 +1,8 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.gotson.komga.application.tasks.LOWEST_PRIORITY
+import org.gotson.komga.application.tasks.LOW_PRIORITY
 import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookMetadataPatchCapability
@@ -347,6 +349,16 @@ class LibraryContentLifecycle(
       newBooks.forEach { book ->
         taskEmitter.analyzeBook(bookRepository.findByIdOrNull(book.id) ?: book)
       }
+
+      // Mirror ScanLibrary post-scan tasks so library settings (hashFiles, hashPages,
+      // hashKoreader, repairExtensions, convert, duplicate pages) are honored after a download.
+      // Each emitter filters internally by library flag / book state, so this is idempotent.
+      taskEmitter.repairExtensions(library, LOW_PRIORITY)
+      taskEmitter.findBooksToConvert(library, LOWEST_PRIORITY)
+      taskEmitter.findBooksWithMissingPageHash(library, LOWEST_PRIORITY)
+      taskEmitter.findDuplicatePagesToDelete(library, LOWEST_PRIORITY)
+      taskEmitter.hashBooksWithoutHash(library)
+      taskEmitter.hashBooksWithoutHashKoreader(library)
     } else {
       logger.info { "No new books in $seriesPath, checking chapter URLs" }
     }

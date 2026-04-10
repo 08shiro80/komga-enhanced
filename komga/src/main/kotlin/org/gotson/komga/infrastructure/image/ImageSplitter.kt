@@ -38,14 +38,13 @@ class ImageSplitter(
     val width = image.width
     val height = image.height
 
-    // If image is not taller than target, return as-is
     if (height <= targetHeight) {
       logger.debug { "Image height ($height) <= target ($targetHeight), no split needed" }
       return listOf(imageBytes)
     }
 
     val numParts = ceil(height.toDouble() / targetHeight).toInt()
-    logger.info { "Splitting image ${width}x$height into $numParts parts (target height: $targetHeight)" }
+    logger.debug { "Splitting image ${width}x$height into $numParts parts (target height: $targetHeight)" }
 
     val result = mutableListOf<ByteArray>()
 
@@ -53,12 +52,9 @@ class ImageSplitter(
       val startY = i * targetHeight
       val partHeight = minOf(targetHeight, height - startY)
 
-      // Create subimage
       val subImage = image.getSubimage(0, startY, width, partHeight)
 
-      // Convert to byte array
       ByteArrayOutputStream().use { baos ->
-        // Create a new image to avoid subimage limitations
         val outputImage = BufferedImage(width, partHeight, image.type)
         outputImage.graphics.drawImage(subImage, 0, 0, null)
 
@@ -67,6 +63,48 @@ class ImageSplitter(
       }
 
       logger.debug { "Created part ${i + 1}/$numParts: ${width}x$partHeight" }
+    }
+
+    return result
+  }
+
+  fun splitWideImage(
+    imageBytes: ByteArray,
+    targetWidth: Int,
+    format: String = "png",
+  ): List<ByteArray> {
+    val image =
+      ImageIO.read(imageBytes.inputStream())
+        ?: throw IllegalArgumentException("Could not read image")
+
+    val width = image.width
+    val height = image.height
+
+    if (width <= targetWidth) {
+      logger.debug { "Image width ($width) <= target ($targetWidth), no split needed" }
+      return listOf(imageBytes)
+    }
+
+    val numParts = ceil(width.toDouble() / targetWidth).toInt()
+    logger.debug { "Splitting image ${width}x$height into $numParts horizontal parts (target width: $targetWidth)" }
+
+    val result = mutableListOf<ByteArray>()
+
+    for (i in 0 until numParts) {
+      val startX = i * targetWidth
+      val partWidth = minOf(targetWidth, width - startX)
+
+      val subImage = image.getSubimage(startX, 0, partWidth, height)
+
+      ByteArrayOutputStream().use { baos ->
+        val outputImage = BufferedImage(partWidth, height, image.type)
+        outputImage.graphics.drawImage(subImage, 0, 0, null)
+
+        ImageIO.write(outputImage, format, baos)
+        result.add(baos.toByteArray())
+      }
+
+      logger.debug { "Created part ${i + 1}/$numParts: ${partWidth}x$height" }
     }
 
     return result

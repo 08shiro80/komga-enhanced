@@ -46,6 +46,11 @@ class PageSplitter(
   private val eventPublisher: ApplicationEventPublisher,
   private val historicalEventRepository: HistoricalEventRepository,
 ) {
+  companion object {
+    const val MIN_VALID_DIMENSION = 50
+    const val MAX_WIDE_RATIO = 10.0
+  }
+
   /**
    * Splits tall pages in a book based on the maximum height threshold.
    *
@@ -57,6 +62,8 @@ class PageSplitter(
     book: Book,
     maxHeight: Int? = null,
     maxRatio: Double? = null,
+    mode: SplitMode = SplitMode.TALL,
+    pageNumbers: Set<Int>? = null,
   ): SplitResult {
     if (book.path.exists().not()) {
       throw FileNotFoundException("File not found: ${book.path}")
@@ -70,30 +77,58 @@ class PageSplitter(
 
     val pagesToSplit = mutableListOf<PageToSplit>()
     media.pages.forEachIndexed { index, page ->
+      val pageNumber = index + 1
       val dimension = page.dimension
-      if (dimension != null && dimension.width > 0) {
+      if (dimension == null || dimension.width <= 0 || dimension.height <= 0) return@forEachIndexed
+      // Reject pathological strip images (webtoon dividers like 720x1, 1200x15, 1200x25)
+      if (dimension.width < MIN_VALID_DIMENSION || dimension.height < MIN_VALID_DIMENSION) return@forEachIndexed
+      // If an explicit page set was provided, only split those pages — ratio checks are skipped
+      // for explicit selections since the user already decided via the UI.
+      if (pageNumbers != null && pageNumber !in pageNumbers) return@forEachIndexed
+
+      if (mode == SplitMode.WIDE) {
+        val aspectRatio = dimension.width.toDouble() / dimension.height
+        if (pageNumbers == null && aspectRatio > MAX_WIDE_RATIO) return@forEachIndexed
+        val effectiveMaxWidth = (dimension.height * (maxRatio ?: 1.0)).toInt()
+        if (pageNumbers == null && dimension.width <= effectiveMaxWidth) return@forEachIndexed
+        pagesToSplit.add(
+          PageToSplit(
+            pageIndex = index,
+            fileName = page.fileName,
+            height = dimension.height,
+            width = dimension.width,
+            effectiveMax = effectiveMaxWidth,
+            mode = SplitMode.WIDE,
+          ),
+        )
+      } else {
         val effectiveMaxHeight =
           if (maxRatio != null) {
             (dimension.width * maxRatio).toInt()
           } else {
             maxHeight ?: 2000
           }
-        if (dimension.height > effectiveMaxHeight) {
-          pagesToSplit.add(
-            PageToSplit(
-              pageIndex = index,
-              fileName = page.fileName,
-              height = dimension.height,
-              width = dimension.width,
-              effectiveMaxHeight = effectiveMaxHeight,
-            ),
-          )
-        }
+        if (pageNumbers == null && dimension.height <= effectiveMaxHeight) return@forEachIndexed
+        pagesToSplit.add(
+          PageToSplit(
+            pageIndex = index,
+            fileName = page.fileName,
+            height = dimension.height,
+            width = dimension.width,
+            effectiveMax = effectiveMaxHeight,
+            mode = SplitMode.TALL,
+          ),
+        )
       }
     }
 
     if (pagesToSplit.isEmpty()) {
-      val thresholdDesc = if (maxRatio != null) "ratio $maxRatio:1" else "height ${maxHeight ?: 2000}px"
+      val thresholdDesc =
+        when {
+          mode == SplitMode.WIDE -> "width ratio ${maxRatio ?: 1.0}:1"
+          maxRatio != null -> "ratio $maxRatio:1"
+          else -> "height ${maxHeight ?: 2000}px"
+        }
       logger.info { "No pages need splitting in book: ${book.name}" }
       return SplitResult(
         bookId = book.id,
@@ -138,9 +173,18 @@ class PageSplitter(
           val pageToSplit = pagesToSplit.find { it.pageIndex == index }
 
           if (pageToSplit != null) {
-            // This page needs splitting
-            val imageBytes = bookAnalyzer.getFileContent(BookWithMedia(book, media), page.fileName)
-            val splitImages = imageSplitter.splitTallImage(imageBytes, pageToSplit.effectiveMaxHeight, getFormatFromMediaType(page.mediaType))
+            val splitImages =
+              try {
+                val imageBytes = bookAnalyzer.getFileContent(BookWithMedia(book, media), page.fileName)
+                if (pageToSplit.mode == SplitMode.WIDE) {
+                  imageSplitter.splitWideImage(imageBytes, pageToSplit.effectiveMax, getFormatFromMediaType(page.mediaType))
+                } else {
+                  imageSplitter.splitTallImage(imageBytes, pageToSplit.effectiveMax, getFormatFromMediaType(page.mediaType))
+                }
+              } catch (e: Exception) {
+                logger.warn(e) { "Failed to split page ${index + 1} (${page.fileName}, ${pageToSplit.width}x${pageToSplit.height}) in book: ${book.name}" }
+                throw e
+              }
 
             splitImages.forEachIndexed { partIndex, partBytes ->
               val extension = getExtensionFromMediaType(page.mediaType)
@@ -177,7 +221,7 @@ class PageSplitter(
       // Replace original with new file
       book.path.deleteIfExists()
       Files.move(tempPath, book.path, StandardCopyOption.REPLACE_EXISTING)
-      logger.info { "Replaced original file with split version" }
+      logger.debug { "Replaced original file with split version" }
 
       // Re-analyze the book
       val updatedBook =
@@ -268,12 +312,15 @@ class PageSplitter(
     }
 }
 
+enum class SplitMode { TALL, WIDE }
+
 data class PageToSplit(
   val pageIndex: Int,
   val fileName: String,
   val height: Int,
   val width: Int,
-  val effectiveMaxHeight: Int,
+  val effectiveMax: Int,
+  val mode: SplitMode,
 )
 
 data class SplitResult(
