@@ -321,7 +321,7 @@ class MangaDexApiClient(
           val type = relationship["type"] as? String
           if (type == "scanlation_group") {
             val groupAttributes = relationship["attributes"] as? Map<*, *>
-            scanlationGroup = groupAttributes?.get("name") as? String
+            scanlationGroup = (groupAttributes?.get("name") as? String)?.trim()?.takeIf { it.isNotEmpty() }
           }
         }
       }
@@ -409,7 +409,7 @@ class MangaDexApiClient(
                 val type = relationship["type"] as? String
                 if (type == "scanlation_group") {
                   val groupAttributes = relationship["attributes"] as? Map<*, *>
-                  scanlationGroup = groupAttributes?.get("name") as? String
+                  scanlationGroup = (groupAttributes?.get("name") as? String)?.trim()?.takeIf { it.isNotEmpty() }
                 }
               }
             }

@@ -9,6 +9,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 ## [0.1.3.4] - 2026-04-10
 
 ### Bug Fixes
+- **Duplicate chapters from trailing whitespace in MangaDex scanlation group name** — MangaDex returned the same scanlation group (e.g. `Bathhouse Scans`) with and without a trailing space for different chapters, so `ChapterMatcher.findSameGroupDuplicates` grouped by `Pair(chapterNumber, scanlationGroup)` saw two distinct groups and both versions were downloaded side-by-side (`v26 c248 [Bathhouse Scans].cbz` + `v26 c248 [Bathhouse Scans ].cbz`). `MangaDexApiClient.fetchChapterMetadata` / `fetchAllChaptersFromMangaDex` now `.trim()` the group name and treat empty strings as `null`, so the dedup logic and filename generation collapse the two variants into one.
 - **Oversized Pages: "Split Selected" ignored the selection** — Clicking "Split Selected" only sent the unique `bookId`s to `POST /api/v1/media-management/oversized-pages/split/{bookId}` with no page list. The backend then re-scanned the entire book by ratio and split *every* matching page, not just the selected one — so selecting a single oversized page could split 10+ other pages in the same book as a side effect. Frontend now groups selected rows by `bookId` and passes `pageNumbers[]`; backend `PageSplitter.splitTallPages(..., pageNumbers: Set<Int>?)` respects the set verbatim (ratio filters are bypassed for explicit selections since the UI already vetted them, sanity filters still apply).
 
 ### New Features
@@ -41,6 +42,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `komga-webui/src/services/komga-books.service.ts` | `getOversizedPages()` takes `mode` + `includeIgnored`; new `ignoreOversizedPage()`, `ignoreOversizedPagesBatch()`, `unignoreOversizedPage()`, `deleteOversizedPage()`, `deleteOversizedPagesBatch()` |
 | `domain/service/LibraryContentLifecycle.kt` | `scanSeriesFolder` now mirrors `ScanLibrary` post-scan tasks (`repairExtensions`, `findBooksToConvert`, `findBooksWithMissingPageHash`, `findDuplicatePagesToDelete`, `hashBooksWithoutHash`, `hashBooksWithoutHashKoreader`) |
 | `infrastructure/download/GalleryDlWrapper.kt` | All INFO download-progress logs demoted to DEBUG (20 call sites); warn/error untouched |
+| `infrastructure/download/MangaDexApiClient.kt` | `.trim()` scanlation group name from MangaDex API (both `fetchChapterMetadata` and `fetchAllChaptersFromMangaDex`); empty-after-trim collapses to `null` so dedup no longer splits on trailing whitespace |
 | `gradle.properties` | Fork version bump to `0.1.3.4` |
 
 ---
