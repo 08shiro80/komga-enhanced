@@ -49,6 +49,7 @@ class PageSplitter(
   companion object {
     const val MIN_VALID_DIMENSION = 50
     const val MAX_WIDE_RATIO = 10.0
+    const val MIN_TARGET_DIMENSION = 300
   }
 
   /**
@@ -91,6 +92,12 @@ class PageSplitter(
         if (pageNumbers == null && aspectRatio > MAX_WIDE_RATIO) return@forEachIndexed
         val effectiveMaxWidth = (dimension.height * (maxRatio ?: 1.0)).toInt()
         if (pageNumbers == null && dimension.width <= effectiveMaxWidth) return@forEachIndexed
+        if (effectiveMaxWidth < MIN_TARGET_DIMENSION) {
+          logger.warn {
+            "Skipping page $pageNumber in ${book.name}: computed target width $effectiveMaxWidth px is below sanity floor $MIN_TARGET_DIMENSION px (dimension=${dimension.width}x${dimension.height}, ratio=${maxRatio ?: 1.0}) — stored dimensions likely stale"
+          }
+          return@forEachIndexed
+        }
         pagesToSplit.add(
           PageToSplit(
             pageIndex = index,
@@ -109,6 +116,12 @@ class PageSplitter(
             maxHeight ?: 2000
           }
         if (pageNumbers == null && dimension.height <= effectiveMaxHeight) return@forEachIndexed
+        if (effectiveMaxHeight < MIN_TARGET_DIMENSION) {
+          logger.warn {
+            "Skipping page $pageNumber in ${book.name}: computed target height $effectiveMaxHeight px is below sanity floor $MIN_TARGET_DIMENSION px (dimension=${dimension.width}x${dimension.height}, ratio=$maxRatio) — stored dimensions likely stale"
+          }
+          return@forEachIndexed
+        }
         pagesToSplit.add(
           PageToSplit(
             pageIndex = index,
@@ -209,12 +222,15 @@ class PageSplitter(
           }
         }
 
-        // Also copy non-page files (like ComicInfo.xml)
         media.files.forEach { file ->
-          val content = bookAnalyzer.getFileContent(BookWithMedia(book, media), file.fileName)
-          zipStream.putArchiveEntry(ZipArchiveEntry(file.fileName))
-          zipStream.write(content)
-          zipStream.closeArchiveEntry()
+          try {
+            val content = bookAnalyzer.getFileContent(BookWithMedia(book, media), file.fileName)
+            zipStream.putArchiveEntry(ZipArchiveEntry(file.fileName))
+            zipStream.write(content)
+            zipStream.closeArchiveEntry()
+          } catch (_: org.gotson.komga.domain.model.EntryNotFoundException) {
+            logger.warn { "Skipping missing file ${file.fileName} in book: ${book.name}" }
+          }
         }
       }
 

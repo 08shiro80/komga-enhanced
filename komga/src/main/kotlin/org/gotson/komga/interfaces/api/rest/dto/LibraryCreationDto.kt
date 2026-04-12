@@ -15,6 +15,7 @@ data class LibraryCreationDto(
   val importMylarSeries: Boolean = true,
   val importLocalArtwork: Boolean = true,
   val importBarcodeIsbn: Boolean = true,
+  val importChapterUrls: Boolean = true,
   val scanForceModifiedTime: Boolean = false,
   val scanInterval: ScanIntervalDto = ScanIntervalDto.EVERY_6H,
   val scanOnStartup: Boolean = false,

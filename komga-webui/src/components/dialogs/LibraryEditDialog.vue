@@ -302,6 +302,28 @@
                 <v-container fluid>
                   <v-row>
                     <v-col>
+                      <span class="text-subtitle-1 text--primary">{{
+                          $t('dialog.edit_library.label_import_chapter_urls')
+                        }}</span>
+                      <v-checkbox
+                        v-model="form.importChapterUrls"
+                        :label="$t('dialog.edit_library.field_import_chapter_urls')"
+                        hide-details
+                        class="mx-4"
+                      >
+                        <template v-slot:append>
+                          <v-tooltip bottom max-width="400">
+                            <template v-slot:activator="{ on }">
+                              <v-icon v-on="on" color="warning">mdi-alert-circle-outline</v-icon>
+                            </template>
+                            {{ $t('dialog.edit_library.tooltip_import_chapter_urls') }}
+                          </v-tooltip>
+                        </template>
+                      </v-checkbox>
+                    </v-col>
+                  </v-row>
+                  <v-row>
+                    <v-col>
                       <v-checkbox
                         v-model="importComicInfo"
                         :indeterminate="importComicInfo === 1"
@@ -470,6 +492,7 @@ export default Vue.extend({
         importMylarSeries: true,
         importLocalArtwork: true,
         importBarcodeIsbn: false,
+        importChapterUrls: true,
         scanForceModifiedTime: false,
         scanInterval: ScanIntervalDto.EVERY_6H,
         scanOnStartup: false,
@@ -626,6 +649,7 @@ export default Vue.extend({
       this.form.importMylarSeries = library ? library.importMylarSeries : true
       this.form.importLocalArtwork = library ? library.importLocalArtwork : true
       this.form.importBarcodeIsbn = library ? library.importBarcodeIsbn : false
+      this.form.importChapterUrls = library ? library.importChapterUrls : true
       this.form.scanForceModifiedTime = library ? library.scanForceModifiedTime : false
       this.form.scanInterval = library ? library.scanInterval : ScanIntervalDto.EVERY_6H
       this.form.scanOnStartup = library ? library.scanOnStartup : false
@@ -663,6 +687,7 @@ export default Vue.extend({
           importMylarSeries: this.form.importMylarSeries,
           importLocalArtwork: this.form.importLocalArtwork,
           importBarcodeIsbn: this.form.importBarcodeIsbn,
+          importChapterUrls: this.form.importChapterUrls,
           scanForceModifiedTime: this.form.scanForceModifiedTime,
           scanInterval: this.form.scanInterval,
           scanOnStartup: this.form.scanOnStartup,

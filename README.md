@@ -188,6 +188,8 @@ Never download the same chapter twice:
 - Tracks chapter metadata (volume, language, scanlation group)
 - Multi-group support — same chapter from different scanlation groups downloaded separately
 
+> **Important:** `Import chapter URLs` is **enabled by default** and required for the downloader, follow list, and subscription sync to detect already-downloaded chapters. **Disable it** in **Library → Edit → Metadata** for libraries that don't use the download system — otherwise library scans will be significantly slower.
+
 ### Guest/Kiosk Mode
 
 Read-only browsing without login — perfect for family or shared setups:
@@ -243,19 +245,10 @@ Full API documentation with request/response examples: **[API Reference](docs/ap
 
 ## Switching Between Official Komga and This Fork
 
-Since version 0.1.0, the fork stores its database migrations in a separate history table (`flyway_fork_history`), completely independent from the official Komga migration history (`flyway_schema_history`). This means:
+The fork stores its database migrations in a separate history table (`flyway_fork_history`), completely independent from the official Komga migration history (`flyway_schema_history`):
 
 - **Official Komga → Fork:** Works. Fork migrations run automatically on first startup.
 - **Fork → Official Komga:** Works. Official Komga only sees its own migration history and starts normally. The fork's extra tables and columns remain in the database but are ignored.
-- **Upgrading from fork 0.0.9 or earlier:** The fork automatically moves its entries from `flyway_schema_history` to `flyway_fork_history` on first startup. No manual steps needed.
-
-**If you are on fork version 0.0.9 or earlier** and want to switch back to official Komga without upgrading to 0.1.0 first, you need to remove the fork migration entries manually:
-
-```sql
-DELETE FROM flyway_schema_history WHERE version > '20250730173126';
-```
-
-After this, official Komga starts normally.
 
 ---
 
@@ -278,6 +271,7 @@ docker pull 08shiro80/komga:latest
 
 docker run -d \
   --name komga \
+  --network bridge \
   -p 25600:25600 \
   -v /path/to/config:/config \
   -v /path/to/manga:/manga \
@@ -292,6 +286,7 @@ services:
   komga:
     image: 08shiro80/komga:latest
     container_name: komga
+    network_mode: bridge
     ports:
       - "25600:25600"
     volumes:
@@ -303,8 +298,6 @@ services:
 ```bash
 docker compose up -d
 ```
-
-> **VLAN users:** If your Docker host uses VLANs and the container has no internet access, add `network_mode: bridge` to your compose service. Docker's default networking can fail to route traffic correctly in VLAN setups.
 
 ### Updating gallery-dl in Docker
 

@@ -501,13 +501,12 @@ export default Vue.extend({
 
       for (const [bookId, pageNumbers] of byBook) {
         try {
+          const search = new URLSearchParams()
+          search.set('maxRatio', String(this.splitRatio))
+          search.set('mode', this.currentMode)
+          pageNumbers.forEach(n => search.append('pageNumbers', String(n)))
           const response = await this.$http.post(
-            `/api/v1/media-management/oversized-pages/split/${bookId}`,
-            null,
-            {
-              params: {maxRatio: this.splitRatio, mode: this.currentMode, pageNumbers},
-              paramsSerializer: params => qs.stringify(params, {indices: false}),
-            },
+            `/api/v1/media-management/oversized-pages/split/${bookId}?${search.toString()}`,
           )
           this.splitResults.push(response.data)
         } catch (e: any) {

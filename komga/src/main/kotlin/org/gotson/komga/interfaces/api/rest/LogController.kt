@@ -83,13 +83,29 @@ class LogController(
           raf.seek(maxOf(0L, raf.length() - 8192))
           if (raf.filePointer > 0) raf.readLine()
 
+          val batch = mutableListOf<String>()
           while (!Thread.currentThread().isInterrupted) {
             val line = raf.readLine()
             if (line != null) {
-              val decoded = String(line.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
-              emitter.send(SseEmitter.event().data(decoded))
+              batch.add(String(line.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8))
+              if (batch.size >= 50) {
+                emitter.send(
+                  SseEmitter
+                    .event()
+                    .data(batch.joinToString("\n")),
+                )
+                batch.clear()
+              }
             } else {
-              Thread.sleep(500)
+              if (batch.isNotEmpty()) {
+                emitter.send(
+                  SseEmitter
+                    .event()
+                    .data(batch.joinToString("\n")),
+                )
+                batch.clear()
+              }
+              Thread.sleep(200)
             }
           }
         }

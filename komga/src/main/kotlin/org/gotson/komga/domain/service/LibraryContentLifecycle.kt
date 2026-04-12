@@ -226,15 +226,17 @@ class LibraryContentLifecycle(
       }
 
       // Import chapter URLs from ComicInfo.xml in CBZ files (must happen before tasks are emitted)
-      try {
-        val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
-        if (importResults.isNotEmpty()) {
-          val totalImported = importResults.sumOf { it.imported }
-          val totalSkipped = importResults.sumOf { it.skippedDuplicates }
-          logger.info { "Chapter URL import: $totalImported imported, $totalSkipped duplicates skipped from ${importResults.size} series" }
+      if (library.importChapterUrls) {
+        try {
+          val importResults = chapterUrlImporter.scanAndImportLibrary(Paths.get(library.root.toURI()), library.id)
+          if (importResults.isNotEmpty()) {
+            val totalImported = importResults.sumOf { it.imported }
+            val totalSkipped = importResults.sumOf { it.skippedDuplicates }
+            logger.info { "Chapter URL import: $totalImported imported, $totalSkipped duplicates skipped from ${importResults.size} series" }
+          }
+        } catch (e: Exception) {
+          logger.warn(e) { "Failed to import chapter URLs for library ${library.name}" }
         }
-      } catch (e: Exception) {
-        logger.warn(e) { "Failed to import chapter URLs for library ${library.name}" }
       }
 
       // for all series where books have been removed or added, trigger a sort and refresh metadata
@@ -366,14 +368,16 @@ class LibraryContentLifecycle(
 
     taskEmitter.refreshSeriesLocalArtwork(series.id)
 
-    try {
-      chapterUrlImporter.syncMangaDexUuidForSeries(series)
-      val result = chapterUrlImporter.importFromSeriesPath(seriesPath, series.id)
-      if (result.imported > 0) {
-        logger.info { "Chapter URL import after download: ${result.imported} imported for ${series.name}" }
+    if (library.importChapterUrls) {
+      try {
+        chapterUrlImporter.syncMangaDexUuidForSeries(series)
+        val result = chapterUrlImporter.importFromSeriesPath(seriesPath, series.id)
+        if (result.imported > 0) {
+          logger.info { "Chapter URL import after download: ${result.imported} imported for ${series.name}" }
+        }
+      } catch (e: Exception) {
+        logger.warn(e) { "Failed to import chapter URLs for ${series.name}" }
       }
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to import chapter URLs for ${series.name}" }
     }
   }
 

@@ -468,6 +468,7 @@
       "field_analysis_hash_pages": "Erzeuge einen Hash für Seiten",
       "field_convert_to_cbz": "Automatisch in CBZ konvertieren",
       "field_import_barcode_isbn": "ISBN Strichcode",
+      "field_import_chapter_urls": "Kapitel-URLs aus CBZ-Metadaten importieren",
       "field_import_comicinfo_book": "Buch Metadaten",
       "field_import_comicinfo_collections": "Sammlungen",
       "field_import_comicinfo_readlists": "Leseliste",
@@ -491,6 +492,7 @@
       "label_analysis": "Analysiere",
       "label_file_management": "Dateiverwaltung",
       "label_import_barcode_isbn": "Importieren Sie die ISBN aus einem Barcode",
+      "label_import_chapter_urls": "Kapitel-URLs importieren",
       "label_import_comicinfo": "Importiere aus einer vorhandenen ComicInfo.xml Datei die Metadaten für CBR/CBZ",
       "label_import_epub": "Importiere für EPUB Dateien die Metadaten",
       "label_import_local": "Importiere lokale Medienbestände",
@@ -502,6 +504,7 @@
       "tab_general": "Allgemein",
       "tab_metadata": "Metadaten",
       "tab_options": "Optionen",
+      "tooltip_import_chapter_urls": "Durchsucht CBZ-Dateien nach Kapitel-URLs um doppelte Downloads zu vermeiden. Für Bibliotheken die das Download-System nicht nutzen deaktivieren um langsame Scans zu vermeiden.",
       "tooltip_oneshotsdirectory": "Nicht auswählen um es zu deaktivieren",
       "tooltip_scanner_force_modified_time": "Einschalten, wenn es sich um eine Bibliothek auf Google Drive handelt",
       "tooltip_use_resources": "Diese Option kann bei großen Bibliotheken oder langsamer Hardware lange benötigen und viele Ressourcen belegen"

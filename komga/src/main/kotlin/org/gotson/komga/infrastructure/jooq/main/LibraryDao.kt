@@ -96,6 +96,7 @@ class LibraryDao(
       .set(l.IMPORT_MYLAR_SERIES, library.importMylarSeries)
       .set(l.IMPORT_LOCAL_ARTWORK, library.importLocalArtwork)
       .set(l.IMPORT_BARCODE_ISBN, library.importBarcodeIsbn)
+      .set(l.IMPORT_CHAPTER_URLS, library.importChapterUrls)
       .set(l.SCAN_FORCE_MODIFIED_TIME, library.scanForceModifiedTime)
       .set(l.SCAN_CBX, library.scanCbx)
       .set(l.SCAN_PDF, library.scanPdf)
@@ -134,6 +135,7 @@ class LibraryDao(
       .set(l.IMPORT_MYLAR_SERIES, library.importMylarSeries)
       .set(l.IMPORT_LOCAL_ARTWORK, library.importLocalArtwork)
       .set(l.IMPORT_BARCODE_ISBN, library.importBarcodeIsbn)
+      .set(l.IMPORT_CHAPTER_URLS, library.importChapterUrls)
       .set(l.SCAN_FORCE_MODIFIED_TIME, library.scanForceModifiedTime)
       .set(l.SCAN_CBX, library.scanCbx)
       .set(l.SCAN_PDF, library.scanPdf)
@@ -190,6 +192,7 @@ class LibraryDao(
       importMylarSeries = importMylarSeries,
       importLocalArtwork = importLocalArtwork,
       importBarcodeIsbn = importBarcodeIsbn,
+      importChapterUrls = importChapterUrls,
       scanForceModifiedTime = scanForceModifiedTime,
       scanCbx = scanCbx,
       scanPdf = scanPdf,

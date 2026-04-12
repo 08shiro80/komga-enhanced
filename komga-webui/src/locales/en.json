@@ -469,6 +469,7 @@
       "field_analysis_hash_pages": "Compute hash for pages",
       "field_convert_to_cbz": "Automatically convert to CBZ",
       "field_import_barcode_isbn": "ISBN barcode",
+      "field_import_chapter_urls": "Import chapter URLs from CBZ metadata",
       "field_import_comicinfo_book": "Book metadata",
       "field_import_comicinfo_collections": "Collections",
       "field_import_comicinfo_readlists": "Read lists",
@@ -492,6 +493,7 @@
       "label_analysis": "Analysis",
       "label_file_management": "File management",
       "label_import_barcode_isbn": "Import ISBN within barcode",
+      "label_import_chapter_urls": "Import chapter URLs",
       "label_import_comicinfo": "Import metadata for CBR/CBZ containing a ComicInfo.xml file",
       "label_import_epub": "Import metadata from EPUB files",
       "label_import_local": "Import local media assets",
@@ -504,6 +506,7 @@
       "tab_metadata": "Metadata",
       "tab_options": "Options",
       "tooltip_oneshotsdirectory": "Leave empty to disable",
+      "tooltip_import_chapter_urls": "Scans CBZ files for chapter URLs to prevent duplicate downloads. Disable for libraries that don't use the download system to avoid slow scans.",
       "tooltip_scanner_force_modified_time": "Enable if the library is on a Google Drive",
       "tooltip_use_resources": "Can consume lots of resources on large libraries or slow hardware"
     },

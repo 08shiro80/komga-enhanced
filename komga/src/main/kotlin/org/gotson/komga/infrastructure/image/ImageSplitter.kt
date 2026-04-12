@@ -44,13 +44,14 @@ class ImageSplitter(
     }
 
     val numParts = ceil(height.toDouble() / targetHeight).toInt()
-    logger.debug { "Splitting image ${width}x$height into $numParts parts (target height: $targetHeight)" }
+    val evenHeight = ceil(height.toDouble() / numParts).toInt()
+    logger.debug { "Splitting image ${width}x$height into $numParts parts (target: $targetHeight, even: $evenHeight)" }
 
     val result = mutableListOf<ByteArray>()
 
     for (i in 0 until numParts) {
-      val startY = i * targetHeight
-      val partHeight = minOf(targetHeight, height - startY)
+      val startY = i * evenHeight
+      val partHeight = minOf(evenHeight, height - startY)
 
       val subImage = image.getSubimage(0, startY, width, partHeight)
 
@@ -85,14 +86,14 @@ class ImageSplitter(
       return listOf(imageBytes)
     }
 
-    val numParts = ceil(width.toDouble() / targetWidth).toInt()
-    logger.debug { "Splitting image ${width}x$height into $numParts horizontal parts (target width: $targetWidth)" }
+    val halfWidth = ceil(width.toDouble() / 2).toInt()
+    logger.debug { "Splitting double page ${width}x$height in half ($halfWidth + ${width - halfWidth})" }
 
     val result = mutableListOf<ByteArray>()
 
-    for (i in 0 until numParts) {
-      val startX = i * targetWidth
-      val partWidth = minOf(targetWidth, width - startX)
+    for (i in 0 until 2) {
+      val startX = i * halfWidth
+      val partWidth = minOf(halfWidth, width - startX)
 
       val subImage = image.getSubimage(startX, 0, partWidth, height)
 
@@ -104,7 +105,7 @@ class ImageSplitter(
         result.add(baos.toByteArray())
       }
 
-      logger.debug { "Created part ${i + 1}/$numParts: ${partWidth}x$height" }
+      logger.debug { "Created part ${i + 1}/2: ${partWidth}x$height" }
     }
 
     return result

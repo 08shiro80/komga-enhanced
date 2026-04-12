@@ -19,6 +19,7 @@ data class Library(
   val importMylarSeries: Boolean = true,
   val importLocalArtwork: Boolean = true,
   val importBarcodeIsbn: Boolean = true,
+  val importChapterUrls: Boolean = true,
   val scanForceModifiedTime: Boolean = false,
   val scanOnStartup: Boolean = false,
   val scanInterval: ScanInterval = ScanInterval.EVERY_6H,

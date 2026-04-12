@@ -104,6 +104,8 @@ export default Vue.extend({
     paused: false,
     eventSource: null as EventSource | null,
     pauseBuffer: [] as string[],
+    lineBuffer: [] as string[],
+    flushTimer: 0,
   }),
   computed: {
     filteredLines(): string[] {
@@ -177,11 +179,18 @@ export default Vue.extend({
       this.pauseBuffer = []
 
       this.eventSource.onmessage = (event: MessageEvent) => {
+        const lines = (event.data as string).split('\n')
         if (this.paused) {
-          this.pauseBuffer.push(event.data)
+          this.pauseBuffer.push(...lines)
           return
         }
-        this.appendLine(event.data)
+        this.lineBuffer.push(...lines)
+        if (!this.flushTimer) {
+          this.flushTimer = window.setTimeout(() => {
+            this.flushBuffer()
+            this.flushTimer = 0
+          }, 150)
+        }
       }
 
       this.eventSource.onerror = () => {
@@ -194,6 +203,10 @@ export default Vue.extend({
       }
     },
     stopStream() {
+      if (this.flushTimer) {
+        clearTimeout(this.flushTimer)
+        this.flushTimer = 0
+      }
       if (this.eventSource) {
         this.eventSource.close()
         this.eventSource = null
@@ -201,23 +214,26 @@ export default Vue.extend({
       this.streaming = false
       this.paused = false
       this.pauseBuffer = []
+      this.lineBuffer = []
     },
     togglePause() {
       if (this.paused) {
-        for (const line of this.pauseBuffer) {
-          this.appendLine(line)
-        }
+        this.lineBuffer.push(...this.pauseBuffer)
         this.pauseBuffer = []
         this.paused = false
+        this.flushBuffer()
       } else {
         this.paused = true
       }
     },
-    appendLine(line: string) {
-      this.logLines.push(line)
-      while (this.logLines.length > this.lines) {
-        this.logLines.shift()
+    flushBuffer() {
+      if (this.lineBuffer.length === 0) return
+      this.logLines.push(...this.lineBuffer)
+      const excess = this.logLines.length - this.lines
+      if (excess > 0) {
+        this.logLines.splice(0, excess)
       }
+      this.lineBuffer = []
       this.scrollToBottom()
     },
     scrollToBottom() {

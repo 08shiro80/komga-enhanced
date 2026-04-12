@@ -6,9 +6,11 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.1.3.4] - 2026-04-10
+## [0.1.3.4] - 2026-04-11
 
 ### Bug Fixes
+- **Oversized Pages: "Split Selected" still split every page + created tiny shards** — Two compounding bugs when splitting a single selected webtoon page: (1) `OversizedPages.vue:splitSelected` built the request with `paramsSerializer: params => qs.stringify(params, {indices: false})` but `qs` was never imported in the file. At runtime the serializer threw `ReferenceError`, the `pageNumbers` query list never reached the backend, and the backend fell back to re-scanning the whole book by ratio — so selecting 1 page triggered 32 splits and 64 new pages. Replaced the `qs` call with `URLSearchParams` which builds `?maxRatio=…&mode=…&pageNumbers=1&pageNumbers=2&…` natively — no dependency, no runtime surprise. (2) After the split completed, the new parts were ~800×80 px — far smaller than the Webtoon preset's `splitRatio 1.5` target should produce. Root cause: `PageSplitter.splitTallPages` reads `media.pages[x].dimension.width` from the DB when computing `effectiveMaxHeight = width × maxRatio`. When stored dimensions are stale or truncated (e.g. a thin strip at `53×200`), the target height collapses to `53 × 1.5 ≈ 80 px` while `ImageSplitter` loads the real image and slices its actual `800 px` width into 50+ shards of 80 px. Added `MIN_TARGET_DIMENSION = 300` sanity floor: if the computed target height/width falls below 300 px the page is skipped and a `WARN` naming the offending dimension/ratio is logged, so stale DB entries can no longer produce degenerate splits.
+- **Library scan takes hours on non-manga libraries (Issue #25)** — `ChapterUrlImporter` opened every CBZ file twice per scan: once for the ZIP comment, then via `ZipInputStream` for `ComicInfo.xml`. Three fixes: (1) new `importChapterUrls` library flag (default `true`) gates the importer — disable for non-download libraries; (2) `ChapterUrlImporter` now only reads ZIP comments (central-directory lookup, no file extraction); (3) chapter URLs from `ComicInfo.xml <Web>` are now extracted by `BookMetadataLifecycle` during the normal metadata refresh — piggybacking on the `ComicInfoProvider` read that already happens, eliminating the redundant ZIP open entirely.
 - **Duplicate chapters from trailing whitespace in MangaDex scanlation group name** — MangaDex returned the same scanlation group (e.g. `Bathhouse Scans`) with and without a trailing space for different chapters, so `ChapterMatcher.findSameGroupDuplicates` grouped by `Pair(chapterNumber, scanlationGroup)` saw two distinct groups and both versions were downloaded side-by-side (`v26 c248 [Bathhouse Scans].cbz` + `v26 c248 [Bathhouse Scans ].cbz`). `MangaDexApiClient.fetchChapterMetadata` / `fetchAllChaptersFromMangaDex` now `.trim()` the group name and treat empty strings as `null`, so the dedup logic and filename generation collapse the two variants into one.
 - **Oversized Pages: "Split Selected" ignored the selection** — Clicking "Split Selected" only sent the unique `bookId`s to `POST /api/v1/media-management/oversized-pages/split/{bookId}` with no page list. The backend then re-scanned the entire book by ratio and split *every* matching page, not just the selected one — so selecting a single oversized page could split 10+ other pages in the same book as a side effect. Frontend now groups selected rows by `bookId` and passes `pageNumbers[]`; backend `PageSplitter.splitTallPages(..., pageNumbers: Set<Int>?)` respects the set verbatim (ratio filters are bypassed for explicit selections since the UI already vetted them, sanity filters still apply).
 
@@ -25,6 +27,11 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 ### UI Improvements
 - **Oversized Pages: more rows-per-page options** — Added `250` and `500` to `itemsPerPage` selector alongside existing `20/50/100`.
 - **Oversized Pages: fix Split Selected count** — `item-key` was `bookId`, so Vuetify deduplicated rows when multiple pages from the same book appeared on one page — selecting all 100 rows ended up with fewer entries in `selectedPages`. Switched to composite `rowKey = bookId_pageNumber`; "Split Selected (N)" now reflects the real row count.
+
+### Documentation
+- **README: Docker `network_mode: bridge` as default** — `docker run` and `docker-compose.yml` now include `network_mode: bridge` / `--network bridge` by default; removed the separate VLAN footnote.
+- **README: Removed pre-0.1.0 migration instructions** — The SQL cleanup for fork versions ≤ 0.0.9 is no longer relevant; section simplified to a two-line summary.
+- **README: Chapter URL import note** — Added note under *Chapter URL Tracking* explaining that the toggle is enabled by default and should be disabled for libraries that don't use the download system.
 
 | Modified/New Files | Purpose |
 |-------------------|---------|
@@ -43,6 +50,17 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `domain/service/LibraryContentLifecycle.kt` | `scanSeriesFolder` now mirrors `ScanLibrary` post-scan tasks (`repairExtensions`, `findBooksToConvert`, `findBooksWithMissingPageHash`, `findDuplicatePagesToDelete`, `hashBooksWithoutHash`, `hashBooksWithoutHashKoreader`) |
 | `infrastructure/download/GalleryDlWrapper.kt` | All INFO download-progress logs demoted to DEBUG (20 call sites); warn/error untouched |
 | `infrastructure/download/MangaDexApiClient.kt` | `.trim()` scanlation group name from MangaDex API (both `fetchChapterMetadata` and `fetchAllChaptersFromMangaDex`); empty-after-trim collapses to `null` so dedup no longer splits on trailing whitespace |
+| `domain/model/Library.kt` | New `importChapterUrls: Boolean = true` field |
+| `infrastructure/jooq/main/LibraryDao.kt` | Insert/update/toDomain threads `importChapterUrls` through the `IMPORT_CHAPTER_URLS` column |
+| `flyway/resources/db/migration/fork/sqlite/V20260411000000__library_import_chapter_urls.sql` | New `ALTER TABLE library ADD COLUMN IMPORT_CHAPTER_URLS boolean NOT NULL DEFAULT 0` |
+| `interfaces/api/rest/dto/LibraryDto.kt` / `LibraryCreationDto.kt` / `LibraryUpdateDto.kt` | Expose `importChapterUrls` on API |
+| `interfaces/api/rest/LibraryController.kt` | Create/patch pass `importChapterUrls` through |
+| `domain/service/LibraryContentLifecycle.kt` | `scanRootFolder` and `scanSeriesFolder` call `chapterUrlImporter` only when `library.importChapterUrls` is `true` |
+| `domain/service/ChapterUrlImporter.kt` | Removed ComicInfo.xml reading entirely; now only reads ZIP comments (central-directory lookup). `parseComicInfoXml`, regex constants, and `unescapeXml` removed |
+| `domain/service/BookMetadataLifecycle.kt` | New `tryImportChapterUrl`: extracts chapter URL from `ComicInfoProvider` patch links during normal metadata refresh — no extra ZIP open |
+| `komga-webui/src/components/dialogs/LibraryEditDialog.vue` | New metadata toggle row for chapter URL import with warning tooltip |
+| `komga-webui/src/types/komga-libraries.ts` | `importChapterUrls` on `LibraryDto`/`LibraryCreationDto`/`LibraryUpdateDto` |
+| `komga-webui/src/locales/en.json` / `de.json` | New `field_import_chapter_urls`, `label_import_chapter_urls`, `tooltip_import_chapter_urls` keys |
 | `gradle.properties` | Fork version bump to `0.1.3.4` |
 
 ---

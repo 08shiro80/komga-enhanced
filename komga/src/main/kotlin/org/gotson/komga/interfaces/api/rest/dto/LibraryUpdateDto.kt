@@ -24,6 +24,7 @@ class LibraryUpdateDto {
   val importMylarSeries: Boolean? = null
   val importLocalArtwork: Boolean? = null
   val importBarcodeIsbn: Boolean? = null
+  val importChapterUrls: Boolean? = null
 
   val scanForceModifiedTime: Boolean? = null
   val scanInterval: ScanIntervalDto? = null
