@@ -6,7 +6,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.1.3.4] - 2026-04-11
+## [0.1.4] - 2026-04-12
 
 ### Bug Fixes
 - **Oversized Pages: "Split Selected" still split every page + created tiny shards** — Two compounding bugs when splitting a single selected webtoon page: (1) `OversizedPages.vue:splitSelected` built the request with `paramsSerializer: params => qs.stringify(params, {indices: false})` but `qs` was never imported in the file. At runtime the serializer threw `ReferenceError`, the `pageNumbers` query list never reached the backend, and the backend fell back to re-scanning the whole book by ratio — so selecting 1 page triggered 32 splits and 64 new pages. Replaced the `qs` call with `URLSearchParams` which builds `?maxRatio=…&mode=…&pageNumbers=1&pageNumbers=2&…` natively — no dependency, no runtime surprise. (2) After the split completed, the new parts were ~800×80 px — far smaller than the Webtoon preset's `splitRatio 1.5` target should produce. Root cause: `PageSplitter.splitTallPages` reads `media.pages[x].dimension.width` from the DB when computing `effectiveMaxHeight = width × maxRatio`. When stored dimensions are stale or truncated (e.g. a thin strip at `53×200`), the target height collapses to `53 × 1.5 ≈ 80 px` while `ImageSplitter` loads the real image and slices its actual `800 px` width into 50+ shards of 80 px. Added `MIN_TARGET_DIMENSION = 300` sanity floor: if the computed target height/width falls below 300 px the page is skipped and a `WARN` naming the offending dimension/ratio is logged, so stale DB entries can no longer produce degenerate splits.
