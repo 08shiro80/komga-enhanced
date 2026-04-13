@@ -92,7 +92,7 @@
     </v-container>
 
     <!-- Install Dialog -->
-    <v-dialog v-model="installDialog" max-width="600">
+    <v-dialog v-model="installDialog" max-width="600" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title>{{ $t('plugin_manager.dialog_install_title') }}</v-card-title>
         <v-card-text>
@@ -126,7 +126,7 @@
     </v-dialog>
 
     <!-- Uninstall Confirmation -->
-    <v-dialog v-model="uninstallDialog" max-width="500">
+    <v-dialog v-model="uninstallDialog" max-width="500" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title class="headline">{{ $t('plugin_manager.dialog_uninstall_title') }}</v-card-title>
         <v-card-text>
@@ -144,7 +144,7 @@
     </v-dialog>
 
     <!-- Config Dialog -->
-    <v-dialog v-model="configDialog" max-width="800">
+    <v-dialog v-model="configDialog" max-width="800" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title>
           {{ $t('plugin_manager.configure') }} {{ selectedPlugin?.name }}
@@ -195,7 +195,7 @@
     </v-dialog>
 
     <!-- Logs Dialog -->
-    <v-dialog v-model="logsDialog" max-width="1200" scrollable>
+    <v-dialog v-model="logsDialog" max-width="1200" scrollable :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title>
           {{ selectedPlugin?.name }} {{ $t('plugin_manager.logs_title') }}

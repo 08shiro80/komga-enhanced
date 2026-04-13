@@ -1,222 +1,308 @@
 <template>
   <v-container fluid class="pa-6">
-    <v-data-table
-      v-model="selectedPages"
-      :headers="headers"
-      :items="oversizedPages"
-      :options.sync="options"
-      :server-items-length="totalPages"
-      :loading="loading"
-      show-select
-      item-key="rowKey"
-      class="elevation-1"
-      :footer-props="{
-        itemsPerPageOptions: [20, 50, 100, 250, 500]
-      }"
-    >
-      <template v-slot:top>
-        <v-container>
-          <v-row>
-            <v-col cols="12">
-              <v-alert v-if="currentMode === 'wide'" type="info" dismissible text class="body-2">
-                Scan for wide pages (double pages combined in one image) and split them
-                horizontally into two (or more) single pages. Uses aspect ratio
-                (width &divide; height) &mdash; works at any resolution.
-              </v-alert>
-              <v-alert v-else type="info" dismissible text class="body-2">
-                Scan for tall pages (webtoon strips, long scrolling pages) and split them into
-                multiple readable pages. Uses aspect ratio (height &divide; width) instead of
-                fixed pixel values &mdash; works at any resolution.
-              </v-alert>
-            </v-col>
-          </v-row>
-          <v-row align="center">
-            <v-col cols="12" sm="6" md="3">
-              <v-select
-                v-model="selectedPreset"
-                :items="presets"
-                item-text="label"
-                item-value="key"
-                label="Preset"
-                filled
-                dense
-                @change="applyPreset"
-              />
-            </v-col>
-            <v-col cols="12" sm="3" md="2">
-              <v-text-field
-                v-model.number="detectRatio"
-                label="Detect ratio"
-                type="number"
-                filled
-                dense
-                step="0.1"
-                :min="1.1"
-                :max="20"
-                :hint="currentMode === 'wide' ? 'Find pages wider than N:1' : 'Find pages taller than N:1'"
-                persistent-hint
-                @input="selectedPreset = 'custom'"
-              />
-            </v-col>
-            <v-col cols="12" sm="3" md="2">
-              <v-text-field
-                v-model.number="splitRatio"
-                label="Split ratio"
-                type="number"
-                filled
-                dense
-                step="0.1"
-                :min="0.5"
-                :max="10"
-                :hint="currentMode === 'wide' ? 'Max width per part (N &times; height)' : 'Max height per part (N &times; width)'"
-                persistent-hint
-                @input="selectedPreset = 'custom'"
-              />
-            </v-col>
-            <v-col cols="12" sm="6" md="5" class="d-flex align-center flex-wrap">
-              <v-btn color="primary" @click="loadPages" class="mr-2 mb-2">
-                <v-icon left>mdi-magnify</v-icon>
-                Search
-              </v-btn>
-              <v-btn
-                color="warning"
-                @click="splitSelected"
-                :disabled="selectedPages.length === 0"
-                :loading="splitting"
-                class="mr-2 mb-2"
-              >
-                <v-icon left>mdi-scissors-cutting</v-icon>
-                Split Selected ({{ selectedPages.length }})
-              </v-btn>
-              <v-btn
-                color="error"
-                @click="confirmSplitAll"
-                :disabled="oversizedPages.length === 0"
-                :loading="splitting"
-                class="mb-2"
-              >
-                <v-icon left>mdi-content-cut</v-icon>
-                Split All
-              </v-btn>
-            </v-col>
-          </v-row>
-          <v-row align="center">
-            <v-col cols="12" class="d-flex align-center flex-wrap">
-              <v-btn
-                color="grey darken-1"
-                dark
-                @click="ignoreSelected"
-                :disabled="selectedPages.length === 0"
-                class="mr-2 mb-2"
-              >
-                <v-icon left>mdi-eye-off</v-icon>
-                Ignore Selected ({{ selectedPages.length }})
-              </v-btn>
-              <v-btn
-                color="red darken-2"
-                dark
-                @click="confirmDeleteSelected"
-                :disabled="selectedPages.length === 0"
-                class="mr-2 mb-2"
-              >
-                <v-icon left>mdi-delete</v-icon>
-                Delete Selected ({{ selectedPages.length }})
-              </v-btn>
-              <v-switch
-                v-model="includeIgnored"
-                label="Show ignored"
-                hide-details
-                dense
-                class="ml-2 mb-2 mt-0"
-                @change="loadPages"
-              />
-            </v-col>
-          </v-row>
-        </v-container>
-      </template>
+    <v-row>
+      <v-col cols="12">
+        <v-alert v-if="currentMode === 'wide'" type="info" dismissible text class="body-2">
+          Scan for wide pages (double pages combined in one image) and split them
+          horizontally into two (or more) single pages. Uses aspect ratio
+          (width &divide; height) &mdash; works at any resolution.
+        </v-alert>
+        <v-alert v-else type="info" dismissible text class="body-2">
+          Scan for tall pages (webtoon strips, long scrolling pages) and split them into
+          multiple readable pages. Uses aspect ratio (height &divide; width) instead of
+          fixed pixel values &mdash; works at any resolution.
+        </v-alert>
+      </v-col>
+    </v-row>
 
-      <template v-slot:item.thumbnail="{ item }">
-        <v-img
-          :src="thumbnailUrl(item)"
-          :width="60"
-          :height="80"
-          contain
-          class="my-2"
-          style="cursor: pointer"
-          @click="openPreview(item)"
+    <v-row align="center">
+      <v-col cols="12" sm="6" md="3">
+        <v-select
+          v-model="selectedPreset"
+          :items="presets"
+          item-text="label"
+          item-value="key"
+          label="Preset"
+          filled
+          dense
+          @change="applyPreset"
+        />
+      </v-col>
+      <v-col cols="12" sm="3" md="2">
+        <v-text-field
+          v-model.number="detectRatio"
+          label="Detect ratio"
+          type="number"
+          filled
+          dense
+          step="0.1"
+          :min="1.1"
+          :max="20"
+          :hint="currentMode === 'wide' ? 'Find pages wider than N:1' : 'Find pages taller than N:1'"
+          persistent-hint
+          @input="selectedPreset = 'custom'"
+        />
+      </v-col>
+      <v-col cols="12" sm="3" md="2">
+        <v-text-field
+          v-model.number="splitRatio"
+          label="Split ratio"
+          type="number"
+          filled
+          dense
+          step="0.1"
+          :min="0.5"
+          :max="10"
+          :hint="currentMode === 'wide' ? 'Split threshold — halves in 2 when width &gt; N &times; height' : 'Max height per part (N &times; width)'"
+          persistent-hint
+          @input="selectedPreset = 'custom'"
+        />
+      </v-col>
+      <v-col cols="12" sm="6" md="5" class="d-flex align-center flex-wrap">
+        <v-btn color="primary" @click="searchPages" class="mr-2 mb-2">
+          <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-magnify</v-icon>
+          <span class="d-none d-sm-inline">Search</span>
+        </v-btn>
+        <v-btn
+          color="warning"
+          @click="splitSelected"
+          :disabled="selectedPages.length === 0"
+          :loading="splitting"
+          class="mr-2 mb-2"
         >
-          <template v-slot:placeholder>
-            <v-row class="fill-height ma-0" align="center" justify="center">
-              <v-progress-circular indeterminate size="16" />
-            </v-row>
-          </template>
-        </v-img>
-      </template>
+          <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-scissors-cutting</v-icon>
+          <span class="d-none d-sm-inline">Split Selected&nbsp;</span>
+          <span v-if="selectedPages.length > 0">({{ selectedPages.length }})</span>
+        </v-btn>
+        <v-btn
+          color="error"
+          @click="confirmSplitAll"
+          :disabled="oversizedPages.length === 0"
+          :loading="splitting"
+          class="mb-2"
+        >
+          <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-content-cut</v-icon>
+          <span class="d-none d-sm-inline">Split All</span>
+        </v-btn>
+      </v-col>
+    </v-row>
 
-      <template v-slot:item.seriesTitle="{ item }">
-        <router-link :to="{name: 'browse-series', params: {seriesId: item.seriesId}}">
-          {{ item.seriesTitle }}
-        </router-link>
-      </template>
-
-      <template v-slot:item.bookName="{ item }">
-        <router-link :to="{name: 'browse-book', params: {bookId: item.bookId, seriesId: item.seriesId}}">
-          {{ item.bookName }}
-        </router-link>
-      </template>
-
-      <template v-slot:item.dimensions="{ item }">
-        {{ item.width }} &times; {{ item.height }}
-      </template>
-
-      <template v-slot:item.ratio="{ item }">
-        {{ item.ratio }}:1
-      </template>
-
-      <template v-slot:item.splitPreview="{ item }">
-        {{ splitPreviewParts(item) }} parts
-      </template>
-
-      <template v-slot:item.fileSize="{ item }">
-        {{ formatBytes(item.fileSize) }}
-      </template>
-
-      <template v-slot:item.actions="{ item }">
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on }">
-            <v-btn icon small v-on="on" @click="openPreview(item)">
-              <v-icon small>mdi-image-search</v-icon>
-            </v-btn>
-          </template>
-          <span>Preview</span>
-        </v-tooltip>
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on }">
-            <v-btn icon small v-on="on" @click="ignoreRow(item)">
-              <v-icon small>mdi-eye-off</v-icon>
-            </v-btn>
-          </template>
-          <span>Ignore</span>
-        </v-tooltip>
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on }">
-            <v-btn icon small v-on="on" @click="confirmDeleteRow(item)">
-              <v-icon small color="red darken-2">mdi-delete</v-icon>
-            </v-btn>
-          </template>
-          <span>Delete page from book</span>
-        </v-tooltip>
-      </template>
-
-      <template v-slot:footer.prepend>
-        <v-btn icon @click="loadPages">
+    <v-row align="center">
+      <v-col cols="12" class="d-flex align-center flex-wrap">
+        <v-btn
+          color="grey darken-1"
+          dark
+          @click="ignoreSelected"
+          :disabled="selectedPages.length === 0"
+          class="mr-2 mb-2"
+        >
+          <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-eye-off</v-icon>
+          <span class="d-none d-sm-inline">Ignore Selected&nbsp;</span>
+          <span v-if="selectedPages.length > 0">({{ selectedPages.length }})</span>
+        </v-btn>
+        <v-btn
+          color="red darken-2"
+          dark
+          @click="confirmDeleteSelected"
+          :disabled="selectedPages.length === 0"
+          class="mr-2 mb-2"
+        >
+          <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-delete</v-icon>
+          <span class="d-none d-sm-inline">Delete Selected&nbsp;</span>
+          <span v-if="selectedPages.length > 0">({{ selectedPages.length }})</span>
+        </v-btn>
+        <v-btn
+          text
+          small
+          @click="toggleSelectAll"
+          class="mr-2 mb-2"
+          :disabled="oversizedPages.length === 0"
+        >
+          <v-icon :left="$vuetify.breakpoint.smAndUp" small>{{ allSelected ? 'mdi-checkbox-multiple-marked' : 'mdi-checkbox-multiple-blank-outline' }}</v-icon>
+          <span class="d-none d-sm-inline">{{ allSelected ? 'Deselect page' : 'Select page' }}</span>
+        </v-btn>
+        <v-switch
+          v-model="includeIgnored"
+          label="Show ignored"
+          hide-details
+          dense
+          class="ml-2 mb-2 mt-0"
+          @change="searchPages"
+        />
+        <v-spacer />
+        <v-btn icon @click="searchPages" :loading="loading">
           <v-icon>mdi-refresh</v-icon>
         </v-btn>
-      </template>
-    </v-data-table>
+      </v-col>
+    </v-row>
+
+    <v-row align="center" class="mb-2">
+      <v-col cols="12" sm="6" md="5">
+        <v-text-field
+          v-model="searchQuery"
+          label="Filter by series or book name"
+          prepend-inner-icon="mdi-magnify"
+          clearable
+          dense
+          hide-details
+          @input="onSearchInput"
+          @click:clear="onSearchClear"
+        />
+      </v-col>
+      <v-col cols="12" sm="6" md="7" class="d-flex align-center flex-wrap">
+        <span class="d-none d-sm-inline text-caption mr-2">Sort:</span>
+        <v-btn-toggle v-model="sortKey" mandatory dense @change="loadPages">
+          <v-btn small value="ratio">Ratio</v-btn>
+          <v-btn small value="fileSize">Size</v-btn>
+          <v-btn small value="seriesTitle">Series</v-btn>
+          <v-btn small value="bookName">Book</v-btn>
+          <v-btn small value="pageNumber">Page</v-btn>
+        </v-btn-toggle>
+        <v-btn icon small @click="toggleSortDir" class="ml-1">
+          <v-icon small>{{ sortDesc ? 'mdi-sort-descending' : 'mdi-sort-ascending' }}</v-icon>
+        </v-btn>
+        <v-spacer />
+        <span class="d-none d-sm-inline text-caption mr-2">Per page:</span>
+        <v-select
+          v-model="pageSize"
+          :items="[20, 50, 100, 250, 500]"
+          dense
+          hide-details
+          style="max-width: 90px"
+          @change="loadPages"
+        />
+      </v-col>
+    </v-row>
+
+    <v-row v-if="loading" justify="center" class="my-8">
+      <v-progress-circular indeterminate color="primary" />
+    </v-row>
+
+    <v-row v-else-if="oversizedPages.length === 0" justify="center" class="my-8">
+      <span class="text-subtitle-1 grey--text">No oversized pages found.</span>
+    </v-row>
+
+    <v-row v-else>
+      <v-slide-x-transition group hide-on-leave style="width: 100%; display: flex; flex-wrap: wrap">
+        <v-card
+          v-for="item in oversizedPages"
+          :key="item.rowKey"
+          class="ma-2"
+          :style="{width: $vuetify.breakpoint.xsOnly ? '100%' : '480px'}"
+          :class="isSelected(item) ? 'elevation-6' : 'elevation-1'">
+            <v-row no-gutters>
+              <v-col cols="auto" class="pa-2" style="position: relative">
+                <v-checkbox
+                  :input-value="isSelected(item)"
+                  @change="toggleSelect(item)"
+                  hide-details
+                  dense
+                  class="ma-0 pa-0"
+                  style="position: absolute; top: 4px; left: 4px; z-index: 2; background: rgba(255,255,255,0.7); border-radius: 4px"
+                />
+                <v-img
+                  :src="thumbnailUrl(item)"
+                  :width="220"
+                  :height="320"
+                  contain
+                  style="cursor: zoom-in; background: #111"
+                  @click="openPreview(item)"
+                >
+                  <template v-slot:placeholder>
+                    <v-row class="fill-height ma-0" align="center" justify="center">
+                      <v-progress-circular indeterminate size="24" />
+                    </v-row>
+                  </template>
+                </v-img>
+              </v-col>
+              <v-col class="pa-3 d-flex flex-column">
+                <div class="text-caption grey--text">Series</div>
+                <router-link
+                  :to="{name: 'browse-series', params: {seriesId: item.seriesId}}"
+                  class="text-body-2 text-truncate"
+                  style="max-width: 100%"
+                >
+                  {{ item.seriesTitle }}
+                </router-link>
+
+                <div class="text-caption grey--text mt-2">Book</div>
+                <router-link
+                  :to="{name: 'browse-book', params: {bookId: item.bookId, seriesId: item.seriesId}}"
+                  class="text-body-2 text-truncate"
+                  style="max-width: 100%"
+                >
+                  {{ item.bookName }}
+                </router-link>
+
+                <v-row no-gutters class="mt-2">
+                  <v-col cols="6">
+                    <div class="text-caption grey--text">Page #</div>
+                    <div class="text-body-2">{{ item.pageNumber }}</div>
+                  </v-col>
+                  <v-col cols="6">
+                    <div class="text-caption grey--text">Ratio</div>
+                    <div class="text-body-2">{{ item.ratio }}:1</div>
+                  </v-col>
+                </v-row>
+
+                <v-row no-gutters class="mt-2">
+                  <v-col cols="6">
+                    <div class="text-caption grey--text">Dimensions</div>
+                    <div class="text-body-2">{{ item.width }} &times; {{ item.height }}</div>
+                  </v-col>
+                  <v-col cols="6">
+                    <div class="text-caption grey--text">File Size</div>
+                    <div class="text-body-2">{{ formatBytes(item.fileSize) }}</div>
+                  </v-col>
+                </v-row>
+
+                <v-row no-gutters class="mt-2">
+                  <v-col cols="12">
+                    <div class="text-caption grey--text">Split into</div>
+                    <div class="text-body-2">{{ splitPreviewParts(item) }} parts</div>
+                  </v-col>
+                </v-row>
+
+                <v-spacer />
+
+                <v-card-actions class="pa-0 mt-2">
+                  <v-tooltip bottom>
+                    <template v-slot:activator="{ on }">
+                      <v-btn icon small v-on="on" @click="openPreview(item)">
+                        <v-icon small>mdi-image-search</v-icon>
+                      </v-btn>
+                    </template>
+                    <span>Preview</span>
+                  </v-tooltip>
+                  <v-tooltip bottom>
+                    <template v-slot:activator="{ on }">
+                      <v-btn icon small v-on="on" @click="ignoreRow(item)">
+                        <v-icon small>mdi-eye-off</v-icon>
+                      </v-btn>
+                    </template>
+                    <span>Ignore</span>
+                  </v-tooltip>
+                  <v-tooltip bottom>
+                    <template v-slot:activator="{ on }">
+                      <v-btn icon small v-on="on" @click="confirmDeleteRow(item)">
+                        <v-icon small color="red darken-2">mdi-delete</v-icon>
+                      </v-btn>
+                    </template>
+                    <span>Delete page from book</span>
+                  </v-tooltip>
+                </v-card-actions>
+              </v-col>
+            </v-row>
+          </v-card>
+      </v-slide-x-transition>
+    </v-row>
+
+    <v-row v-if="pageCount > 1" justify="center" class="mt-4">
+      <v-pagination v-model="page" :length="pageCount" :total-visible="9" @input="loadPages" />
+    </v-row>
 
     <!-- Confirm Split All Dialog -->
-    <v-dialog v-model="showConfirmDialog" max-width="500">
+    <v-dialog v-model="showConfirmDialog" max-width="500" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title class="headline warning white--text">
           <v-icon left dark>mdi-alert</v-icon>
@@ -224,8 +310,8 @@
         </v-card-title>
         <v-card-text class="pt-4">
           <p v-if="currentMode === 'wide'">This will split all pages with width:height ratio
-            above <strong>{{ detectRatio }}:1</strong> into parts of max
-            <strong>{{ splitRatio }}:1</strong>.</p>
+            above <strong>{{ detectRatio }}:1</strong> in half (2 parts) whenever the ratio
+            exceeds <strong>{{ splitRatio }}:1</strong>.</p>
           <p v-else>This will split all pages with ratio above
             <strong>{{ detectRatio }}:1</strong> into parts of max
             <strong>{{ splitRatio }}:1</strong>.</p>
@@ -240,7 +326,7 @@
     </v-dialog>
 
     <!-- Preview Dialog -->
-    <v-dialog v-model="showPreviewDialog" max-width="90vw">
+    <v-dialog v-model="showPreviewDialog" max-width="90vw" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card v-if="previewItem">
         <v-card-title class="headline">
           {{ previewItem.bookName }} &mdash; Page {{ previewItem.pageNumber }}
@@ -270,7 +356,7 @@
     </v-dialog>
 
     <!-- Confirm Delete Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="540">
+    <v-dialog v-model="showDeleteDialog" max-width="540" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title class="headline red darken-2 white--text">
           <v-icon left dark>mdi-alert</v-icon>
@@ -295,7 +381,7 @@
     </v-dialog>
 
     <!-- Results Dialog -->
-    <v-dialog v-model="showResultsDialog" max-width="700">
+    <v-dialog v-model="showResultsDialog" max-width="700" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title class="headline">
           Split Results
@@ -341,8 +427,6 @@ import Vue from 'vue'
 import {OversizedPageDto} from '@/types/komga-books'
 import {bookPageThumbnailUrl, bookPageUrl} from '@/functions/urls'
 
-const qs = require('qs')
-
 interface SplitResult {
   bookId: string
   bookName: string
@@ -375,14 +459,15 @@ export default Vue.extend({
   name: 'OversizedPages',
   data: function () {
     return {
-      oversizedPages: [] as OversizedPageDto[],
-      selectedPages: [] as OversizedPageDto[],
-      totalPages: 0,
+      oversizedPages: [] as (OversizedPageDto & {rowKey: string})[],
+      selectedPages: [] as (OversizedPageDto & {rowKey: string})[],
+      totalElements: 0,
+      page: 1,
+      pageSize: this.$store?.state?.persistedState?.dataTablePageSize || 20,
+      sortKey: 'ratio',
+      sortDesc: true,
       loading: true,
       splitting: false,
-      options: {
-        itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
-      } as any,
       selectedPreset: 'webtoon',
       currentMode: 'tall' as SplitMode,
       detectRatio: 3,
@@ -392,37 +477,22 @@ export default Vue.extend({
       showResultsDialog: false,
       showConfirmDialog: false,
       showPreviewDialog: false,
-      previewItem: null as OversizedPageDto | null,
+      previewItem: null as (OversizedPageDto & {rowKey: string}) | null,
       includeIgnored: false,
       showDeleteDialog: false,
-      pagesToDelete: [] as OversizedPageDto[],
+      pagesToDelete: [] as (OversizedPageDto & {rowKey: string})[],
       deleting: false,
+      searchQuery: '',
+      searchDebounce: null as number | null,
     }
   },
-  watch: {
-    options: {
-      handler() {
-        if (this.options.itemsPerPage) {
-          this.$store.commit('setDataTablePageSize', this.options.itemsPerPage)
-        }
-        this.loadPages()
-      },
-      deep: true,
-    },
-  },
   computed: {
-    headers(): object[] {
-      return [
-        {text: '', value: 'thumbnail', sortable: false, width: '80px'},
-        {text: 'Series', value: 'seriesTitle'},
-        {text: 'Book', value: 'bookName'},
-        {text: 'Page #', value: 'pageNumber', width: '80px'},
-        {text: 'Dimensions', value: 'dimensions', sortable: false},
-        {text: 'Ratio', value: 'ratio', width: '90px'},
-        {text: 'Split into', value: 'splitPreview', sortable: false, width: '100px'},
-        {text: 'File Size', value: 'fileSize'},
-        {text: '', value: 'actions', sortable: false, width: '140px'},
-      ]
+    pageCount(): number {
+      if (this.pageSize <= 0) return 0
+      return Math.ceil(this.totalElements / this.pageSize)
+    },
+    allSelected(): boolean {
+      return this.oversizedPages.length > 0 && this.selectedPages.length === this.oversizedPages.length
     },
     previewImgStyle(): object {
       return {
@@ -431,6 +501,9 @@ export default Vue.extend({
         objectFit: 'contain',
       }
     },
+  },
+  mounted() {
+    this.loadPages()
   },
   methods: {
     applyPreset(key: string) {
@@ -442,42 +515,73 @@ export default Vue.extend({
       }
       this.currentMode = preset.mode
       this.selectedPages = []
+      this.page = 1
+      this.loadPages()
+    },
+    searchPages() {
+      this.page = 1
+      this.loadPages()
+    },
+    onSearchInput() {
+      if (this.searchDebounce) window.clearTimeout(this.searchDebounce)
+      this.searchDebounce = window.setTimeout(() => {
+        this.page = 1
+        this.loadPages()
+      }, 350)
+    },
+    onSearchClear() {
+      this.searchQuery = ''
+      this.page = 1
+      this.loadPages()
+    },
+    toggleSortDir() {
+      this.sortDesc = !this.sortDesc
       this.loadPages()
     },
     splitPreviewParts(item: OversizedPageDto): number {
       if (this.splitRatio <= 0) return 1
       if (this.currentMode === 'wide') {
-        return Math.ceil(item.width / (item.height * this.splitRatio))
+        return item.width > item.height * this.splitRatio ? 2 : 1
       }
       return Math.ceil(item.height / (item.width * this.splitRatio))
     },
+    isSelected(item: OversizedPageDto & {rowKey: string}): boolean {
+      return this.selectedPages.some(p => p.rowKey === item.rowKey)
+    },
+    toggleSelect(item: OversizedPageDto & {rowKey: string}) {
+      const idx = this.selectedPages.findIndex(p => p.rowKey === item.rowKey)
+      if (idx >= 0) this.selectedPages.splice(idx, 1)
+      else this.selectedPages.push(item)
+    },
+    toggleSelectAll() {
+      if (this.allSelected) this.selectedPages = []
+      else this.selectedPages = [...this.oversizedPages]
+    },
     async loadPages() {
       this.loading = true
-
-      const pageRequest = {
-        page: this.options.page - 1,
-        size: this.options.itemsPerPage,
-      } as PageRequest
-
-      if (this.options.sortBy && this.options.sortBy.length > 0) {
-        const orders = this.options.sortDesc.map((desc: boolean, index: number) =>
-          `${this.options.sortBy[index]},${desc ? 'desc' : 'asc'}`,
-        )
-        pageRequest.sort = orders
+      if (this.pageSize) {
+        this.$store.commit('setDataTablePageSize', this.pageSize)
       }
 
+      const pageRequest = {
+        page: this.page - 1,
+        size: this.pageSize,
+        sort: [`${this.sortKey},${this.sortDesc ? 'desc' : 'asc'}`],
+      } as PageRequest
+
       try {
-        const page = await this.$komgaBooks.getOversizedPages(
+        const pageResult = await this.$komgaBooks.getOversizedPages(
           this.detectRatio,
           this.currentMode,
           this.includeIgnored,
           pageRequest,
+          this.searchQuery,
         )
-        this.oversizedPages = page.content.map(p => ({
+        this.oversizedPages = pageResult.content.map(p => ({
           ...p,
           rowKey: `${p.bookId}_${p.pageNumber}`,
         }))
-        this.totalPages = page.totalElements
+        this.totalElements = pageResult.totalElements
       } catch (e) {
         this.$eventHub.$emit('error', {message: e.message})
       } finally {
@@ -490,8 +594,6 @@ export default Vue.extend({
       this.splitting = true
       this.splitResults = []
 
-      // Group selected pages by bookId so each book gets a targeted page list,
-      // otherwise the backend would re-scan the entire book by ratio.
       const byBook = new Map<string, number[]>()
       for (const p of this.selectedPages) {
         const arr = byBook.get(p.bookId) || []
@@ -557,7 +659,7 @@ export default Vue.extend({
     fullImageUrl(item: OversizedPageDto): string {
       return bookPageUrl(item.bookId, item.pageNumber)
     },
-    openPreview(item: OversizedPageDto) {
+    openPreview(item: OversizedPageDto & {rowKey: string}) {
       this.previewItem = item
       this.showPreviewDialog = true
     },
@@ -588,7 +690,7 @@ export default Vue.extend({
       this.showPreviewDialog = false
       await this.ignoreRow(item)
     },
-    confirmDeleteRow(item: OversizedPageDto) {
+    confirmDeleteRow(item: OversizedPageDto & {rowKey: string}) {
       this.pagesToDelete = [item]
       this.showDeleteDialog = true
     },

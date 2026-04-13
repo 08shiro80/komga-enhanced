@@ -11,18 +11,18 @@
       <v-row>
         <v-col cols="12">
           <v-card>
-            <v-card-title>
-              {{ $t('download_manager.queue_title') }}
+            <v-card-title class="flex-wrap">
+              <span class="text-subtitle-1 text-sm-h6">{{ $t('download_manager.queue_title') }}</span>
               <v-spacer></v-spacer>
               <v-btn color="primary" @click="addDownloadDialog = true">
-                <v-icon left>mdi-plus</v-icon>
-                {{ $t('download_manager.add_download') }}
+                <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-plus</v-icon>
+                <span class="d-none d-sm-inline">{{ $t('download_manager.add_download') }}</span>
               </v-btn>
               <v-menu offset-y>
                 <template v-slot:activator="{ on, attrs }">
                   <v-btn text v-bind="attrs" v-on="on" class="ml-2">
-                    <v-icon left>mdi-broom</v-icon>
-                    {{ $t('download_manager.clear') }}
+                    <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-broom</v-icon>
+                    <span class="d-none d-sm-inline">{{ $t('download_manager.clear') }}</span>
                     <v-icon right>mdi-menu-down</v-icon>
                   </v-btn>
                 </template>
@@ -56,6 +56,84 @@
                 {{ $t('download_manager.no_downloads') }}
               </v-alert>
 
+              <!-- Mobile card layout -->
+              <div v-else-if="$vuetify.breakpoint.smAndDown">
+                <v-card
+                  v-for="item in downloads"
+                  :key="item.id"
+                  outlined
+                  class="mb-2"
+                >
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-start">
+                      <div class="flex-grow-1" style="min-width: 0">
+                        <div class="font-weight-medium text-truncate">{{ item.title || $t('download_manager.unknown_title') }}</div>
+                        <div class="text-caption text--secondary text-truncate">{{ item.sourceUrl }}</div>
+                      </div>
+                      <v-chip x-small :color="getStatusColor(item.status)" class="ml-2 flex-shrink-0">
+                        {{ item.status }}
+                      </v-chip>
+                    </div>
+                    <div v-if="item.status === 'DOWNLOADING'" class="mt-2">
+                      <v-progress-linear
+                        :value="item.progressPercent"
+                        height="18"
+                        :color="getStatusColor(item.status)"
+                      >
+                        <span class="white--text caption">
+                          {{ item.progressPercent }}%
+                          <span v-if="item.totalChapters">
+                            ({{ item.currentChapter }}/{{ item.totalChapters }})
+                          </span>
+                        </span>
+                      </v-progress-linear>
+                    </div>
+                    <div class="text-caption mt-2 d-flex flex-wrap" style="gap: 8px">
+                      <span>
+                        <v-icon x-small>mdi-folder</v-icon>
+                        <span v-if="item.libraryId">{{ getLibraryName(item.libraryId) }}</span>
+                        <span v-else class="text--secondary">{{ $t('download_manager.downloads_folder') }}</span>
+                      </span>
+                      <span class="text--secondary">{{ formatDate(item.createdDate) }}</span>
+                    </div>
+                  </v-card-text>
+                  <v-card-actions class="pt-0">
+                    <v-spacer />
+                    <v-btn
+                      v-if="item.status === 'DOWNLOADING' || item.status === 'PENDING'"
+                      icon
+                      small
+                      color="warning"
+                      @click="cancelDownload(item)"
+                    >
+                      <v-icon small>mdi-stop</v-icon>
+                    </v-btn>
+                    <v-btn
+                      v-if="item.status === 'FAILED'"
+                      icon
+                      small
+                      color="primary"
+                      @click="retryDownload(item)"
+                    >
+                      <v-icon small>mdi-refresh</v-icon>
+                    </v-btn>
+                    <v-btn
+                      v-if="item.errorMessage"
+                      icon
+                      small
+                      color="error"
+                      @click="showError(item)"
+                    >
+                      <v-icon small>mdi-alert-circle</v-icon>
+                    </v-btn>
+                    <v-btn icon small color="error" @click="confirmDelete(item)">
+                      <v-icon small>mdi-delete</v-icon>
+                    </v-btn>
+                  </v-card-actions>
+                </v-card>
+              </div>
+
+              <!-- Desktop table layout -->
               <v-data-table
                 v-else
                 :headers="headers"
@@ -158,7 +236,7 @@
     </v-container>
 
     <!-- Add Download Dialog -->
-    <v-dialog v-model="addDownloadDialog" max-width="700">
+    <v-dialog v-model="addDownloadDialog" max-width="700" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title>{{ $t('download_manager.dialog_add_title') }}</v-card-title>
         <v-card-text>
@@ -221,7 +299,7 @@
     </v-dialog>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="deleteDialog" max-width="500">
+    <v-dialog v-model="deleteDialog" max-width="500" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title class="headline">{{ $t('download_manager.dialog_delete_title') }}</v-card-title>
         <v-card-text>
@@ -239,7 +317,7 @@
     </v-dialog>
 
     <!-- Error Dialog -->
-    <v-dialog v-model="errorDialog" max-width="600">
+    <v-dialog v-model="errorDialog" max-width="600" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title class="error white--text">
           {{ $t('download_manager.dialog_error_title') }}

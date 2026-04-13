@@ -61,6 +61,7 @@ class OversizedPagesController(
     @RequestParam(name = "minRatio", required = false) minRatio: Double?,
     @RequestParam(name = "mode", required = false, defaultValue = "tall") mode: String,
     @RequestParam(name = "includeIgnored", required = false, defaultValue = "false") includeIgnored: Boolean,
+    @RequestParam(name = "search", required = false) search: String?,
     @Parameter(hidden = true) page: Pageable,
   ): Page<OversizedPageDto> {
     val useRatio = minRatio != null
@@ -68,6 +69,7 @@ class OversizedPagesController(
     val effectiveMinHeight = minHeight ?: 4000
     val wideMode = mode.equals("wide", ignoreCase = true)
     val normalizedMode = if (wideMode) "wide" else "tall"
+    val searchTerm = search?.trim()?.takeIf { it.isNotEmpty() }?.lowercase()
 
     val ignoredKeys =
       if (includeIgnored) {
@@ -82,6 +84,12 @@ class OversizedPagesController(
     for (book in allBooks) {
       val media = mediaRepository.findByIdOrNull(book.id) ?: continue
       val series = seriesRepository.findByIdOrNull(book.seriesId)
+
+      if (searchTerm != null) {
+        val bookMatch = book.name.lowercase().contains(searchTerm)
+        val seriesMatch = series?.name?.lowercase()?.contains(searchTerm) == true
+        if (!bookMatch && !seriesMatch) continue
+      }
 
       media.pages.forEachIndexed { index, bookPage ->
         val dimension = bookPage.dimension

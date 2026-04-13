@@ -78,7 +78,7 @@ class BookMetadataLifecycle(
             }
           }
 
-          if (library.importChapterUrls && patch != null) {
+          if (patch != null) {
             tryImportChapterUrl(patch, book)
           }
         }

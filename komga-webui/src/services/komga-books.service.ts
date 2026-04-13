@@ -353,12 +353,13 @@ export default class KomgaBooksService {
     }
   }
 
-  async getOversizedPages(minRatio?: number, mode?: string, includeIgnored?: boolean, pageRequest?: PageRequest): Promise<Page<OversizedPageDto>> {
+  async getOversizedPages(minRatio?: number, mode?: string, includeIgnored?: boolean, pageRequest?: PageRequest, search?: string): Promise<Page<OversizedPageDto>> {
     try {
       const params = {...pageRequest} as any
       if (minRatio) params.minRatio = minRatio
       if (mode) params.mode = mode
       if (includeIgnored) params.includeIgnored = includeIgnored
+      if (search && search.trim()) params.search = search.trim()
 
       return (await this.http.get('/api/v1/media-management/oversized-pages', {
         params: params,

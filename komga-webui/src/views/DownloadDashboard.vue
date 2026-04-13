@@ -19,36 +19,36 @@
       </v-row>
 
       <!-- Stats Cards -->
-      <v-row>
-        <v-col cols="12" sm="3">
+      <v-row dense>
+        <v-col cols="6" sm="3">
           <v-card>
-            <v-card-text>
-              <div class="text-h4">{{ activeDownloads.length }}</div>
-              <div class="text-subtitle-2">Active</div>
+            <v-card-text class="pa-3">
+              <div class="text-h5 text-sm-h4">{{ activeDownloads.length }}</div>
+              <div class="text-caption text-sm-subtitle-2">Active</div>
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" sm="3">
+        <v-col cols="6" sm="3">
           <v-card>
-            <v-card-text>
-              <div class="text-h4">{{ pendingDownloads.length }}</div>
-              <div class="text-subtitle-2">Pending</div>
+            <v-card-text class="pa-3">
+              <div class="text-h5 text-sm-h4">{{ pendingDownloads.length }}</div>
+              <div class="text-caption text-sm-subtitle-2">Pending</div>
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" sm="3">
+        <v-col cols="6" sm="3">
           <v-card>
-            <v-card-text>
-              <div class="text-h4 success--text">{{ completedDownloads.length }}</div>
-              <div class="text-subtitle-2">Completed</div>
+            <v-card-text class="pa-3">
+              <div class="text-h5 text-sm-h4 success--text">{{ completedDownloads.length }}</div>
+              <div class="text-caption text-sm-subtitle-2">Completed</div>
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" sm="3">
+        <v-col cols="6" sm="3">
           <v-card>
-            <v-card-text>
-              <div class="text-h4 error--text">{{ failedDownloads.length }}</div>
-              <div class="text-subtitle-2">Failed</div>
+            <v-card-text class="pa-3">
+              <div class="text-h5 text-sm-h4 error--text">{{ failedDownloads.length }}</div>
+              <div class="text-caption text-sm-subtitle-2">Failed</div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -99,18 +99,18 @@
       <v-row>
         <v-col cols="12">
           <v-card>
-            <v-card-title>
-              Download Queue
+            <v-card-title class="flex-wrap">
+              <span class="text-subtitle-1 text-sm-h6">Download Queue</span>
               <v-spacer></v-spacer>
               <v-btn color="primary" @click="newDownloadDialog = true">
-                <v-icon left>mdi-plus</v-icon>
-                New Download
+                <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-plus</v-icon>
+                <span class="d-none d-sm-inline">New Download</span>
               </v-btn>
               <v-menu offset-y>
                 <template v-slot:activator="{ on, attrs }">
                   <v-btn text v-bind="attrs" v-on="on" class="ml-2">
-                    <v-icon left>mdi-broom</v-icon>
-                    Clear
+                    <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-broom</v-icon>
+                    <span class="d-none d-sm-inline">Clear</span>
                     <v-icon right>mdi-menu-down</v-icon>
                   </v-btn>
                 </template>
@@ -217,14 +217,14 @@
                             :loading="loadingFollowTxt"
                           ></v-textarea>
                         </v-card-text>
-                        <v-card-actions>
+                        <v-card-actions class="flex-wrap">
                           <v-btn
                             text
                             @click="checkNow"
                             :loading="checkingNow"
                           >
-                            <v-icon left>mdi-update</v-icon>
-                            Check Now
+                            <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-update</v-icon>
+                            <span class="d-none d-sm-inline">Check Now</span>
                           </v-btn>
                           <v-btn
                             v-if="mangaDexPluginEnabled"
@@ -232,13 +232,13 @@
                             @click="syncToMangaDex"
                             :loading="syncingToMangaDex"
                           >
-                            <v-icon left>mdi-cloud-upload</v-icon>
-                            Sync to MangaDex
+                            <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-cloud-upload</v-icon>
+                            <span class="d-none d-sm-inline">Sync to MangaDex</span>
                           </v-btn>
                           <v-spacer></v-spacer>
                           <v-btn text @click="loadFollowTxt">
-                            <v-icon left>mdi-refresh</v-icon>
-                            Reload
+                            <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-refresh</v-icon>
+                            <span class="d-none d-sm-inline">Reload</span>
                           </v-btn>
                           <v-btn
                             color="primary"
@@ -246,8 +246,8 @@
                             :loading="savingFollowTxt"
                             :disabled="!followTxtChanged"
                           >
-                            <v-icon left>mdi-content-save</v-icon>
-                            Save
+                            <v-icon :left="$vuetify.breakpoint.smAndUp">mdi-content-save</v-icon>
+                            <span class="d-none d-sm-inline">Save</span>
                           </v-btn>
                         </v-card-actions>
                       </v-card>
@@ -461,7 +461,7 @@
     </v-container>
 
     <!-- New Download Dialog -->
-    <v-dialog v-model="newDownloadDialog" max-width="600">
+    <v-dialog v-model="newDownloadDialog" max-width="600" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-title>Add Download</v-card-title>
         <v-card-text>

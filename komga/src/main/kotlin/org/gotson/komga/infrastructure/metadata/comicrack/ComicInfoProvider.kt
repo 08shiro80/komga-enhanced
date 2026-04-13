@@ -50,7 +50,11 @@ class ComicInfoProvider(
     getComicInfo(book)?.let { comicInfo ->
       val releaseDate =
         comicInfo.year?.let {
-          LocalDate.of(comicInfo.year!!, comicInfo.month ?: 1, comicInfo.day ?: 1)
+          try {
+            LocalDate.of(comicInfo.year!!, comicInfo.month ?: 1, comicInfo.day ?: 1)
+          } catch (_: java.time.DateTimeException) {
+            LocalDate.of(comicInfo.year!!, comicInfo.month ?: 1, 1)
+          }
         }
 
       val authors = mutableListOf<Author>()

@@ -97,7 +97,7 @@
       </v-col>
     </v-row>
 
-    <v-dialog v-model="dialogImage">
+    <v-dialog v-model="dialogImage" :fullscreen="$vuetify.breakpoint.xsOnly">
       <v-card>
         <v-card-text>
           <v-img
@@ -113,6 +113,7 @@
     <v-dialog
       v-model="dialogMatches"
       scrollable
+      :fullscreen="$vuetify.breakpoint.xsOnly"
     >
       <v-card>
         <v-card-text>
