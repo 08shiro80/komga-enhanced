@@ -185,16 +185,22 @@
     <v-row v-else>
       <v-slide-x-transition group hide-on-leave style="width: 100%; display: flex; flex-wrap: wrap">
         <v-card
-          v-for="item in oversizedPages"
+          v-for="(item, idx) in oversizedPages"
           :key="item.rowKey"
-          class="ma-2"
-          :style="{width: $vuetify.breakpoint.xsOnly ? '100%' : '480px'}"
-          :class="isSelected(item) ? 'elevation-6' : 'elevation-1'">
+          class="ma-2 oversized-card"
+          :style="{
+            width: $vuetify.breakpoint.xsOnly ? '100%' : '480px',
+            cursor: 'pointer',
+            border: isSelected(item) ? '2px solid var(--v-primary-base)' : '2px solid transparent',
+          }"
+          :class="isSelected(item) ? 'elevation-6' : 'elevation-1'"
+          @click="onCardClick(item, idx, $event)">
             <v-row no-gutters>
               <v-col cols="auto" class="pa-2" style="position: relative">
                 <v-checkbox
                   :input-value="isSelected(item)"
-                  @change="toggleSelect(item)"
+                  @click.stop="onCheckboxClick(item, idx, $event)"
+                  readonly
                   hide-details
                   dense
                   class="ma-0 pa-0"
@@ -206,7 +212,7 @@
                   :height="320"
                   contain
                   style="cursor: zoom-in; background: #111"
-                  @click="openPreview(item)"
+                  @click.stop="openPreview(item)"
                 >
                   <template v-slot:placeholder>
                     <v-row class="fill-height ma-0" align="center" justify="center">
@@ -221,6 +227,7 @@
                   :to="{name: 'browse-series', params: {seriesId: item.seriesId}}"
                   class="text-body-2 text-truncate"
                   style="max-width: 100%"
+                  @click.native.stop
                 >
                   {{ item.seriesTitle }}
                 </router-link>
@@ -230,6 +237,7 @@
                   :to="{name: 'browse-book', params: {bookId: item.bookId, seriesId: item.seriesId}}"
                   class="text-body-2 text-truncate"
                   style="max-width: 100%"
+                  @click.native.stop
                 >
                   {{ item.bookName }}
                 </router-link>
@@ -268,7 +276,7 @@
                 <v-card-actions class="pa-0 mt-2">
                   <v-tooltip bottom>
                     <template v-slot:activator="{ on }">
-                      <v-btn icon small v-on="on" @click="openPreview(item)">
+                      <v-btn icon small v-on="on" @click.stop="openPreview(item)">
                         <v-icon small>mdi-image-search</v-icon>
                       </v-btn>
                     </template>
@@ -276,7 +284,7 @@
                   </v-tooltip>
                   <v-tooltip bottom>
                     <template v-slot:activator="{ on }">
-                      <v-btn icon small v-on="on" @click="ignoreRow(item)">
+                      <v-btn icon small v-on="on" @click.stop="ignoreRow(item)">
                         <v-icon small>mdi-eye-off</v-icon>
                       </v-btn>
                     </template>
@@ -284,7 +292,7 @@
                   </v-tooltip>
                   <v-tooltip bottom>
                     <template v-slot:activator="{ on }">
-                      <v-btn icon small v-on="on" @click="confirmDeleteRow(item)">
+                      <v-btn icon small v-on="on" @click.stop="confirmDeleteRow(item)">
                         <v-icon small color="red darken-2">mdi-delete</v-icon>
                       </v-btn>
                     </template>
@@ -484,6 +492,7 @@ export default Vue.extend({
       deleting: false,
       searchQuery: '',
       searchDebounce: null as number | null,
+      lastSelectedIndex: -1,
     }
   },
   computed: {
@@ -552,6 +561,25 @@ export default Vue.extend({
       const idx = this.selectedPages.findIndex(p => p.rowKey === item.rowKey)
       if (idx >= 0) this.selectedPages.splice(idx, 1)
       else this.selectedPages.push(item)
+    },
+    onCardClick(item: OversizedPageDto & {rowKey: string}, idx: number, event: MouseEvent) {
+      if (event.shiftKey && this.lastSelectedIndex >= 0) {
+        const start = Math.min(this.lastSelectedIndex, idx)
+        const end = Math.max(this.lastSelectedIndex, idx)
+        const range = this.oversizedPages.slice(start, end + 1)
+        const shouldSelect = !this.isSelected(item)
+        for (const r of range) {
+          const existingIdx = this.selectedPages.findIndex(p => p.rowKey === r.rowKey)
+          if (shouldSelect && existingIdx < 0) this.selectedPages.push(r)
+          else if (!shouldSelect && existingIdx >= 0) this.selectedPages.splice(existingIdx, 1)
+        }
+      } else {
+        this.toggleSelect(item)
+      }
+      this.lastSelectedIndex = idx
+    },
+    onCheckboxClick(item: OversizedPageDto & {rowKey: string}, idx: number, event: MouseEvent) {
+      this.onCardClick(item, idx, event)
     },
     toggleSelectAll() {
       if (this.allSelected) this.selectedPages = []
