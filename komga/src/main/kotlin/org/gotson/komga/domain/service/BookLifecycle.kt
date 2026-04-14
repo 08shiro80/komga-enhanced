@@ -21,6 +21,7 @@ import org.gotson.komga.domain.model.SearchContext
 import org.gotson.komga.domain.model.SearchOperator
 import org.gotson.komga.domain.model.ThumbnailBook
 import org.gotson.komga.domain.model.TypedBytes
+import org.gotson.komga.domain.model.restoreHashFrom
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
@@ -82,21 +83,26 @@ class BookLifecycle(
     val media = bookAnalyzer.analyze(book, libraryRepository.findById(book.libraryId).analyzeDimensions)
 
     transactionTemplate.executeWithoutResult {
+      val previous = mediaRepository.findById(book.id)
       // if the number of pages has changed, delete all read progress for that book
-      mediaRepository.findById(book.id).let { previous ->
-        if (previous.status == Media.Status.OUTDATED && previous.pageCount != media.pageCount) {
-          val adjustedProgress =
-            readProgressRepository
-              .findAllByBookId(book.id)
-              .map { it.copy(page = if (it.completed) media.pageCount else 1) }
-          if (adjustedProgress.isNotEmpty()) {
-            logger.info { "Number of pages differ, adjust read progress for book" }
-            readProgressRepository.save(adjustedProgress)
-          }
+      if (previous.status == Media.Status.OUTDATED && previous.pageCount != media.pageCount) {
+        val adjustedProgress =
+          readProgressRepository
+            .findAllByBookId(book.id)
+            .map { it.copy(page = if (it.completed) media.pageCount else 1) }
+        if (adjustedProgress.isNotEmpty()) {
+          logger.info { "Number of pages differ, adjust read progress for book" }
+          readProgressRepository.save(adjustedProgress)
         }
       }
 
-      mediaRepository.update(media)
+      val mediaToPersist =
+        if (media.status == Media.Status.READY)
+          media.copy(pages = media.pages.restoreHashFrom(previous.pages))
+        else
+          media
+
+      mediaRepository.update(mediaToPersist)
     }
 
     eventPublisher.publishEvent(DomainEvent.BookUpdated(book))
