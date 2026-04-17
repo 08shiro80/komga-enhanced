@@ -754,6 +754,7 @@ export default Vue.extend({
         errorMessage: '',
       },
       metadataSources: {} as Record<string, { source: string; updatedAt: string }>,
+      pendingCoverUrl: '',
     }
   },
   props: {
@@ -1048,6 +1049,22 @@ export default Vue.extend({
           this.$v.form?.alternateTitles?.$touch()
         }
 
+        // Store cover URL for download on Save
+        this.pendingCoverUrl = metadata.coverUrl || ''
+
+        // Write series.json (no cover download yet)
+        if (this.single) {
+          try {
+            await this.$komgaPlugins.applyMetadataToSeries(
+              this.series.id,
+              metadata,
+              result.externalId,
+            )
+          } catch (err) {
+            this.$eventHub.$emit(ERROR, {message: `series.json failed: ${err.message}`} as ErrorEvent)
+          }
+        }
+
         // Switch to General tab to show applied metadata
         this.tab = 0
 
@@ -1134,6 +1151,7 @@ export default Vue.extend({
         this.poster.deleteQueue = []
         this.poster.uploadQueue = []
         this.poster.seriesThumbnails = []
+        this.pendingCoverUrl = ''
       }
     },
     dialogCancel() {
@@ -1274,6 +1292,19 @@ export default Vue.extend({
             this.$eventHub.$emit(ERROR, {message: e.message} as ErrorEvent)
           }
         }
+
+        if (this.single && this.pendingCoverUrl) {
+          try {
+            await this.$komgaPlugins.applyCoverToSeries(
+              (this.series as SeriesDto).id,
+              this.pendingCoverUrl,
+            )
+          } catch (e) {
+            this.$eventHub.$emit(ERROR, {message: e.message} as ErrorEvent)
+          }
+          this.pendingCoverUrl = ''
+        }
+
         return true
       } else return false
     },

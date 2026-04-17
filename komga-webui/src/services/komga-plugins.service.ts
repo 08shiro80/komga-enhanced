@@ -43,6 +43,7 @@ export interface MetadataDetails {
   language: string | null
   status: string | null
   coverUrl: string | null
+  alternativeTitles: Record<string, string> | null
 }
 
 export interface Author {
@@ -126,6 +127,44 @@ export default class KomgaPluginsService {
       return (await this.http.get(`/api/v1/plugins/${pluginId}/metadata/${externalId}`)).data
     } catch (e) {
       let msg = `An error occurred while fetching metadata from plugin ${pluginId}`
+      if (e.response && e.response.data && e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async applyMetadataToSeries(seriesId: string, metadata: MetadataDetails, externalId?: string): Promise<void> {
+    try {
+      await this.http.post(`/api/v1/plugins/apply-metadata/${seriesId}`, {
+        title: metadata.title,
+        summary: metadata.summary,
+        publisher: metadata.publisher,
+        ageRating: metadata.ageRating,
+        releaseDate: metadata.releaseDate,
+        status: metadata.status,
+        externalId: externalId,
+        genres: metadata.genres,
+        tags: metadata.tags,
+        authors: metadata.authors,
+        alternativeTitles: metadata.alternativeTitles,
+      })
+    } catch (e) {
+      let msg = 'An error occurred while applying metadata'
+      if (e.response && e.response.data && e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async applyCoverToSeries(seriesId: string, coverUrl: string): Promise<void> {
+    try {
+      await this.http.post(`/api/v1/plugins/apply-cover/${seriesId}`, {
+        coverUrl: coverUrl,
+      })
+    } catch (e) {
+      let msg = 'An error occurred while applying cover'
       if (e.response && e.response.data && e.response.data.message) {
         msg += `: ${e.response.data.message}`
       }
