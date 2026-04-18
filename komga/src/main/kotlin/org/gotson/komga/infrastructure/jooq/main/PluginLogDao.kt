@@ -22,30 +22,6 @@ class PluginLogDao(
   PluginLogRepository {
   private val pl = Tables.PLUGIN_LOG
 
-  override fun findById(id: String): PluginLog = findByIdOrNull(id) ?: throw NoSuchElementException("PluginLog not found: $id")
-
-  override fun findByIdOrNull(id: String): PluginLog? =
-    dslRO
-      .selectFrom(pl)
-      .where(pl.ID.eq(id))
-      .fetchOne()
-      ?.toDomain()
-
-  override fun findAll(pageable: Pageable): Page<PluginLog> {
-    val count = dslRO.fetchCount(pl).toLong()
-
-    val results =
-      dslRO
-        .selectFrom(pl)
-        .orderBy(pl.CREATED_DATE.desc())
-        .limit(pageable.pageSize)
-        .offset(pageable.offset)
-        .fetch()
-        .map { it.toDomain() }
-
-    return PageImpl(results, pageable, count)
-  }
-
   override fun findByPluginId(
     pluginId: String,
     pageable: Pageable,
@@ -117,28 +93,12 @@ class PluginLogDao(
       ).execute()
   }
 
-  override fun delete(id: String) {
-    dslRW
-      .deleteFrom(pl)
-      .where(pl.ID.eq(id))
-      .execute()
-  }
-
   override fun deleteByPluginId(pluginId: String) {
     dslRW
       .deleteFrom(pl)
       .where(pl.PLUGIN_ID.eq(pluginId))
       .execute()
   }
-
-  override fun deleteOlderThan(cutoffDate: java.time.LocalDateTime) {
-    dslRW
-      .deleteFrom(pl)
-      .where(pl.CREATED_DATE.lt(cutoffDate))
-      .execute()
-  }
-
-  override fun count(): Long = dslRO.fetchCount(pl).toLong()
 
   private fun PluginLogRecord.toDomain() =
     PluginLog(

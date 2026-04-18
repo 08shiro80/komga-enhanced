@@ -20,21 +20,6 @@ class PluginConfigDao(
   PluginConfigRepository {
   private val pc = Tables.PLUGIN_CONFIG
 
-  override fun findById(id: String): PluginConfig = findByIdOrNull(id) ?: throw NoSuchElementException("PluginConfig not found: $id")
-
-  override fun findByIdOrNull(id: String): PluginConfig? =
-    dslRO
-      .selectFrom(pc)
-      .where(pc.ID.eq(id))
-      .fetchOne()
-      ?.toDomain()
-
-  override fun findAll(): Collection<PluginConfig> =
-    dslRO
-      .selectFrom(pc)
-      .fetch()
-      .map { it.toDomain() }
-
   override fun findByPluginId(pluginId: String): Collection<PluginConfig> =
     dslRO
       .selectFrom(pc)
@@ -91,8 +76,6 @@ class PluginConfigDao(
       .where(pc.PLUGIN_ID.eq(pluginId))
       .execute()
   }
-
-  override fun count(): Long = dslRO.fetchCount(pc).toLong()
 
   private fun PluginConfigRecord.toDomain() =
     PluginConfig(

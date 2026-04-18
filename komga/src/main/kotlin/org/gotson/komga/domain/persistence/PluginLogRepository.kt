@@ -6,12 +6,6 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface PluginLogRepository {
-  fun findById(id: String): PluginLog
-
-  fun findByIdOrNull(id: String): PluginLog?
-
-  fun findAll(pageable: Pageable): Page<PluginLog>
-
   fun findByPluginId(
     pluginId: String,
     pageable: Pageable,
@@ -25,11 +19,5 @@ interface PluginLogRepository {
 
   fun insert(log: PluginLog)
 
-  fun delete(id: String)
-
   fun deleteByPluginId(pluginId: String)
-
-  fun deleteOlderThan(cutoffDate: java.time.LocalDateTime)
-
-  fun count(): Long
 }

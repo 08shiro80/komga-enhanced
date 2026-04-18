@@ -70,35 +70,11 @@ export default class KomgaPluginsService {
     }
   }
 
-  async getPlugin(pluginId: string): Promise<PluginDto> {
-    try {
-      return (await this.http.get(`/api/v1/plugins/${pluginId}`)).data
-    } catch (e) {
-      let msg = `An error occurred while trying to retrieve plugin ${pluginId}`
-      if (e.response.data.message) {
-        msg += `: ${e.response.data.message}`
-      }
-      throw new Error(msg)
-    }
-  }
-
   async updatePlugin(pluginId: string, update: { enabled: boolean }): Promise<void> {
     try {
       await this.http.patch(`/api/v1/plugins/${pluginId}`, update)
     } catch (e) {
       let msg = `An error occurred while trying to update plugin ${pluginId}`
-      if (e.response.data.message) {
-        msg += `: ${e.response.data.message}`
-      }
-      throw new Error(msg)
-    }
-  }
-
-  async deletePlugin(pluginId: string): Promise<void> {
-    try {
-      await this.http.delete(`/api/v1/plugins/${pluginId}`)
-    } catch (e) {
-      let msg = `An error occurred while trying to delete plugin ${pluginId}`
       if (e.response.data.message) {
         msg += `: ${e.response.data.message}`
       }

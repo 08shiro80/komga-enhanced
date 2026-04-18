@@ -3,12 +3,6 @@ package org.gotson.komga.domain.persistence
 import org.gotson.komga.domain.model.PluginConfig
 
 interface PluginConfigRepository {
-  fun findById(id: String): PluginConfig
-
-  fun findByIdOrNull(id: String): PluginConfig?
-
-  fun findAll(): Collection<PluginConfig>
-
   fun findByPluginId(pluginId: String): Collection<PluginConfig>
 
   fun findByPluginIdAndKey(
@@ -23,6 +17,4 @@ interface PluginConfigRepository {
   fun delete(id: String)
 
   fun deleteByPluginId(pluginId: String)
-
-  fun count(): Long
 }

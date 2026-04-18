@@ -13,6 +13,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 - **Metadata plugin: search results incomplete** — `MangaDexMetadataPlugin.search()` did not pass `contentRating[]` to the API, so results were limited to a subset. Now includes all content ratings so every manga is found.
 - **Metadata plugin: Apply only wrote to DB, not series.json** — Clicking Apply updated the database but never wrote `series.json`. On the next library scan `MylarSeriesProvider` read the old file and overwrote plugin-applied metadata. New `POST /api/v1/plugins/apply-metadata/{seriesId}` endpoint writes `series.json` (Mylar format) to the series folder.
 - **Metadata plugin: cover applied on click instead of on Save, then reverted** — `applyMetadataResult()` immediately downloaded the cover and set it as thumbnail when clicking a search result. The dialog's poster management (`selectedThumbnail`/`deleteQueue`) didn't know about the new thumbnail, so Save Changes re-selected the old one. Cover was also only stored in the DB, not as a file on disk. Fix: cover download is now deferred to Save Changes via a separate `POST /api/v1/plugins/apply-cover/{seriesId}` endpoint. The backend saves `cover.jpg`/`cover.png`/`cover.webp` to the series folder and sets the DB thumbnail.
+- **Metadata plugin: authors/artists not split by role in series.json** — `writeSeriesJson()` wrote only the first author's name as singular `"author"` key, ignoring the role field and all other authors. MylarMetadata expects separate `"authors"` (writers) and `"artists"` lists. Now splits by role (`author`/`writer` → `authors`, `artist`/`penciller` → `artists`) with deduplication.
 - **Metadata plugin: alternative titles ignored** — `applyMetadata()` now maps `alternativeTitles` to `AlternateTitleDto[]` and includes them in the metadata update.
 - **ComicInfoProvider crash on invalid release date** — `ComicInfoProvider.getBookMetadataFromBook` called `LocalDate.of(year, month, day)` without validation, so ComicInfo.xml with impossible dates (e.g. February 29 in a non-leap year) threw `DateTimeException` and aborted the entire metadata refresh for that book — including `tryImportChapterUrl`, which never ran. Now catches `DateTimeException` and falls back to the 1st of the month.
 - **Chapter URL import blocked by `importChapterUrls` flag** — `BookMetadataLifecycle.tryImportChapterUrl` was gated behind `library.importChapterUrls`, but since Komga already reads ComicInfo.xml during normal metadata refresh, extracting the `<Web>` chapter URL from the parsed patch costs nothing extra. Removed the flag guard so chapter URLs are always imported from metadata. The flag now only controls the heavy bulk ZIP-comment scan in `ChapterUrlImporter`.
@@ -29,7 +30,12 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
   - **Icon-only toolbar buttons on mobile** — Action buttons with long labels (`Split Selected (N)`, `Delete Selected (N)`, `New Download`, `Clear`, `Check Now`, `Sync to MangaDex`, `Save`, `Reload`, etc.) keep their icon + chip count on xs and reveal the text label from sm upward via `d-none d-sm-inline`, so the toolbar no longer wraps into three rows on a phone.
   - **DownloadDashboard stat cards** — Grid switched from `cols="12" sm="3"` (4 full-width cards stacked on mobile) to `cols="6" sm="3"` (2×2 grid on mobile); inner typography scales `text-h5 text-sm-h4` / `text-caption text-sm-subtitle-2` so numbers are readable but compact.
   - **Downloads.vue and DuplicateFiles.vue gain a mobile card layout** — `v-data-table` still renders on md+, but `smAndDown` now falls back to an outlined card per row (title + source URL + status chip + inline progress bar + library + date + icon actions for `Downloads.vue`; grouped-by-fileHash cards with URL, size, deleted chip and delete button for `DuplicateFiles.vue`). Desktop behavior is unchanged.
-  - **`src/mixins/mobile-layout.ts`** — Shared mixin exposing `isXs`, `isMobile`, `dialogFullscreen`, `toolbarCompact` computed props for future views, so the breakpoint checks don't get sprinkled inline.
+### Refactoring
+- **Dead code removal: `MetadataSearchDialog.vue`** — The dialog was unreachable: `SeriesActionsMenu` opens `EditSeriesDialog` (Tab 6), not `MetadataSearchDialog`, and `BookActionsMenu` emitted `search-metadata` but no parent handled the event. Deleted the 267-line component and all references from `BrowseSeries.vue` (import, component registration, data property, template block, `onMetadataSelected` method) and `BookActionsMenu.vue` ("Search Online Metadata" menu item + `searchMetadata` method).
+- **Dead code removal: `mobile-layout.ts` mixin** — Created in this version but never imported by any view (0 references). Deleted. The views use `$vuetify.breakpoint` inline instead. If needed during Vue 3 migration, recreate as a composable.
+- **Dead code removal: unused repository methods** — Removed 4 methods from `PluginConfigRepository`/`PluginConfigDao` (`findById`, `findByIdOrNull`, `findAll`, `count`) and 6 methods from `PluginLogRepository`/`PluginLogDao` (`findById`, `findByIdOrNull`, `findAll`, `delete`, `deleteOlderThan`, `count`) — all with 0 callers.
+- **Dead code removal: unused frontend service methods** — Removed `getPlugin()` and `deletePlugin()` from `komga-plugins.service.ts` (0 call sites).
+- **`PluginController.kt`: replaced FQ annotation** — `@org.springframework.web.bind.annotation.PostMapping` → `@PostMapping` (already imported).
 
 | Modified/New Files | Purpose |
 |-------------------|---------|
@@ -48,7 +54,16 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `komga-webui/src/views/DuplicateFiles.vue` | Mobile card layout grouped by `fileHash` on `smAndDown`; desktop table unchanged |
 | `komga-webui/src/views/DuplicatePagesKnown.vue` | Preview + matches dialogs fullscreen on xs (view already card-based) |
 | `komga-webui/src/views/PluginManager.vue` | Install/uninstall/config/logs dialogs fullscreen on xs |
-| `komga-webui/src/mixins/mobile-layout.ts` | New shared mixin with `isXs`, `isMobile`, `dialogFullscreen`, `toolbarCompact` computed helpers |
+| `komga-webui/src/components/dialogs/MetadataSearchDialog.vue` | **Deleted** — unreachable dead code (267 lines) |
+| `komga-webui/src/views/BrowseSeries.vue` | Removed all `MetadataSearchDialog` references (import, component, data, template, method) |
+| `komga-webui/src/components/menus/BookActionsMenu.vue` | Removed "Search Online Metadata" menu item and `searchMetadata()` method |
+| `komga-webui/src/mixins/mobile-layout.ts` | **Deleted** — 0 imports, dead on arrival |
+| `komga-webui/src/services/komga-plugins.service.ts` | Removed unused `getPlugin()` and `deletePlugin()` methods |
+| `interfaces/api/rest/PluginController.kt` | Replaced FQ `@org.springframework.web.bind.annotation.PostMapping` with short `@PostMapping` |
+| `domain/persistence/PluginConfigRepository.kt` | Removed `findById`, `findByIdOrNull`, `findAll`, `count` (0 callers) |
+| `infrastructure/jooq/main/PluginConfigDao.kt` | Removed matching DAO implementations |
+| `domain/persistence/PluginLogRepository.kt` | Removed `findById`, `findByIdOrNull`, `findAll`, `delete`, `deleteOlderThan`, `count` (0 callers) |
+| `infrastructure/jooq/main/PluginLogDao.kt` | Removed matching DAO implementations |
 
 ---
 

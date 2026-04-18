@@ -63,6 +63,7 @@ class PluginController(
   private val coverClient = RestClient.create()
 
   private val allowedCoverHosts = listOf("mangadex.org", "anilist.co", "kitsu.io", "media.kitsu.app")
+
   private fun getMetadataProvider(pluginId: String): OnlineMetadataProvider? =
     when (pluginId) {
       "mangadex-metadata" -> mangaDexMetadataPlugin
@@ -176,7 +177,7 @@ class PluginController(
       .findByPluginId(id)
       .associate { it.configKey to (it.configValue ?: "") }
 
-  @org.springframework.web.bind.annotation.PostMapping("{id}/config")
+  @PostMapping("{id}/config")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Update plugin configuration", tags = [TagNames.PLUGINS])
   fun updatePluginConfig(
@@ -318,7 +319,20 @@ class PluginController(
     if (request.genres?.isNotEmpty() == true) metadata["genres"] = request.genres
     if (request.tags?.isNotEmpty() == true) metadata["tags"] = request.tags
     if (alternateTitles.isNotEmpty()) metadata["alternate_titles"] = alternateTitles
-    request.authors?.firstOrNull()?.let { metadata["author"] = it.name }
+    request.authors?.let { authorList ->
+      val writers =
+        authorList
+          .filter { it.role.equals("author", ignoreCase = true) || it.role.equals("writer", ignoreCase = true) }
+          .map { it.name }
+          .distinct()
+      val artists =
+        authorList
+          .filter { it.role.equals("artist", ignoreCase = true) || it.role.equals("penciller", ignoreCase = true) }
+          .map { it.name }
+          .distinct()
+      if (writers.isNotEmpty()) metadata["authors"] = writers
+      if (artists.isNotEmpty()) metadata["artists"] = artists
+    }
 
     val seriesJson = mapOf("metadata" to metadata)
     val seriesJsonFile = seriesPath.resolve("series.json").toFile()

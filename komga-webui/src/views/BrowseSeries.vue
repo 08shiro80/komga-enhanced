@@ -18,7 +18,6 @@
       <series-actions-menu v-if="series"
                            :series="series"
                            @manage-blacklist="showBlacklistDialog = true"
-                           @search-metadata="showMetadataSearchDialog = true"
       />
       <v-toolbar-title>
         <span v-if="$_.get(series, 'metadata.title')">{{ series.metadata.title }}</span>
@@ -503,12 +502,6 @@
                       :series-id="series.id"
     />
 
-    <metadata-search-dialog v-if="series"
-                            v-model="showMetadataSearchDialog"
-                            :entity-id="series.id"
-                            entity-type="series"
-                            @metadata-selected="onMetadataSelected"
-    />
   </div>
 </template>
 
@@ -520,7 +513,6 @@ import EmptyState from '@/components/EmptyState.vue'
 import ItemBrowser from '@/components/ItemBrowser.vue'
 import ItemCard from '@/components/ItemCard.vue'
 import BlacklistDialog from '@/components/dialogs/BlacklistDialog.vue'
-import MetadataSearchDialog from '@/components/dialogs/MetadataSearchDialog.vue'
 import SeriesActionsMenu from '@/components/menus/SeriesActionsMenu.vue'
 import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import {parseQuerySort} from '@/functions/query-params'
@@ -604,7 +596,6 @@ export default Vue.extend({
   name: 'BrowseSeries',
   components: {
     BlacklistDialog,
-    MetadataSearchDialog,
     ToolbarSticky,
     ItemBrowser,
     PageSizeSelect,
@@ -656,7 +647,6 @@ export default Vue.extend({
       readMore: false,
       readMoreTitles: false,
       showBlacklistDialog: false,
-      showMetadataSearchDialog: false,
     }
   },
   computed: {
@@ -1108,10 +1098,6 @@ export default Vue.extend({
     },
     refreshMetadata() {
       this.$komgaSeries.refreshMetadata(this.series)
-    },
-    onMetadataSelected() {
-      this.showMetadataSearchDialog = false
-      this.reloadSeries()
     },
     editSeries() {
       this.$store.dispatch('dialogUpdateSeries', this.series)
