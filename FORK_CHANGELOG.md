@@ -21,6 +21,7 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ### New Features
 - **Oversized Pages: search filter by series/book name** — New text-field in the controls row filters the list server-side. `GET /api/v1/media-management/oversized-pages` now accepts `search=` (case-insensitive `contains` match against book name and series name); the frontend debounces input by 350 ms and resets pagination on each query. Lets you split or ignore everything in a single manga without scrolling through unrelated series.
+- **Series view: persistent book sorting per library** — The book sort order chosen inside a series detail view (e.g. "Release Date, desc") is now remembered per library via `vuex-persistedstate` (localStorage). When opening any series in the same library again, the stored sort is restored instead of resetting to "Number, asc". URL sort params still take priority. Resetting filters/sort clears the stored preference. Follows the same pattern as `BrowseBooks`/`BrowseLibraries` sort persistence.
 
 ### UI Improvements
 - **Oversized Pages: click anywhere on card to select + Shift-click range** — Selection checkbox was a 20px square pinned to the thumbnail's top-left corner (`position: absolute; top:4px; left:4px`), easy to miss and impossible to hit quickly on touch. Now the whole `v-card` is clickable: click anywhere outside the thumbnail/links/action-buttons toggles the selection (`.stop` modifiers added on `v-img`, series/book `router-link`s and preview/ignore/delete `v-btn`s so their own handlers are unaffected). Shift+click extends or collapses the selection from the last-clicked card across the grid (tracks `lastSelectedIndex`, direction of the new click determines select/deselect for the whole range), so picking 20 consecutive pages takes two clicks instead of 20. Selected cards get a 2px `primary` border in addition to the existing elevation bump so the active selection is obvious at a glance. The checkbox is now `readonly` and shares the same click handler, so clicking it behaves identically to clicking the card.
@@ -59,6 +60,8 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 | `komga-webui/src/components/menus/BookActionsMenu.vue` | Removed "Search Online Metadata" menu item and `searchMetadata()` method |
 | `komga-webui/src/mixins/mobile-layout.ts` | **Deleted** — 0 imports, dead on arrival |
 | `komga-webui/src/services/komga-plugins.service.ts` | Removed unused `getPlugin()` and `deletePlugin()` methods |
+| `komga-webui/src/plugins/persisted-state.ts` | Added `sortSeriesBooks` state, `getLibrarySortSeriesBooks` getter, `setLibrarySortSeriesBooks` mutation for per-library series-book sort persistence |
+| `komga-webui/src/views/BrowseSeries.vue` | `loadSeries` awaits series fetch, applies stored sort from `persistedState.library.sortSeriesBooks[libraryId]` when no URL sort param; `setWatches` persists sort changes; `resetSortAndFilters` clears stored sort |
 | `interfaces/api/rest/PluginController.kt` | Replaced FQ `@org.springframework.web.bind.annotation.PostMapping` with short `@PostMapping` |
 | `domain/persistence/PluginConfigRepository.kt` | Removed `findById`, `findByIdOrNull`, `findAll`, `count` (0 callers) |
 | `infrastructure/jooq/main/PluginConfigDao.kt` | Removed matching DAO implementations |

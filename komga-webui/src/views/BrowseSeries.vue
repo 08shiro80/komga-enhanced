@@ -851,7 +851,7 @@ export default Vue.extend({
     if (this.$route.query.page) this.page = Number(this.$route.query.page)
     if (this.$route.query.pageSize) this.pageSize = Number(this.$route.query.pageSize)
 
-    this.loadSeries(this.seriesId)
+    await this.loadSeries(this.seriesId, this.$route)
 
     this.setWatches()
   },
@@ -869,7 +869,7 @@ export default Vue.extend({
       this.books = []
       this.collections = []
 
-      this.loadSeries(to.params.seriesId)
+      await this.loadSeries(to.params.seriesId, to)
 
       this.setWatches()
     }
@@ -886,6 +886,9 @@ export default Vue.extend({
         this.$set(this.filters, prop, [])
       }
       this.sortActive = this.sortDefault
+      if (this.series.libraryId) {
+        this.$store.commit('setLibrarySortSeriesBooks', {id: this.series.libraryId, sort: this.sortActive})
+      }
       this.updateRouteAndReload()
     },
     async resetParams(route: any, seriesId: string) {
@@ -936,7 +939,12 @@ export default Vue.extend({
       return validFilterMode
     },
     setWatches() {
-      this.sortUnwatch = this.$watch('sortActive', this.updateRouteAndReload)
+      this.sortUnwatch = this.$watch('sortActive', (val) => {
+        if (this.series.libraryId) {
+          this.$store.commit('setLibrarySortSeriesBooks', {id: this.series.libraryId, sort: val})
+        }
+        this.updateRouteAndReload()
+      })
       this.filterUnwatch = this.$watch('filters', this.updateRouteAndReload)
       this.filterModeUnwatch = this.$watch('filtersMode', this.updateRouteAndReload)
       this.pageSizeUnwatch = this.$watch('pageSize', (val) => {
@@ -1003,22 +1011,30 @@ export default Vue.extend({
       this.$komgaSeries.getOneSeries(this.seriesId)
         .then((v: SeriesDto) => this.series = v)
     }, 1000),
-    async loadSeries(seriesId: string) {
-      this.$komgaSeries.getOneSeries(seriesId)
-        .then(v => {
-          this.series = v
-          // for the cases where we can't change the origin target route because we don't have the full BookDto
-          if (this.series.oneshot) this.$router.replace({name: 'browse-oneshot', params: {seriesId: this.seriesId}})
-        })
+    async loadSeries(seriesId: string, route?: any) {
+      this.series = await this.$komgaSeries.getOneSeries(seriesId)
+      if (this.series.oneshot) {
+        this.$router.replace({name: 'browse-oneshot', params: {seriesId: this.seriesId}})
+        return
+      }
+
+      const r = route || this.$route
+      if (!r.query.sort) {
+        const storedSort = this.$store.getters.getLibrarySortSeriesBooks(this.series.libraryId)
+        if (storedSort) {
+          this.sortActive = storedSort
+        }
+      }
+
       this.$komgaSeries.getCollections(seriesId)
         .then(v => this.collections = v)
 
       // parse query params to get context and contextId
-      if (this.$route.query.contextId && this.$route.query.context
-        && Object.values(ContextOrigin).includes(this.$route.query.context as ContextOrigin)) {
+      if (r.query.contextId && r.query.context
+        && Object.values(ContextOrigin).includes(r.query.context as ContextOrigin)) {
         this.context = {
-          origin: this.$route.query.context as ContextOrigin,
-          id: this.$route.query.contextId as string,
+          origin: r.query.context as ContextOrigin,
+          id: r.query.contextId as string,
         }
         this.series.context = this.context
       }
