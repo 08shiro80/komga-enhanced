@@ -6,6 +6,21 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.4.1] - 2026-04-26 — Upstream merge: 1.24.4
+
+### Upstream Fixes (from Komga 1.24.4)
+
+| File | Change |
+|------|--------|
+| `infrastructure/mediacontainer/epub/Nav.kt` | EPUB TOC: XML-Parser für korrekte TOC-Verarbeitung |
+| `infrastructure/kobo/KoboProxy.kt` | Kobo: Request-Body als `ByteArray` proxied |
+| `interfaces/api/kosync/KoreaderSyncController.kt` | KOReader: akzeptiert auch `application/json` |
+| `interfaces/api/opds/v2/Opds2Controller.kt` | OPDS2: `series/latest` Navigation-Link-Fix |
+| `interfaces/api/OpdsGenerator.kt` | OPDS2: Auth-Logo-URL korrekt bei Base-URL |
+| `interfaces/api/rest/dto/UserDto.kt` | API: `ageRestriction` wird ausgeblendet statt als `null` gesendet |
+
+---
+
 ## [0.1.4.1] - 2026-04-12
 
 ### Bug Fixes

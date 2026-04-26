@@ -3,6 +3,7 @@ package org.gotson.komga.interfaces.api.kobo
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.fasterxml.jackson.module.kotlin.treeToValue
 import com.github.benmanes.caffeine.cache.Caffeine
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -230,13 +231,15 @@ class KoboController(
    */
   @PostMapping("v1/auth/device")
   fun authDevice(
-    @RequestBody body: JsonNode,
+    @RequestBody rawBody: ByteArray,
   ): Any {
     try {
-      return koboProxy.proxyCurrentRequest(body)
+      return koboProxy.proxyCurrentRequest(rawBody)
     } catch (_: Exception) {
       logger.warn { "Failed to get response from Kobo /v1/auth/device, fallback to noproxy" }
     }
+
+    val body = mapper.readTree(rawBody)
 
     /**
      * Komga does not use the /v1/auth/device API call for authentication/authorization.
@@ -546,13 +549,15 @@ class KoboController(
   fun updateState(
     @AuthenticationPrincipal principal: KomgaPrincipal,
     @PathVariable bookId: String,
-    @RequestBody body: ReadingStateStateUpdateDto,
+    @RequestBody rawBody: ByteArray,
     @RequestHeader(name = X_KOBO_DEVICEID, required = false) koboDeviceId: String = "unknown",
   ): ResponseEntity<*> {
+    val body = mapper.readValue<ReadingStateStateUpdateDto>(rawBody)
+
     val book =
       bookRepository.findByIdOrNull(bookId)
         ?: if (koboProxy.isEnabled())
-          return koboProxy.proxyCurrentRequest(body)
+          return koboProxy.proxyCurrentRequest(rawBody)
         else
           throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
@@ -733,7 +738,7 @@ class KoboController(
     method = [RequestMethod.GET, RequestMethod.PUT, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.PATCH],
   )
   fun catchAll(
-    @RequestBody body: Any?,
+    @RequestBody body: ByteArray?,
   ): ResponseEntity<JsonNode> =
     if (koboProxy.isEnabled())
       koboProxy.proxyCurrentRequest(body)

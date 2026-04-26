@@ -63,3 +63,4 @@ secret/
 
 ##Ignore
 gradle-tasks.txt
+/scripts/
