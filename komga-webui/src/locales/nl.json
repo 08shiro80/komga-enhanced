@@ -1,0 +1,1203 @@
+{
+  "$vuetify": {
+    "dataFooter": {
+      "pageText": "{0}-{1} van {2}"
+    },
+    "dataIterator": {
+      "loadingText": "Onderdelen laden...",
+      "noResultsText": "Geen overeenkomende gegevens gevonden"
+    },
+    "dataTable": {
+      "itemsPerPageText": "Regels per pagina:",
+      "sortBy": "Sorteren op"
+    },
+    "fileInput": {
+      "counter": "{0} bestanden",
+      "counterSize": "{0} bestanden ({1} in totaal)"
+    },
+    "noDataText": "Geen gegevens beschikbaar"
+  },
+  "account_settings": {
+    "account_settings": "Accountinstellingen",
+    "api_key": {
+      "created_date": "Aanmaakdatum: {date}",
+      "force_kobo_sync": "Kobo synchronisatie forceren",
+      "generate_api_key": "Genereer API-sleutel",
+      "no_keys": "Nog geen API-sleutels aangemaakt"
+    },
+    "change_password": "wijzig wachtwoord",
+    "details": "Details",
+    "my_account": "Mijn account"
+  },
+  "announcements": {
+    "mark_all_read": "Alles markeren als gelezen",
+    "mark_read": "Markeren als gelezen",
+    "tab_title": "Aankondigingen"
+  },
+  "authentication_activity": {
+    "api_key": "API-sleutel",
+    "datetime": "Datum en tijd",
+    "email": "E-mail",
+    "error": "Fout",
+    "ip": "IP-adres",
+    "source": "Bron",
+    "success": "Succes",
+    "user_agent": "User Agent"
+  },
+  "author_roles": {
+    "colorist": "inkleurders",
+    "cover": "omslag",
+    "editor": "bewerkers",
+    "inker": "inkttekenaars",
+    "letterer": "tekstzetters",
+    "penciller": "tekenaars",
+    "translator": "vertalers",
+    "writer": "scenarists"
+  },
+  "book_card": {
+    "error": "Fout",
+    "no_release_date": "Geen releasedatum",
+    "unknown": "Moet gecontroleerd worden",
+    "unread": "Ongelezen",
+    "unsupported": "Niet ondersteund"
+  },
+  "book_import": {
+    "button_browse": "Bladeren",
+    "button_import": "Importeren",
+    "button_scan": "Scannen",
+    "button_select_series": "Selecteer serie",
+    "field_import_path": "Importeren uit map",
+    "info_part1": "Met dit scherm kunt u bestanden importeren die zich buiten uw bestaande bibliotheken bevinden. U kunt alleen bestanden importeren in bestaande series. In dit geval verplaatst of kopieert Komga de bestanden naar de map van de gekozen serie.",
+    "info_part2": "Als u een nummer kiest voor een boek en er bestaat al een boek met dat nummer, dan kunt u de 2 boeken vergelijken. Als u besluit het boek te importeren, dan zal Komga het bestaande boek bijwerken met het nieuwe, waarbij het oude bestand wordt vervangen door het nieuwe.",
+    "no_files_found": "Geen bestanden gevonden",
+    "notification": {
+      "go_to_book": "Ga naar boek",
+      "import_failure": "Boek importeren mislukt: {file}",
+      "import_successful": "Boek succesvol geïmporteerd: {book}",
+      "source_file": "Bron bestand: {file}"
+    },
+    "row": {
+      "error_analyze_first": "Boek moet eerst worden geanalyseerd",
+      "error_choose_series": "Kies een serie",
+      "error_only_import_no_errors": "Kan alleen boeken importeren zonder fouten",
+      "warning_upgrade": "Bestaand boek zal worden bijgewerkt"
+    },
+    "table": {
+      "destination_name": "Doelnaam",
+      "file_name": "Bestandsnaam",
+      "number": "Nummer",
+      "series": "Serie"
+    },
+    "title": "Importeer",
+    "try_another_directory": "Probeer te zoeken in een andere map"
+  },
+  "bookreader": {
+    "beginning_of_book": "Je bent bij het begin van het boek.",
+    "changing_reading_direction": "Wijzig leesrichting naar",
+    "cycling_page_layout": "Wisselen paginaopmaak",
+    "cycling_page_margin": "Pagina marge wisselen",
+    "cycling_scale": "Wisselen schaal",
+    "cycling_side_padding": "Wisselen marges",
+    "download_current_page": "Download huidige pagina",
+    "end_of_book": "Je hebt het einde van het boek bereikt.",
+    "from_series_metadata": "uit metadata van de serie",
+    "move_next": "Klik of druk opnieuw op \"Volgende\" om naar het volgende boek te gaan.",
+    "move_next_exit": "Klik of druk opnieuw op \"Volgende\" om de reader te verlaten.",
+    "move_previous": "Klik of druk opnieuw op \"Vorige\" om naar het vorige boek te gaan.",
+    "notification_poster_set_book": "Boekomslag is nu ingesteld als de huidge pagina.",
+    "notification_poster_set_readlist": "De omslag van de leeslijst is nu ingesteld als de huidige pagina.",
+    "notification_poster_set_series": "De omslag van de serie is nu ingesteld als de huidige pagina.",
+    "paged_reader_layout": {
+      "double": "Dubbele pagina's",
+      "double_no_cover": "Dubbele pagina's (geen omslag)",
+      "single": "Enkele pagina"
+    },
+    "reader_settings": "Readerinstellingen",
+    "scale_type": {
+      "continuous_original": "Origineel",
+      "continuous_width": "Breedte passend maken",
+      "height": "Hoogte passend maken",
+      "original": "Origineel",
+      "screen": "Schermvullend",
+      "width": "Breedte passend maken",
+      "width_shrink_only": "Pasbreedte (alleen krimpen)"
+    },
+    "set_current_page_as_book_poster": "Pagina instellen als omslag voor boek",
+    "set_current_page_as_readlist_poster": "Pagina instellen als omslag voor leeslijst",
+    "set_current_page_as_series_poster": "Pagina instellen als omslag voor serie",
+    "settings": {
+      "always_fullscreen": "Altijd Volledig Scherm",
+      "animate_page_transitions": "Bladeren animeren",
+      "background_color": "Achtergrondkleur",
+      "background_colors": {
+        "black": "Zwart",
+        "gray": "Grijs",
+        "white": "Wit"
+      },
+      "display": "Scherm",
+      "general": "Algemeen",
+      "gestures": "Gebaren",
+      "page_layout": "Paginaopmaak",
+      "page_margin": "Pagina marge",
+      "paged": "Opties voor gepagineerde reader",
+      "reading_mode": "Leesmodus",
+      "scale_type": "Schaaltype",
+      "side_padding": "Marges",
+      "side_padding_none": "Geen",
+      "webtoon": "Webtoon Reader opties"
+    },
+    "shortcuts": {
+      "close": "Sluiten",
+      "cycle_page_layout": "Wissel paginaopmaak",
+      "cycle_scale": "Wissel schaal",
+      "cycle_side_padding": "Wissel marges",
+      "first_page": "Eerste pagina",
+      "fullscreen": "Volledig scherm aan/uit",
+      "last_page": "Laatste pagina",
+      "left_to_right": "Links naar Rechts",
+      "menus": "Menu's",
+      "next_page": "Volgende pagina",
+      "previous_page": "Vorige pagina",
+      "reader_navigation": "Reader navigatie",
+      "right_to_left": "Rechts naar Links",
+      "settings": "Instellingen",
+      "show_hide_help": "Toon/verberg hulp",
+      "show_hide_settings": "Toon/verberg instellingsmenu",
+      "show_hide_thumbnails": "Toon/verberg miniatuurweergave",
+      "show_hide_toolbars": "Toon/verberg menubalken",
+      "vertical": "Verticaal",
+      "webtoon": "Webtoon"
+    },
+    "tooltip_incognito": "Leesvorderingen worden niet opgeslagen"
+  },
+  "browse_book": {
+    "comment": "OPMERKING",
+    "date_created": "GEMAAKT",
+    "date_modified": "LAATST GEWIJZIGD",
+    "download_file": "Download bestand",
+    "file": "BESTAND",
+    "format": "BESTANDSTYPE",
+    "isbn": "ISBN",
+    "links": "LINKS",
+    "navigation_within_readlist": "Navigatie in de leeslijst: {name}",
+    "outdated_tooltip": "Het bestand voor dit boek is veranderd, dit boek moet opnieuw geanalyseerd worden",
+    "read_book": "Lees boek",
+    "read_incognito": "Incognito lezen",
+    "remove_from_collection": "Verwijder boek uit verzameling",
+    "remove_from_readlist": "Boek verwijderen uit leeslijst",
+    "size": "GROOTTE"
+  },
+  "browse_collection": {
+    "edit_collection": "Verzameling bewerken",
+    "edit_elements": "Bewerk elementen",
+    "manual_ordering": "handmatig sorteren"
+  },
+  "browse_readlist": {
+    "edit_elements": "Bewerk elementen",
+    "edit_readlist": "Wijzig leeslijst",
+    "manual_ordering": "handmatig ordenen"
+  },
+  "browse_series": {
+    "earliest_year_from_release_dates": "Dit is het oudste jaar van de verschijningsdata van alle boeken in de serie",
+    "remove_from_collection": "Serie uit verzameling verwijderen",
+    "series_no_summary": "Deze serie heeft geen samenvatting, dus hebben we er een voor je uitgezocht!",
+    "summary_from_book": "Samenvatting uit boek {number}:"
+  },
+  "collections_expansion_panel": {
+    "manage_collection": "Beheer verzameling",
+    "title": "{name} verzameling"
+  },
+  "common": {
+    "age": "Leeftijd",
+    "all_libraries": "Alle bibliotheken",
+    "all_of": "Allemaal",
+    "any_of": "Een van",
+    "book": "Boek",
+    "books": "Boeken",
+    "books_n": "Geen boek | 1 boek | {count} boeken",
+    "books_total": "{count} / {total} boeken",
+    "cancel": "Annuleren",
+    "cbx": "Striparchieven",
+    "choose_image": "Kies een afbeelding",
+    "close": "Sluiten",
+    "collections": "Verzamelingen",
+    "copied": "Gekopieerd!",
+    "create": "Maak",
+    "delete": "Verwijderen",
+    "dimension": "b: {width}, h: {height}",
+    "discard": "Weggooien",
+    "disk_space": "Schijfruimte",
+    "dismiss": "Verwerpen",
+    "download": "Downloaden",
+    "drag_drop": "slepen en neerzetten",
+    "duplicate": "Duplicaat",
+    "email": "E-mail",
+    "epub": "Epub",
+    "error": "Fout",
+    "filename": "Bestandsnaam",
+    "filter_no_matches": "Het actieve filter vindt geen overeenkomsten",
+    "genre": "Genre",
+    "go_to_collection": "Ga naar collectie",
+    "go_to_library": "Ga naar bibliotheek",
+    "go_to_readlist": "Ga naar leeslijst",
+    "go_to_series": "Ga naar series",
+    "i_understand": "Ik begrijp het",
+    "library": "Bibliotheek",
+    "locale_name": "Nederlands",
+    "locale_rtl": "false",
+    "lock_all": "Vergrendel alles",
+    "media": "Media",
+    "more": "Meer",
+    "n_selected": "{count} geselecteerd",
+    "nothing_to_show": "Niets te tonen",
+    "ok": "OK",
+    "oneshot": "One-shot",
+    "outdated": "Verouderd",
+    "page": "Pagina",
+    "page_number": "Pagina nummer",
+    "pages": "pagina's",
+    "pages_left": "Geen pagina's over | 1 pagina over | {count} pagina's over",
+    "pages_n": "Geen pagina's | 1 pagina | {count} pagina's",
+    "password": "Wachtwoord",
+    "pdf": "PDF",
+    "pending_tasks": "Geen openstaande taken | 1 openstaande taak | {count} openstaande taken",
+    "pinned_libraries": "Vastgepinde bibliotheken",
+    "publisher": "Uitgever",
+    "read": "Lezen",
+    "read_on": "Gelezen op {date}",
+    "readlist": "Lees lijst",
+    "readlists": "Leeslijsten",
+    "remember-me": "Onthoud mij",
+    "reorder": "Opnieuw ordenen",
+    "required": "Vereist",
+    "reset_filters": "Filters resetten",
+    "roles": "Rollen",
+    "save_changes": "Wijzigingen opslaan",
+    "series": "Serie | Series",
+    "settings": "Instellingen",
+    "tags": "Labels",
+    "ui": "Gebruikersinterface",
+    "unavailable": "Niet beschikbaar",
+    "unlock_all": "Ontgrendel alles",
+    "url": "URL",
+    "use_filter_panel_to_change_filter": "Gebruik het filterpaneel om het actieve filter te wijzigen",
+    "year": "jaar"
+  },
+  "dashboard": {
+    "keep_reading": "Blijf lezen",
+    "on_deck": "Eerste Ongelezen",
+    "recently_added_books": "Recent Toegevoegde Boeken",
+    "recently_added_series": "Recent Toegevoegde Series",
+    "recently_read_books": "Recent Gelezen Boeken",
+    "recently_released_books": "Recent Uitgebrachte Boeken",
+    "recently_updated_series": "Recent Bijgewerkte Series"
+  },
+  "data_import": {
+    "book_number": "Boeknummer: {name}",
+    "book_series": "Serie: {name}",
+    "button_import": "Importeren",
+    "button_match": "Overeenkomst",
+    "comicrack_preambule_html": "U kunt bestaande ComicRack leeslijsten importeren in <code>.cbl</code> formaat.<br>Komga zal proberen om de opgegeven serie en boeknummer te matchen met series en boeken in uw bibliotheken.",
+    "dialog_confirmation": {
+      "body": "{unmatched} / {total} boeken komen niet overeen",
+      "body2": "{duplicates} / {total} boeken zijn gedupliceerd",
+      "create": "Toch aanmaken",
+      "title": "Sommige boeken komen niet overeen"
+    },
+    "field_file_label": "ComicRack Lees Lijst (.cbl)",
+    "field_files_label": "ComicRack-leeslijsten (.cbl)",
+    "import_read_lists": "Leeslijsten importeren",
+    "imported_as": "Geïmporteerd als {name}",
+    "readlist_created": "Lees Lijst aangemaakt: {name}",
+    "requested_number": "Aangevraagd aantal",
+    "requested_series": "Gevraagde Serie",
+    "results_preambule": "Het resultaat van de import wordt hieronder getoond. U kunt ook de niet-overeenkomende boeken voor elk ingevoerd bestand controleren.",
+    "size_limit": "De grootte moet minder zijn dan {size} MB",
+    "tab_title": "Gegevens importeren"
+  },
+  "dialog": {
+    "add_api_key": {
+      "button_confirm": "Genereer",
+      "context": "API-sleutels kunnen worden gebruikt voor authenticatie via het Kobo Sync-protocol.",
+      "dialog_title": "Genereer nieuwe API-sleutel",
+      "field_comment": "Opmerking",
+      "field_comment_hint": "Waar dient deze API-sleutel voor?",
+      "info_copy": "Zorg ervoor dat u uw API-sleutel nu kopieert. U kunt deze niet meer zien!"
+    },
+    "add_to_collection": {
+      "button_create": "Maken",
+      "card_collection_subtitle": "Geen serie | 1 serie | {count} series",
+      "dialog_title": "Aan verzameling toevoegen",
+      "field_search_create": "Zoek of maak verzameling",
+      "field_search_create_error": "Er bestaat al een verzameling met deze naam",
+      "label_no_matching_collection": "Geen overeenkomstige verzameling"
+    },
+    "add_to_readlist": {
+      "button_create": "Maken",
+      "card_readlist_subtitle": "Geen boek | 1 boek | {count} boeken",
+      "dialog_title": "Toevoegen aan leeslijst",
+      "field_search_create": "Zoek of maak een leeslijst",
+      "field_search_create_error": "Er bestaat al een leeslijst met deze naam",
+      "label_no_matching_readlist": "Geen overeenkomstige leeslijst"
+    },
+    "add_user": {
+      "button_cancel": "Annuleren",
+      "button_confirm": "Toevoegen",
+      "dialog_title": "Voeg gebruiker toe",
+      "field_email": "E-mail",
+      "field_email_error": "Moet een geldig e-mailadres zijn",
+      "field_password": "Wachtwoord"
+    },
+    "analyze_library": {
+      "body": "Analyseert alle media bestanden in de bibliotheek. De analyse vangt informatie over de media. Afhankelijk van uw de grootte van uw bibliotheek kan dit lang duren.",
+      "button_confirm": "Analyseer",
+      "title": "Analyseer bibliotheek"
+    },
+    "book_picker": {
+      "filter": "Filter op boeknummer, titel of releasedatum",
+      "title": "Selecteer Boek"
+    },
+    "delete_apikey": {
+      "button_confirm": "Verwijderen",
+      "confirm_delete": "Ik begrijp het, verwijder de API-sleutel \"{name}\"",
+      "dialog_title": "API-sleutel verwijderen",
+      "warning_html": "Toepassingen of scripts die deze API-sleutel gebruiken, hebben geen toegang meer tot de Komga API. Je kunt deze actie niet ongedaan maken."
+    },
+    "delete_book": {
+      "button_confirm": "Verwijder",
+      "confirm_delete": "Ja, verwijder het boek \"{name}\" en al haar bestanden",
+      "confirm_delete_multiple": "Ja, verwijder {count} boeken en al haar bestanden",
+      "dialog_title": "Verwijder Boek",
+      "dialog_title_multiple": "Verwijder Boeken",
+      "warning_html": "Het boek <b>{name}</b> zal verwijderd worden van deze server samen met opgeslagen media bestanden. Dit <b>kan niet</b> ongedaan gemaakt worden. Doorgaan?",
+      "warning_multiple_html": "{count} boeken zullen verwijderd worden van deze server samen met opgeslagen media bestanden. Dit <b>kan niet</b> ongedaan gemaakt worden. Doorgaan?"
+    },
+    "delete_collection": {
+      "button_confirm": "Verwijderen",
+      "confirm_delete": "Ja, verwijder de verzameling \"{name}\"",
+      "confirm_delete_multiple": "Ja, verwijder {count} collecties",
+      "dialog_title": "Verwijder verzameling",
+      "dialog_title_multiple": "Verwijder Collecties",
+      "warning_html": "De verzameling <b>{name}</b> wordt van deze server verwijderd. Uw mediabestanden worden niet beïnvloed. Dit kan <b>niet</b> ongedaan worden gemaakt. Doorgaan?",
+      "warning_multiple_html": "{count} collecties zullen van deze server worden verwijdert. Uw bestanden worden niet beïnvloed. Dit kan <b>niet ongedaan</b> worden gemaakt. Doorgaan?"
+    },
+    "delete_library": {
+      "button_confirm": "Verwijderen",
+      "confirm_delete": "Ja, verwijder de bibliotheek \"{name}\"",
+      "title": "Verwijder Bibliotheek",
+      "warning_html": "De bibliotheek <b>{name}</b> zal van deze server worden verwijderd. Uw mediabestanden zullen niet worden beïnvloed. Dit kan <b>niet</b> ongedaan worden gemaakt. Doorgaan?"
+    },
+    "delete_readlist": {
+      "button_confirm": "Verwijderen",
+      "confirm_delete": "Ja, verwijder de leeslijst \"{name}\"",
+      "confirm_delete_multiple": "Ja, verwijder {count} leeslijsten",
+      "dialog_title": "Verwijder Leeslijst",
+      "dialog_title_multiple": "Verwijder Leeslijsten",
+      "warning_html": "De leeslijst <b>{name}</b> zal van deze server worden verwijderd. Uw mediabestanden zullen niet worden beïnvloed. Dit kan <b>niet</b> ongedaan worden gemaakt. Doorgaan?",
+      "warning_multiple_html": "{count} lees lijsten zullen van deze server worden verwijdert. Uw bestanden worden niet beïnvloed. Dit kan <b>niet ongedaan</b> worden gemaakt. Doorgaan?"
+    },
+    "delete_series": {
+      "button_confirm": "Verwijder",
+      "confirm_delete": "Ja, verwijder de serie \"{name}\" en haar bestanden",
+      "confirm_delete_multiple": "Ja, verwijder {count} series en haar bestanden",
+      "dialog_title": "Verwijder Serie",
+      "warning_html": "De Serie <b>{name}</b> word verwijderd van deze server samen met opgeslagen media bestanden. Dit <b>kan niet</b> ongedaan gemaakt worden. Doorgaan?",
+      "warning_multiple_html": "{count} series zullen verwijderd worden van deze server samen met opgeslagen media bestanden. Dit <b>kan niet</b> ongedaan gemaakt worden. Doorgaan?"
+    },
+    "delete_user": {
+      "button_confirm": "Verwijderen",
+      "confirm_delete": "Ja, verwijder de gebruiker \"{name}\"",
+      "dialog_title": "Verwijder gebruiker",
+      "warning_html": "De gebruiker <b>{name}</b> zal van deze server worden verwijderd. Dit kan <b>niet</b> ongedaan worden gemaakt. Doorgaan?"
+    },
+    "edit_books": {
+      "add_author_role_error_duplicate": "Bestaat al",
+      "authors_notice_multiple_edit": "U bewerkt auteurs voor meerdere boeken. Dit vervangt de bestaande auteurs van elk boek.",
+      "button_cancel": "Annuleren",
+      "button_confirm": "Wijzigingen opslaan",
+      "copy_from": "Kopiëren van {field}",
+      "dialog_title_multiple": "Bewerk {count} boek | Bewerk {count} boeken",
+      "dialog_title_single": "Bewerk {book}",
+      "field_alternate_title": "Alternatieve titel",
+      "field_isbn": "ISBN",
+      "field_isbn_error": "Moet een geldig ISBN 13 zijn",
+      "field_link_label": "Label",
+      "field_link_url": "URL",
+      "field_link_url_error_protocol": "Moet http of https zijn",
+      "field_link_url_error_url": "Moet een geldige URL zijn",
+      "field_number": "Nummer",
+      "field_number_sort": "Sorteernummer",
+      "field_number_sort_hint": "U kunt decimalen gebruiken",
+      "field_release_date": "Verschijningsdatum",
+      "field_release_date_error": "Moet een geldige datum zijn in het formaat JJJJ-MM-DD",
+      "field_summary": "Samenvatting",
+      "field_tags": "Labels",
+      "field_title": "Titel",
+      "number_sort_decrement": "Verminder alles met 1",
+      "number_sort_increment": "Vermeerder alles met 1",
+      "tab_authors": "Auteurs",
+      "tab_general": "Algemeen",
+      "tab_links": "Links",
+      "tab_poster": "Poster",
+      "tab_tags": "Labels",
+      "tags_notice_multiple_edit": "U bewerkt labels voor meerdere boeken. Dit overschrijft de bestaande labels van elk boek."
+    },
+    "edit_collection": {
+      "button_cancel": "Annuleren",
+      "button_confirm": "Wijzigingen opslaan",
+      "dialog_title": "Verzameling bewerken",
+      "field_manual_ordering": "Handmatig sorteren",
+      "label_ordering": "Standaard worden series in een verzameling op naam gesorteerd. U kunt handmatig sorteren inschakelen om uw eigen sorteervolgorde te definiëren.",
+      "tab_general": "Algemeen",
+      "tab_poster": "Poster"
+    },
+    "edit_library": {
+      "button_browse": "Bladeren",
+      "button_cancel": "Annuleren",
+      "button_confirm_add": "Toevoegen",
+      "button_confirm_edit": "Bewerken",
+      "button_next": "Volgende",
+      "dialog_title_add": "Bibliotheek toevoegen",
+      "dialot_title_edit": "Bibliotheek bewerken",
+      "field_analysis_analyze_dimensions": "Analyseer pagina dimensies",
+      "field_analysis_hash_files": "Bereken hash voor bestanden",
+      "field_analysis_hash_koreader": "Bereken hash voor bestanden voor KOReader",
+      "field_analysis_hash_pages": "Bereken hash voor pagina's",
+      "field_convert_to_cbz": "Automatisch converteren naar CBZ",
+      "field_import_barcode_isbn": "ISBN streepjescode",
+      "field_import_comicinfo_book": "Boek metadata",
+      "field_import_comicinfo_collections": "Verzamelingen",
+      "field_import_comicinfo_readlists": "Leeslijsten",
+      "field_import_comicinfo_series": "Serie metadata",
+      "field_import_comicinfo_series_append_volume": "Volume toevoegen aan serietitel",
+      "field_import_epub_book": "Boek metadata",
+      "field_import_epub_series": "Serie metadata",
+      "field_import_local_artwork": "Lokale afbeeldingen",
+      "field_import_mylar_series": "Serie metadata",
+      "field_name": "Naam",
+      "field_oneshotsdirectory": "One-Shots map",
+      "field_repair_extensions": "Herstel automatisch onjuiste bestandsextensies",
+      "field_root_folder": "Hoofdmap",
+      "field_scan_interval": "Scaninterval",
+      "field_scanner_empty_trash_after_scan": "Prullenbak automatisch legen na iedere scan",
+      "field_scanner_force_directory_modified_time": "Gewijzigde tijd van map forceren",
+      "field_scanner_scan_startup": "Scannen bij opstarten",
+      "field_series_cover": "Serie omslag",
+      "file_browser_dialog_button_confirm": "Kies",
+      "file_browser_dialog_title": "Hoofdmap van de bibliotheek",
+      "label_analysis": "Analyse",
+      "label_file_management": "Bestandsbeheer",
+      "label_import_barcode_isbn": "Importeer ISBN uit streepjescode",
+      "label_import_comicinfo": "Importeer metadata voor CBR / CBZ met een ComicInfo.xml-bestand",
+      "label_import_epub": "Importeer metadata uit EPUB-bestanden",
+      "label_import_local": "Importeer lokale media-items",
+      "label_import_mylar": "Importeer metadata gegenereerd door Mylar",
+      "label_scan_directory_exclusions": "Uitgesloten mappen",
+      "label_scan_types": "Scannen op deze bestandstypen",
+      "label_scanner": "Scanner",
+      "label_series_cover": "Serie's omslag",
+      "tab_general": "Algemeen",
+      "tab_metadata": "Metadata",
+      "tab_options": "Opties",
+      "tooltip_oneshotsdirectory": "Leeg laten om uit te schakelen",
+      "tooltip_scanner_force_modified_time": "Schakel aan als de bibliotheek op Google Drive staat",
+      "tooltip_use_resources": "Kan veel resources verbruiken bij grote bibliotheken of trage hardware"
+    },
+    "edit_readlist": {
+      "button_cancel": "Annuleren",
+      "button_confirm": "Wijzigingen opslaan",
+      "dialog_title": "Bewerk leeslijst",
+      "field_manual_ordering": "Handmatig ordenen",
+      "field_name": "Naam",
+      "field_summary": "Samenvatting",
+      "label_ordering": "Standaard worden boeken in een leeslijst handmatig geordend. Je kunt handmatig ordenen uitschakelen om boeken op releasedatum te sorteren.",
+      "tab_general": "Algemeen",
+      "tab_poster": "Poster"
+    },
+    "edit_recommended": {
+      "button_confirm": "Wijzigingen opslaan",
+      "button_reset": "Resetten naar standaardinstellingen",
+      "dialog_title": "Aanbevolen weergave bewerken"
+    },
+    "edit_series": {
+      "button_cancel": "Annuleren",
+      "button_confirm": "Wijzigingen opslaan",
+      "dialog_title_multiple": "Bewerk {count} serie | Bewerk {count} series",
+      "dialog_title_single": "Bewerk {series}",
+      "field_age_rating": "Leeftijdsclassificatie",
+      "field_age_rating_error": "Leeftijdsclassificatie moet 0 of hoger zijn",
+      "field_genres": "Genres",
+      "field_labels": "Labels",
+      "field_language": "Taal",
+      "field_language_hint": "IETF BCP 47 taal tag",
+      "field_publisher": "Uitgever",
+      "field_reading_direction": "Leesrichting",
+      "field_sort_title": "Sorteer Titel",
+      "field_status": "Status",
+      "field_summary": "Samenvatting",
+      "field_tags": "Labels",
+      "field_title": "Titel",
+      "field_total_book_count": "Totaal aantal boeken",
+      "field_total_book_count_error": "Totaal aantal boeken moet 1 of meer zijn",
+      "mixed": "GEMENGD",
+      "tab_general": "Algemeen",
+      "tab_poster": "Omslag",
+      "tab_sharing": "Delen",
+      "tab_tags": "Labels",
+      "tab_titles": "Alternatieve Titels",
+      "tags_notice_multiple_edit": "U bewerkt labels voor meerdere series. Dit overschrijft bestaande labels van elke serie."
+    },
+    "edit_user": {
+      "button_cancel": "Annuleren",
+      "button_confirm": "Wijzigingen opslaan",
+      "dialog_title": "Bewerk gebruiker",
+      "label_roles_for": "Rollen voor {name}"
+    },
+    "edit_user_restrictions": {
+      "age_restriction": {
+        "allow_under": "Alleen toegestaan onder",
+        "exclude_over": "Uitsluiten over",
+        "none": "Geen beperking"
+      },
+      "edit_restrictions_for": "Beperkingen bewerken voor {name}",
+      "label_age_restriction": "Leeftijdsbeperking",
+      "label_allow_only_labels": "Alleen labels toestaan",
+      "label_exclude_labels": "Labels uitsluiten",
+      "tab_content_restrictions": "Inhoud beperkingen",
+      "tab_shared_libraries": "Gedeelde bibliotheken"
+    },
+    "empty_trash": {
+      "body": "Standaard verwijdert de mediaserver informatie voor media niet meteen. Dit helpt als een schijf tijdelijk is losgekoppeld. Wanneer u de prullenbak voor een bibliotheek leegmaakt, wordt alle informatie over ontbrekende media verwijderd.",
+      "button_confirm": "Leeg",
+      "title": "Prullenbak legen voor bibliotheek"
+    },
+    "file_browser": {
+      "button_cancel": "Annuleren",
+      "button_confirm_default": "Kies",
+      "dialog_title_default": "Bestandsverkenner",
+      "parent_directory": "Bovenliggende"
+    },
+    "filename_chooser": {
+      "button_choose": "Kies",
+      "field_destination_filename": "Doelbestandsnaam",
+      "label_source_filename": "Bronbestandsnaam",
+      "table": {
+        "existing_file": "Bestaand bestand",
+        "order": "Volgorde"
+      },
+      "title": "Doelbestandsnaam"
+    },
+    "force_kobo_sync": {
+      "dialog_title": "Kobo-synchronisatie forceren",
+      "warning_html": "Dit verwijdert alle synchronisatiegeschiedenis voor deze API-sleutel. Je Kobo zal bij de volgende synchronisatie alles synchroniseren."
+    },
+    "password_change": {
+      "button_cancel": "Annuleren",
+      "button_confirm": "Wijzig wachtwoord",
+      "dialog_title": "Wijzig wachtwoord",
+      "field_new_password": "Nieuw wachtwoord",
+      "field_new_password_error": "Nieuw wachtwoord is vereist.",
+      "field_repeat_password": "Herhaal nieuw wachtwoord",
+      "field_repeat_password_error": "Wachtwoorden moeten identiek zijn."
+    },
+    "refresh_library_metadata": {
+      "body": "Vernieuwt de metadata voor alle mediabestanden in de bibliotheek. Afhankelijk van de grootte van uw bibliotheek kan dit lang duren.",
+      "button_confirm": "Vernieuw",
+      "title": "Metadata voor bibliotheek vernieuwen"
+    },
+    "series_picker": {
+      "label_search_series": "Zoek Serie",
+      "no_results": "Geen Serie gevonden",
+      "title": "Selecteer serie"
+    },
+    "server_stop": {
+      "button_confirm": "Stop",
+      "confirmation_message": "Weet u zeker dat u Komga wilt stoppen?",
+      "dialog_title": "Server afsluiten"
+    },
+    "shortcut_help": {
+      "label_description": "Beschrijving",
+      "label_key": "Sleutel"
+    },
+    "transient_book_details": {
+      "label_candidate": "Kandidaat",
+      "label_existing": "Bestaand",
+      "label_format": "Opmaak",
+      "label_name": "Naam",
+      "label_pages": "Pagina's",
+      "label_size": "Grootte",
+      "pages_table": {
+        "filename": "Bestandsnaam",
+        "height": "Hoogte",
+        "index": "Index",
+        "media_type": "Type media",
+        "size": "Grootte",
+        "width": "Breedte"
+      },
+      "title": "Boek Details",
+      "title_comparison": "Boekvergelijking"
+    },
+    "transient_book_viewer": {
+      "label_candidate": "Kandidaat",
+      "label_existing": "Bestaand",
+      "page_of_pages": "{page} / {pages}",
+      "title": "Bekijk boek",
+      "title_comparison": "Boekvergelijking"
+    }
+  },
+  "duplicate_pages": {
+    "action_auto_delete_remaining": "Automatisch verwijderen resterend ({count})",
+    "action_delete_auto": "Automatisch verwijderen",
+    "action_delete_manual": "Handmatig verwijderen",
+    "action_delete_matches": "Overeenkomsten verwijderen",
+    "action_ignore": "Negeer",
+    "action_ignore_remaining": "Negeer resterend ({count})",
+    "action_manual_delete_remaining": "Handmatig verwijderen resterend ({count})",
+    "confirm_auto_delete_remaining": "Alle resterende pagina-hashes op deze pagina ({count}) worden gemarkeerd voor automatisch verwijderen.",
+    "confirm_manual_delete_remaining": "Alle resterende pagina-hashes op deze pagina ({count}) worden gemarkeerd voor handmatig verwijderen.",
+    "delete_to_save": "Verwijderen om {size} te besparen",
+    "deleted_count": "{count} keer verwijderd",
+    "empty_title": "Geen duplicaatpagina's gevonden",
+    "empty_title_known": "Geen duplicaten bekend",
+    "filter": {
+      "count": "Aantal",
+      "date_added": "Datum toegevoegd",
+      "date_modified": "Datum gewijzigd",
+      "delete_count": "Aantal verwijderingen",
+      "delete_size": "Bespaarde ruimte",
+      "match_count": "Overeenkomst aantal",
+      "size": "Grootte",
+      "total_size": "Totale grootte"
+    },
+    "info": "Het verwijderen van duplicaten wijzigt je bestanden. Maak een back-up van je bestanden en verwijder ze handmatig voordat je ze automatisch verwijdert.",
+    "known": "Bekend",
+    "matches_n": "Geen overeenkomsten | 1 overeenkomst | {count} overeenkomsten",
+    "new": "Nieuw",
+    "saved_size": "{size} bespaard",
+    "title": "Dubbele pagina's",
+    "unknown_size": "Onbekende grootte",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
+  },
+  "duplicates": {
+    "file_hash": "Bestand hash",
+    "size": "Grootte",
+    "title": "Duplicaatbestanden",
+    "url": "URL"
+  },
+  "enums": {
+    "copy_mode": {
+      "HARDLINK": "Hardlink/Kopieer Bestanden",
+      "MOVE": "Verplaats bestanden"
+    },
+    "epubreader": {
+      "appearances": {
+        "day": "Dag",
+        "night": "Nacht",
+        "sepia": "Sepia"
+      },
+      "column_count": {
+        "auto": "Automatisch",
+        "one": "Eén",
+        "two": "Twee"
+      },
+      "reading_direction": {
+        "auto": "Automatisch",
+        "ltr": "Links naar rechts",
+        "rtl": "Rechts naar links"
+      }
+    },
+    "historical_event_type": {
+      "BookConverted": "Boek geconverteerd",
+      "BookFileDeleted": "Boekbestand verwijderd",
+      "BookImported": "Boek geïmporteerd",
+      "DuplicatePageDeleted": "Duplicaatpagina verwijderd",
+      "SeriesFolderDeleted": "Series map verwijderd"
+    },
+    "media_profile": {
+      "DIVINA": "DIVINA",
+      "EPUB": "EPUB",
+      "PDF": "PDF"
+    },
+    "media_status": {
+      "ERROR": "Fout",
+      "OUTDATED": "Verouderd",
+      "READY": "Voltooid",
+      "UNKNOWN": "Onbekend",
+      "UNSUPPORTED": "Niet ondersteund"
+    },
+    "page_hash_action": {
+      "DELETE_AUTO": "Automatisch verwijderen",
+      "DELETE_MANUAL": "Handmatig verwijderen",
+      "IGNORE": "Negeer"
+    },
+    "reading_direction": {
+      "LEFT_TO_RIGHT": "Links naar rechts",
+      "RIGHT_TO_LEFT": "Rechts naar links",
+      "VERTICAL": "Verticaal",
+      "WEBTOON": "Webtoon"
+    },
+    "scan_interval": {
+      "DAILY": "Dagelijks",
+      "DISABLED": "Uitgeschakeld",
+      "EVERY_12H": "Elke 12 uur",
+      "EVERY_6H": "Elke 6 uur",
+      "HOURLY": "Uurlijks",
+      "WEEKLY": "Wekelijks"
+    },
+    "series_cover": {
+      "FIRST": "Eerste",
+      "FIRST_UNREAD_OR_FIRST": "Eerste ongelezen anders eerste",
+      "FIRST_UNREAD_OR_LAST": "Eerste ongelezen anders laatste",
+      "LAST": "Laatste"
+    },
+    "series_status": {
+      "ABANDONED": "Verlaten",
+      "ENDED": "Beëindigd",
+      "HIATUS": "Hiaat",
+      "ONGOING": "Lopend"
+    },
+    "thumbnail_size": {
+      "DEFAULT": "Standaard (300px)",
+      "LARGE": "Groot (900px)",
+      "MEDIUM": "Medium (600px)",
+      "XLARGE": "X-Large (1200px)"
+    }
+  },
+  "epubreader": {
+    "current_chapter": "Huidig hoofdstuk",
+    "page_of": "Pagina {page} van {count}",
+    "publisher_font": "Uitgever",
+    "settings": {
+      "column_count": "Kolom aantal",
+      "font_family": "Lettertype",
+      "layout": "Layout",
+      "layout_paginated": "Gepagineerd",
+      "layout_scroll": "Scroll",
+      "navigation_mode": "Navigatiemodus",
+      "navigation_options": {
+        "both": "Beiden",
+        "buttons": "Knoppen",
+        "click": "Klik / Tik"
+      },
+      "page_margins": "Paginamarges",
+      "viewing_theme": "Bekijk thema"
+    },
+    "shortcuts": {
+      "font_size_decrease": "Lettergrootte verkleinen",
+      "font_size_increase": "Lettergrootte vergroten",
+      "menus": "Menu's",
+      "next": "Vooruit",
+      "previous": "Terug",
+      "reader_navigation": "Lezersnavigatie",
+      "scroll": "Wijzig layout naar scroll",
+      "settings": "Instellingen",
+      "show_hide_toc": "Inhoudsopgave tonen/verbergen"
+    }
+  },
+  "error_codes": {
+    "ERR_1000": "Bestand kon niet worden geopend tijdens analyse",
+    "ERR_1001": "Mediatype wordt niet ondersteund",
+    "ERR_1002": "Versleutelde RAR-archieven worden niet ondersteund",
+    "ERR_1003": "Solid RAR-archieven worden niet ondersteund",
+    "ERR_1004": "Multi-Volume RAR archieven worden niet ondersteund",
+    "ERR_1005": "Onbekende fout tijdens het analyseren van het boek",
+    "ERR_1006": "Boek bevat geen enkele pagina",
+    "ERR_1007": "Sommige vermeldingen konden niet worden geanalyseerd",
+    "ERR_1008": "Onbekende fout bij het ophalen van boekvermeldingen",
+    "ERR_1009": "Er bestaat al een leeslijst met deze naam",
+    "ERR_1015": "Fout tijdens het uitpakken van ComicRack CBL",
+    "ERR_1016": "Map niet toegankelijk of geen map",
+    "ERR_1017": "Kan map die deel uitmaakt van een bestaande bibliotheek niet scannen",
+    "ERR_1018": "Bestand niet gevonden",
+    "ERR_1019": "Importeren niet mogelijk als het bestand onderdeel is van een bestaande bibliotheek",
+    "ERR_1020": "Het te upgraden boek behoort niet tot de opgegeven serie",
+    "ERR_1021": "Doelbestand bestaat al",
+    "ERR_1022": "Recent geïmporteerd boek kan niet worden gescanned",
+    "ERR_1023": "Boek bestaat al in Leeslijst",
+    "ERR_1024": "OAuth2 inlogfout: geen e-mailkenmerk",
+    "ERR_1025": "OAuth2 login error: geen bestaande gebruiker met dit emailadres",
+    "ERR_1026": "OpenID Connect login error: email niet bevestigd",
+    "ERR_1027": "OpenID Connect inlogfout: geen e-mail-geverifieerd kenmerk",
+    "ERR_1028": "OpenID Connect inlogfout: geen e-mailkenmerk",
+    "ERR_1029": "ComicRack CBL bevat geen enkel Boek-element",
+    "ERR_1030": "ComicRack CBL heeft geen Naam-element",
+    "ERR_1031": "ComicRack CBL Boek mist serie of nummer",
+    "ERR_1032": "EPUB-bestand heeft verkeerd mediatype",
+    "ERR_1034": "Er is al een API-sleutel met die opmerking",
+    "ERR_1035": "Fout tijdens het ophalen van EPUB TOC",
+    "ERR_1037": "Fout tijdens het ophalen van EPUB paginalijst",
+    "ERR_1039": "Fout tijdens het ophalen van EPUB posities"
+  },
+  "filter": {
+    "age_rating": "leeftijdsclassificatie",
+    "age_rating_none": "Geen",
+    "any": "Elk",
+    "complete": "Compleet",
+    "genre": "genre",
+    "in_progress": "Wordt uitgevoerd",
+    "language": "taal",
+    "library": "Bibliotheek",
+    "media_profile": "Mediaprofiel",
+    "media_status": "Mediastatus",
+    "oneshot": "One-shot",
+    "publisher": "uitgever",
+    "read": "Lezen",
+    "release_date": "Verschijningsdatum",
+    "sharing_label": "Label delen",
+    "status": "status",
+    "tag": "label",
+    "unread": "ongelezen"
+  },
+  "filter_drawer": {
+    "filter": "filter",
+    "sort": "sorteren"
+  },
+  "history": {
+    "header": {
+      "book": "Boek",
+      "date": "Datum",
+      "details": "Details",
+      "series": "Series",
+      "type": "Type"
+    },
+    "title": "Geschiedenis"
+  },
+  "home": {
+    "theme": "Thema",
+    "translation": "Vertaling"
+  },
+  "library_navigation": {
+    "browse": "Bladeren",
+    "browse_books": "Boeken",
+    "browse_series": "Series",
+    "collections": "Verzamelingen",
+    "readlists": "Leeslijsten",
+    "recommended": "Aanbevolen"
+  },
+  "login": {
+    "create_user_account": "Maak gebruikersaccount aan",
+    "login": "Aanmelden",
+    "unclaimed_html": "Deze Komga server is nog niet actief, u moet een gebruikersaccount aanmaken om toegang te krijgen.<br><br>Kies een <strong>e-mail</strong> en <strong>wachtwoord</strong> en klik op <strong>Gebruikersaccount aanmaken</strong>.",
+    "browse_as_guest": "Browse as guest"
+  },
+  "media_analysis": {
+    "comment": "Opmerking",
+    "media_analysis": "Media-analyse",
+    "media_type": "Mediatype",
+    "name": "Naam",
+    "size": "Grootte",
+    "status": "Status",
+    "url": "URL"
+  },
+  "menu": {
+    "add_to_collection": "Aan verzameling toevoegen",
+    "add_to_readlist": "Toevoegen aan leeslijst",
+    "analyze": "Analyseer",
+    "bulk_edit_metadata": "Metadata in bulk bewerken",
+    "delete": "Verwijderen",
+    "deselect_all": "Alles deselecteren",
+    "download_readlist": "Download leeslijst",
+    "download_series": "Serie downloaden",
+    "edit": "Bewerk",
+    "edit_metadata": "Bewerk metadata",
+    "empty_trash": "Prullenbak leegmaken",
+    "mark_read": "Markeer als gelezen",
+    "mark_unread": "Markeer als ongelezen",
+    "pin": "Pin",
+    "refresh_metadata": "Ververs metadata",
+    "scan_library_files": "Scan bibliotheekbestanden",
+    "scan_library_files_deep": "Scan bibliotheekbestanden (diepgaand)",
+    "select_all": "Alles selecteren"
+  },
+  "metrics": {
+    "library_books": "Boeken per bibliotheek",
+    "library_disk_space": "Bibliotheek schijfruimte",
+    "library_series": "Series per bibliotheek",
+    "tasks_executed": "Uitgevoerde taken",
+    "tasks_total_time": "Totalen tijd taken",
+    "title": "Statistieken"
+  },
+  "missing_posters": {
+    "title": "Ontbrekende posters"
+  },
+  "navigation": {
+    "home": "Beginscherm",
+    "libraries": "Bibliotheken",
+    "logout": "Afmelden"
+  },
+  "page_not_found": {
+    "go_back_to_home_page": "Ga terug naar de startpagina",
+    "page_does_not_exist": "De pagina die u zoekt, bestaat niet.",
+    "page_not_found": "Pagina niet gevonden"
+  },
+  "read_more": {
+    "less": "Lees minder",
+    "more": "Lees meer"
+  },
+  "readlist_import": {
+    "row": {
+      "duplicate_book": "Duplicaat boek",
+      "error_choose_book": "Kies een boek"
+    }
+  },
+  "readlists_expansion_panel": {
+    "manage_readlist": "Beheer leeslijst",
+    "title": "{name} leeslijst"
+  },
+  "search": {
+    "no_results": "De zoekopdracht heeft geen resultaten opgeleverd",
+    "search": "Zoek",
+    "search_for_something_else": "Probeer naar iets anders te zoeken",
+    "search_results_for": "Zoekresultaten voor \"{name}\""
+  },
+  "searchbox": {
+    "in_library": "in {library}",
+    "no_results": "Geen resultaten",
+    "search_all": "Zoek alle…"
+  },
+  "server": {
+    "server_management": {
+      "button_cancel_all_tasks": "Alle taken annuleren",
+      "button_empty_trash": "Prullenbak leegmaken voor alle bibliotheken",
+      "button_scan_libraries": "Scan alle bibliotheken",
+      "button_scan_libraries_deep": "Scan alle bibliotheken (diepgaand)",
+      "button_shutdown": "Afsluiten",
+      "download_log": "Download logbestand",
+      "notification_tasks_cancelled": "Geen taken om te annuleren | Eén taak geannuleerd | {count} geannuleerde taken",
+      "section_title": "Serverbeheer"
+    },
+    "tab_title": "Server",
+    "updates": "Updates"
+  },
+  "server_settings": {
+    "config_precedence": "Heeft voorrang op het configuratiebestand",
+    "dialog_regenerate_thumbnails": {
+      "btn_alternate": "Ja, alle boeken",
+      "btn_cancel": "Nee"
+    },
+    "label_delete_empty_collections": "Lege verzamelingen verwijderen na scannen",
+    "label_delete_empty_readlists": "Lege leeslijsten verwijderen na scannen",
+    "label_kobo_port": "Kobo Sync externe poort",
+    "label_server_context_path": "Basis-URL",
+    "requires_restart": "Opnieuw opstarten vereist om effect te hebben",
+    "server_settings": "Serverinstellingen"
+  },
+  "settings_user": {
+    "change_password": "Wachtwoord wijzigen",
+    "edit_user": "Bewerk gebruiker",
+    "latest_activity": "Laatste activiteit: {date}",
+    "no_recent_activity": "Geen recente activiteit",
+    "role_administrator": "Administrator",
+    "role_user": "Gebruiker"
+  },
+  "sort": {
+    "books_count": "Aantal boeken",
+    "date_added": "Datum toegevoegd",
+    "date_read": "Datum gelezen",
+    "date_updated": "Datum bijgewerkt",
+    "file_name": "Bestandsnaam",
+    "file_size": "Bestandsgrootte",
+    "folder_name": "Mapnaam",
+    "name": "Naam",
+    "number": "Nummer",
+    "page_count": "Aantal pagina's",
+    "random": "Willekeurig",
+    "release_date": "Publicatiedatum",
+    "series": "Series"
+  },
+  "theme": {
+    "dark": "Donker",
+    "light": "Licht",
+    "system": "Systeem"
+  },
+  "thumbnail_card": {
+    "tooltip_delete": "Verwijderen",
+    "tooltip_mark_as_selected": "Markeer als geselecteerd",
+    "tooltip_selected": "Geselecteerd",
+    "tooltip_to_be_deleted": "Te verwijderen",
+    "tooltip_to_be_uploaded": "Te uploaden",
+    "tooltip_too_big": "Bestand te groot!",
+    "tooltip_user_uploaded": "Door gebruiker geüpload"
+  },
+  "titles_more": {
+    "less": "Minder titels",
+    "more": "Meer titels"
+  },
+  "ui_settings": {
+    "general": "Algemeen",
+    "label_oauth2_hide_login": "Verberg inlogvelden als OAuth2 is ingeschakeld",
+    "label_series_groups": "Series groeperen",
+    "section_oauth2": "OAuth2",
+    "series_groups": {
+      "alpha": "Alfabetisch",
+      "japanese": "Gojūon (Japans)"
+    },
+    "tooltip_oauth2_auto_login": "Vereist één enkele OAuth2-provider en 'verberg inlogvelden' ingeschakeld"
+  },
+  "updates": {
+    "available": "Er zijn updates beschikbaar",
+    "latest_installed": "De nieuwste versie van Komga is al geïnstalleerd"
+  },
+  "user_roles": {
+    "ADMIN": "Administrator",
+    "FILE_DOWNLOAD": "Bestand downloaden",
+    "PAGE_STREAMING": "Stream pagina's",
+    "USER": "Gebruiker"
+  },
+  "users": {
+    "api_keys": "API-sleutels",
+    "authentication_activity": "Authenticatie activiteit",
+    "users": "Gebruikers"
+  },
+  "validation": {
+    "context_path": "Moet beginnen met '/', mag niet eindigen met '/-_' en mag alleen '/-_a-z0-9' bevatten",
+    "one_or_more": "Moet 1 of meer zijn",
+    "tcp_port": "Moet zijn tussen 1 en 65535",
+    "zero_or_more": "Moet groter of gelijk aan 0 zijn"
+  },
+  "welcome": {
+    "add_library": "Voeg bibliotheek toe",
+    "no_libraries_yet": "Er zijn nog geen bibliotheken toegevoegd!",
+    "welcome_message": "Welkom bij Komga"
+  },
+  "download_manager": {
+    "title": "Downloadbeheer",
+    "subtitle": "Download manga van externe bronnen met gallery-dl.",
+    "queue_title": "Downloadwachtrij",
+    "add_download": "Download toevoegen",
+    "clear": "Opschonen",
+    "clear_completed": "Voltooide opschonen",
+    "clear_failed": "Mislukte opschonen",
+    "clear_cancelled": "Geannuleerde opschonen",
+    "clear_pending": "Wachtende opschonen",
+    "no_downloads": "Geen downloads in de wachtrij. Voeg een manga-URL toe met de knop hierboven.",
+    "unknown_title": "Onbekend",
+    "downloads_folder": "Downloadmap",
+    "cancel": "Annuleren",
+    "retry": "Opnieuw",
+    "view_error": "Fout bekijken",
+    "delete": "Verwijderen",
+    "close": "Sluiten",
+    "dialog_add_title": "Download toevoegen",
+    "dialog_add_info": "Voer een manga-URL in van een ondersteunde site (bijv. MangaDex).",
+    "field_url": "Manga-URL",
+    "field_url_required": "URL is verplicht",
+    "field_title": "Titel (Optioneel)",
+    "field_title_hint": "Leeg laten voor automatische detectie",
+    "field_library": "Doelbibliotheek (Optioneel)",
+    "field_library_hint": "Leeg laten voor downloadmap",
+    "field_priority": "Prioriteit",
+    "dialog_delete_title": "Download verwijderen?",
+    "dialog_delete_confirm": "Weet je zeker dat je wilt verwijderen:",
+    "dialog_delete_info": "Dit verwijdert het uit de wachtrij.",
+    "dialog_error_title": "Downloadfout",
+    "header_title": "Titel",
+    "header_status": "Status",
+    "header_progress": "Voortgang",
+    "header_library": "Bibliotheek",
+    "header_created": "Aangemaakt",
+    "header_actions": "Acties",
+    "snack_added": "Download toegevoegd",
+    "snack_cancelled": "Download geannuleerd",
+    "snack_retrying": "Download wordt herhaald",
+    "snack_deleted": "Download verwijderd",
+    "snack_load_failed": "Laden mislukt",
+    "snack_add_failed": "Toevoegen mislukt",
+    "snack_cancel_failed": "Annuleren mislukt",
+    "snack_retry_failed": "Herhalen mislukt",
+    "snack_delete_failed": "Verwijderen mislukt",
+    "snack_clear_failed": "Opschonen mislukt"
+  },
+  "plugin_manager": {
+    "title": "Pluginbeheer",
+    "subtitle": "Beheer Komga-plugins voor metadata, downloads en meer.",
+    "installed_plugins": "Geïnstalleerde plugins",
+    "install_plugin": "Plugin installeren",
+    "no_plugins": "Geen plugins geïnstalleerd.",
+    "configure": "Configureren",
+    "view_logs": "Logs bekijken",
+    "uninstall": "Verwijderen",
+    "dialog_install_title": "Plugin installeren",
+    "dialog_install_info": "Upload een JAR-bestand of geef een URL op.",
+    "field_plugin_file": "Pluginbestand (JAR)",
+    "field_plugin_url": "Of plugin-URL",
+    "install": "Installeren",
+    "dialog_uninstall_title": "Plugin verwijderen?",
+    "dialog_uninstall_confirm": "Weet je zeker:",
+    "dialog_uninstall_info": "Dit kan niet ongedaan worden gemaakt.",
+    "save": "Opslaan",
+    "logs_title": "Logs",
+    "log_all": "Alle",
+    "log_debug": "Debug",
+    "log_info": "Info",
+    "log_warn": "Waarschuwing",
+    "log_error": "Fout",
+    "stack_trace": "Stack Trace",
+    "no_logs": "Geen logs gevonden",
+    "header_name": "Naam",
+    "header_version": "Versie",
+    "header_type": "Type",
+    "header_author": "Auteur",
+    "header_enabled": "Ingeschakeld",
+    "header_actions": "Acties",
+    "snack_enabled": "Plugin ingeschakeld",
+    "snack_disabled": "Plugin uitgeschakeld",
+    "snack_uninstalled": "Plugin verwijderd",
+    "snack_config_saved": "Configuratie opgeslagen",
+    "snack_logs_cleared": "Logs gewist",
+    "snack_installed": "Plugin installation will be available soon",
+    "snack_load_failed": "Failed to load plugins",
+    "snack_toggle_failed": "Failed to toggle plugin",
+    "snack_install_failed": "Failed to install plugin",
+    "snack_uninstall_failed": "Failed to uninstall plugin",
+    "snack_config_load_failed": "Failed to load config",
+    "snack_config_save_failed": "Failed to save config",
+    "snack_logs_load_failed": "Failed to load logs",
+    "snack_logs_clear_failed": "Failed to clear logs"
+  },
+  "settings_backup": {
+    "title": "Database backup en herstel",
+    "create_title": "Nieuwe backup maken",
+    "create_description": "Maak een backup van je Komga-database.",
+    "create_backup": "Backup maken",
+    "create_full_backup": "Volledige backup (Hoofd + Taken)",
+    "cleanup_title": "Oude backups opschonen",
+    "cleanup_description": "Verwijder oude backups om schijfruimte vrij te maken.",
+    "field_keep_count": "Aantal te bewaren backups",
+    "clean_old_backups": "Oude opschonen",
+    "available_title": "Beschikbare backups",
+    "no_backups": "Geen backups gevonden.",
+    "download": "Downloaden",
+    "delete": "Verwijderen",
+    "restore": "Herstellen (herstart vereist)",
+    "dialog_delete_title": "Backup verwijderen?",
+    "dialog_delete_confirm": "Weet je zeker:",
+    "dialog_delete_info": "Dit kan niet ongedaan worden gemaakt.",
+    "dialog_restore_title": "Backup herstellen?",
+    "dialog_restore_warning": "Herstellen zal:",
+    "dialog_restore_item1": "De huidige database vervangen",
+    "dialog_restore_item2": "Een herstart vereisen",
+    "dialog_restore_item3": "Mogelijk recente wijzigingen verliezen",
+    "dialog_restore_confirm": "Herstellen van:",
+    "restore_and_restart": "Herstellen en herstarten",
+    "header_filename": "Bestandsnaam",
+    "header_created": "Aanmaakdatum",
+    "header_size": "Grootte",
+    "header_type": "Type",
+    "header_actions": "Acties",
+    "snack_created": "Backup aangemaakt",
+    "snack_full_created": "Volledige backup aangemaakt",
+    "snack_deleted": "Backup verwijderd",
+    "snack_downloaded": "Backup gedownload",
+    "restarting_countdown": "Herstart over {seconds} seconden...",
+    "restarting_message": "Server herstart... Even geduld.",
+    "snack_load_failed": "Failed to load backups",
+    "snack_create_failed": "Failed to create backup",
+    "snack_full_create_failed": "Failed to create full backup",
+    "snack_clean_failed": "Failed to clean backups",
+    "snack_download_failed": "Failed to download backup",
+    "snack_delete_failed": "Failed to delete backup",
+    "snack_restore_failed": "Failed to restore backup"
+  }
+}

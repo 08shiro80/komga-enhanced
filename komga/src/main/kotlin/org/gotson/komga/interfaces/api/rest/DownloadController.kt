@@ -1,0 +1,423 @@
+package org.gotson.komga.interfaces.api.rest
+
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.swagger.v3.oas.annotations.Operation
+import jakarta.validation.Valid
+import org.gotson.komga.domain.model.FollowConfig
+import org.gotson.komga.domain.persistence.DownloadQueueRepository
+import org.gotson.komga.domain.persistence.FollowConfigRepository
+import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.domain.service.ChapterChecker
+import org.gotson.komga.domain.service.DownloadExecutor
+import org.gotson.komga.domain.service.DownloadScheduler
+import org.gotson.komga.infrastructure.download.GalleryDlWrapper
+import org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer
+import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
+import org.gotson.komga.infrastructure.security.KomgaPrincipal
+import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckResultDto
+import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckSummaryDto
+import org.gotson.komga.interfaces.api.rest.dto.ClearResultDto
+import org.gotson.komga.interfaces.api.rest.dto.DownloadActionDto
+import org.gotson.komga.interfaces.api.rest.dto.DownloadCreateDto
+import org.gotson.komga.interfaces.api.rest.dto.DownloadDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowTxtDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowTxtUpdateDto
+import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsDto
+import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsUpdateDto
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
+
+private val logger = KotlinLogging.logger {}
+
+@RestController
+@RequestMapping("api/v1/downloads", produces = [MediaType.APPLICATION_JSON_VALUE])
+@PreAuthorize("hasRole('ADMIN')")
+class DownloadController(
+  private val downloadExecutor: DownloadExecutor,
+  private val downloadQueueRepository: DownloadQueueRepository,
+  private val followConfigRepository: FollowConfigRepository,
+  private val downloadScheduler: DownloadScheduler,
+  private val libraryRepository: LibraryRepository,
+  private val chapterChecker: ChapterChecker,
+  private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
+  private val galleryDlWrapper: GalleryDlWrapper,
+) {
+  @GetMapping
+  @Operation(summary = "List all downloads", tags = [TagNames.DOWNLOADS])
+  fun getAllDownloads(): List<DownloadDto> =
+    downloadQueueRepository
+      .findAll()
+      .sortedWith(compareByDescending<org.gotson.komga.domain.model.DownloadQueue> { it.priority }.thenBy { it.createdDate })
+      .map { it.toDto() }
+
+  @GetMapping("{id}")
+  @Operation(summary = "Get download by ID", tags = [TagNames.DOWNLOADS])
+  fun getDownloadById(
+    @PathVariable id: String,
+  ): DownloadDto =
+    downloadQueueRepository.findByIdOrNull(id)?.toDto()
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Download not found: $id")
+
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(summary = "Create new download", tags = [TagNames.DOWNLOADS])
+  fun createDownload(
+    @Valid @RequestBody create: DownloadCreateDto,
+    @AuthenticationPrincipal principal: KomgaPrincipal,
+  ): DownloadDto =
+    try {
+      downloadExecutor
+        .createDownload(
+          sourceUrl = create.sourceUrl,
+          libraryId = create.libraryId,
+          title = create.title,
+          createdBy = principal.user.email,
+          priority = create.priority,
+        ).toDto()
+    } catch (e: IllegalArgumentException) {
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+    }
+
+  @PostMapping("{id}/action")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Perform action on download (pause, resume, cancel, retry)", tags = [TagNames.DOWNLOADS])
+  fun performAction(
+    @PathVariable id: String,
+    @Valid @RequestBody action: DownloadActionDto,
+  ) {
+    try {
+      when (action.action.lowercase()) {
+        "cancel" -> downloadExecutor.cancelDownload(id)
+        "retry" -> downloadExecutor.retryDownload(id)
+        "resume" -> downloadExecutor.resumeDownload(id)
+        else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown action: ${action.action}")
+      }
+    } catch (e: IllegalArgumentException) {
+      throw ResponseStatusException(HttpStatus.NOT_FOUND, e.message)
+    } catch (e: IllegalStateException) {
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+    }
+  }
+
+  @DeleteMapping("{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Delete download", tags = [TagNames.DOWNLOADS])
+  fun deleteDownload(
+    @PathVariable id: String,
+  ) {
+    try {
+      downloadExecutor.deleteDownload(id)
+    } catch (e: Exception) {
+      throw ResponseStatusException(HttpStatus.NOT_FOUND, "Download not found: $id")
+    }
+  }
+
+  @DeleteMapping("clear/completed")
+  @Operation(summary = "Clear all completed downloads", tags = [TagNames.DOWNLOADS])
+  fun clearCompletedDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearCompletedDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "COMPLETED",
+      message = "Cleared $count completed downloads",
+    )
+  }
+
+  @DeleteMapping("clear/failed")
+  @Operation(summary = "Clear all failed downloads", tags = [TagNames.DOWNLOADS])
+  fun clearFailedDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearFailedDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "FAILED",
+      message = "Cleared $count failed downloads",
+    )
+  }
+
+  @DeleteMapping("clear/cancelled")
+  @Operation(summary = "Clear all cancelled downloads", tags = [TagNames.DOWNLOADS])
+  fun clearCancelledDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearCancelledDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "CANCELLED",
+      message = "Cleared $count cancelled downloads",
+    )
+  }
+
+  @DeleteMapping("clear/pending")
+  @Operation(summary = "Clear all pending downloads", tags = [TagNames.DOWNLOADS])
+  fun clearPendingDownloads(): ClearResultDto {
+    val count = downloadExecutor.clearPendingDownloads()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "PENDING",
+      message = "Cleared $count pending downloads",
+    )
+  }
+
+  @PostMapping("check-new")
+  @Operation(summary = "Check for new chapters across all followed manga", tags = [TagNames.DOWNLOADS])
+  fun checkForNewChapters(): ResponseEntity<Map<String, String>> {
+    java.util.concurrent.CompletableFuture.runAsync {
+      try {
+        chapterChecker.checkAndQueueNewChapters()
+      } catch (e: Exception) {
+        logger.error(e) { "Background chapter check failed" }
+      }
+    }
+    return ResponseEntity
+      .status(HttpStatus.ACCEPTED)
+      .body(mapOf("message" to "Chapter check started in background"))
+  }
+
+  @PostMapping("check-only")
+  @Operation(summary = "Check for new chapters without queuing downloads", tags = [TagNames.DOWNLOADS])
+  fun checkOnly(): ChapterCheckSummaryDto {
+    val summary = chapterChecker.checkAll()
+    return ChapterCheckSummaryDto(
+      totalManga = summary.totalManga,
+      checkedCount = summary.checkedCount,
+      needsDownloadCount = summary.needsDownloadCount,
+      upToDateCount = summary.upToDateCount,
+      errorCount = summary.errorCount,
+      results =
+        summary.results.map { r ->
+          ChapterCheckResultDto(
+            url = r.url,
+            mangaId = r.mangaId,
+            title = r.title,
+            apiChapterCount = r.apiChapterCount,
+            downloadedChapterCount = r.downloadedChapterCount,
+            filesystemChapterCount = r.filesystemChapterCount,
+            newChaptersEstimate = r.newChaptersEstimate,
+            needsDownload = r.needsDownload,
+            error = r.error,
+          )
+        },
+      durationMs = summary.durationMs,
+    )
+  }
+
+  @GetMapping("follow-txt/{libraryId}")
+  @Operation(summary = "Get follow.txt content for a library", tags = [TagNames.DOWNLOADS])
+  fun getFollowTxt(
+    @PathVariable libraryId: String,
+  ): FollowTxtDto {
+    val library =
+      libraryRepository.findByIdOrNull(libraryId)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+
+    val followFile = library.path.resolve("follow.txt").toFile()
+    val content =
+      if (followFile.exists()) {
+        followFile.readText()
+      } else {
+        ""
+      }
+
+    return FollowTxtDto(
+      libraryId = libraryId,
+      libraryName = library.name,
+      content = content,
+    )
+  }
+
+  @PutMapping("follow-txt/{libraryId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Update follow.txt content for a library", tags = [TagNames.DOWNLOADS])
+  fun updateFollowTxt(
+    @PathVariable libraryId: String,
+    @Valid @RequestBody update: FollowTxtUpdateDto,
+  ) {
+    val library =
+      libraryRepository.findByIdOrNull(libraryId)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+
+    val followFile = library.path.resolve("follow.txt").toFile()
+    followFile.writeText(update.content)
+  }
+
+  @PostMapping("follow-txt/{libraryId}/check-now")
+  @Operation(summary = "Trigger immediate check for a library's follow.txt", tags = [TagNames.DOWNLOADS])
+  fun checkFollowTxtNow(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, String>> {
+    java.util.concurrent.CompletableFuture.runAsync {
+      try {
+        downloadScheduler.checkFollowListNow(libraryId)
+      } catch (e: Exception) {
+        logger.error(e) { "Background follow list check failed for library $libraryId" }
+      }
+    }
+    return ResponseEntity
+      .status(HttpStatus.ACCEPTED)
+      .body(mapOf("message" to "Follow list check started in background"))
+  }
+
+  @PostMapping("{libraryId}/migrate-to-uuid")
+  @Operation(summary = "Migrate title-based folders to UUID folder names", tags = [TagNames.DOWNLOADS])
+  fun migrateToUuidFolders(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, Any>> {
+    val result = downloadExecutor.migrateLibraryToUuidFolders(libraryId)
+    return ResponseEntity.ok(
+      mapOf(
+        "foldersRenamed" to result.foldersRenamed,
+        "cbzRenamed" to result.cbzRenamed,
+      ),
+    )
+  }
+
+  @PostMapping("repair-comicinfo/{libraryId}")
+  @Operation(summary = "Repair missing ComicInfo.xml and zip comments in MangaDex CBZ files", tags = [TagNames.DOWNLOADS])
+  fun repairComicInfo(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, Any>> {
+    val library =
+      libraryRepository.findByIdOrNull(libraryId)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found")
+
+    val libraryDir = library.path.toFile()
+    if (!libraryDir.isDirectory) {
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Library path is not a directory")
+    }
+
+    val uuidRegex = Regex("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+    val mangaDexDirs = mutableMapOf<String, MutableList<java.io.File>>()
+
+    libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { dir ->
+      if (uuidRegex.matches(dir.name)) {
+        mangaDexDirs.getOrPut(dir.name) { mutableListOf() }.add(dir)
+      } else {
+        val seriesJson = java.io.File(dir, "series.json")
+        if (seriesJson.exists()) {
+          try {
+            val content = seriesJson.readText()
+            val idMatch =
+              Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""").find(content)
+                ?: Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
+            if (idMatch != null) {
+              mangaDexDirs.getOrPut(idMatch.groupValues[1]) { mutableListOf() }.add(dir)
+            }
+          } catch (e: Exception) {
+            logger.warn(e) { "Failed to read series.json in ${dir.name}" }
+          }
+        }
+      }
+    }
+
+    var totalRepaired = 0
+    var totalSkipped = 0
+    val errors = mutableListOf<String>()
+
+    for ((mangaDexId, dirs) in mangaDexDirs) {
+      val result = galleryDlWrapper.repairMissingComicInfo(mangaDexId, dirs)
+      totalRepaired += result.repaired
+      totalSkipped += result.skipped
+      if (result.error != null) errors.add("$mangaDexId: ${result.error}")
+    }
+
+    return ResponseEntity.ok(
+      mapOf(
+        "repaired" to totalRepaired,
+        "skipped" to totalSkipped,
+        "mangaProcessed" to mangaDexDirs.size,
+        "errors" to errors,
+      ),
+    )
+  }
+
+  @PostMapping("follow-txt/{libraryId}/sync-to-mangadex")
+  @Operation(summary = "Upload follow.txt MangaDex URLs to MangaDex follows list", tags = [TagNames.DOWNLOADS])
+  fun syncFollowsToMangaDex(
+    @PathVariable libraryId: String,
+  ): ResponseEntity<Map<String, Any>> {
+    val result = mangaDexSubscriptionSyncer.syncFollowsToMangaDex(libraryId)
+    if (result.error != null) {
+      return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(mapOf("error" to result.error, "followed" to result.followed, "total" to result.total))
+    }
+    return ResponseEntity.ok(
+      mapOf("followed" to result.followed, "total" to result.total, "message" to "Synced ${result.followed}/${result.total} manga to MangaDex follows"),
+    )
+  }
+
+  @GetMapping("scheduler")
+  @Operation(summary = "Get scheduler settings", tags = [TagNames.DOWNLOADS])
+  fun getSchedulerSettings(): SchedulerSettingsDto {
+    val config = followConfigRepository.findDefault() ?: FollowConfig()
+    return config.toSchedulerDto()
+  }
+
+  @PostMapping("scheduler")
+  @Operation(summary = "Update scheduler settings", tags = [TagNames.DOWNLOADS])
+  fun updateSchedulerSettings(
+    @Valid @RequestBody update: SchedulerSettingsUpdateDto,
+  ): SchedulerSettingsDto {
+    val existingConfig = followConfigRepository.findDefault() ?: FollowConfig()
+
+    val updatedConfig =
+      existingConfig.copy(
+        enabled = update.enabled,
+        checkIntervalHours = update.intervalHours,
+        scheduleMode = update.scheduleMode,
+        checkTime = update.checkTime,
+      )
+
+    val saved = followConfigRepository.save(updatedConfig)
+    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours, saved.scheduleMode, saved.checkTime)
+
+    return saved.toSchedulerDto()
+  }
+
+  @PostMapping("scheduler/check-now")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Trigger immediate follow list check", tags = [TagNames.DOWNLOADS])
+  fun triggerFollowCheck() {
+    val config = followConfigRepository.findDefault()
+    if (config != null && config.urls.isNotEmpty()) {
+      downloadScheduler.processFollowConfigNow(config)
+    }
+  }
+}
+
+fun FollowConfig.toSchedulerDto() =
+  SchedulerSettingsDto(
+    enabled = enabled,
+    intervalHours = checkIntervalHours,
+    scheduleMode = scheduleMode,
+    checkTime = checkTime,
+    lastCheckTime = lastCheckTime?.toString(),
+  )
+
+fun org.gotson.komga.domain.model.DownloadQueue.toDto() =
+  DownloadDto(
+    id = id,
+    sourceUrl = sourceUrl,
+    title = title,
+    status = status.name,
+    progressPercent = progressPercent,
+    currentChapter = currentChapter ?: 0,
+    totalChapters = totalChapters,
+    libraryId = libraryId,
+    errorMessage = errorMessage,
+    createdDate = createdDate,
+    startedDate = startedDate,
+    completedDate = completedDate,
+    priority = priority,
+  )

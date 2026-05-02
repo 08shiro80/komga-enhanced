@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/base.xml"/>
+  <!-- Suppress client connection reset IOExceptions (Windows: "Eine bestehende Verbindung wurde softwaregesteuert abgebrochen") -->
+  <logger name="org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/].[dispatcherServlet]" level="OFF"/>
+</configuration>

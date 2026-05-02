@@ -1,0 +1,1234 @@
+{
+  "$vuetify": {
+    "dataFooter": {
+      "pageText": "{0}-{1} - {2}"
+    },
+    "dataIterator": {
+      "loadingText": "正在載入項目…",
+      "noResultsText": "未能找到匹配的記錄"
+    },
+    "dataTable": {
+      "itemsPerPageText": "每頁行數:",
+      "sortBy": "排序方式"
+    },
+    "fileInput": {
+      "counter": "{0} 個檔案",
+      "counterSize": "{0} 個檔案（共 {1}）"
+    },
+    "noDataText": "無資料可用"
+  },
+  "account_settings": {
+    "account_settings": "帳號設定",
+    "api_key": {
+      "created_date": "建立日期：{date}",
+      "force_kobo_sync": "強制 Kobo 同步",
+      "generate_api_key": "產生 API 金鑰",
+      "no_keys": "尚未產生 API 金鑰"
+    },
+    "change_password": "修改密碼",
+    "details": "詳細資料",
+    "my_account": "我的帳號"
+  },
+  "announcements": {
+    "mark_all_read": "標示全部已讀",
+    "mark_read": "標示已讀",
+    "tab_title": "公告"
+  },
+  "authentication_activity": {
+    "api_key": "API 金鑰",
+    "datetime": "日期/時間",
+    "email": "電子郵件",
+    "error": "錯誤",
+    "ip": "IP 位址",
+    "source": "來源",
+    "success": "成功",
+    "user_agent": "使用者代理"
+  },
+  "author_roles": {
+    "colorist": "著色師",
+    "cover": "封面",
+    "editor": "編輯",
+    "inker": "繪圖者",
+    "letterer": "嵌字者",
+    "penciller": "構圖者",
+    "translator": "翻譯者",
+    "writer": "作者"
+  },
+  "book_card": {
+    "error": "錯誤",
+    "no_release_date": "沒有發布日期",
+    "unknown": "待分析",
+    "unread": "未讀",
+    "unsupported": "不支援"
+  },
+  "book_import": {
+    "button_browse": "瀏覽",
+    "button_import": "匯入",
+    "button_scan": "掃描",
+    "button_select_series": "選擇系列",
+    "field_import_path": "從資料夾匯入",
+    "info_part1": "此頁面允許您匯入現有書櫃之外的檔案。只能將檔案匯入到現有序列，在這種情況下Komga會將檔案移動或複製到所選序列的目錄中。",
+    "info_part2": "如果您為一本書選擇了一個編號，並且已經存在一本帶有該編號的書，你可以比較這兩本書.如果您決定匯入該書。Komga 將升級現有的書使用新檔案，有效地用新檔案替換舊檔案。",
+    "no_files_found": "找不到檔案",
+    "notification": {
+      "go_to_book": "開啟書籍位置",
+      "import_failure": "無法匯入書籍:{file}",
+      "import_successful": "書籍匯入成功：{book}",
+      "source_file": "來源檔案：{file}"
+    },
+    "row": {
+      "error_analyze_first": "書籍需要先分析一下",
+      "error_choose_series": "選擇一個系列",
+      "error_only_import_no_errors": "只能匯入沒有錯誤的書",
+      "warning_upgrade": "將更新現有書籍"
+    },
+    "table": {
+      "destination_name": "目標名稱",
+      "file_name": "檔案名稱",
+      "number": "編號",
+      "series": "系列"
+    },
+    "title": "匯入",
+    "try_another_directory": "嘗試搜尋其他目錄"
+  },
+  "bookreader": {
+    "beginning_of_book": "你可以開始閱讀這本書。",
+    "changing_reading_direction": "將閱讀方向變更為",
+    "cycling_page_layout": "切換頁面布局",
+    "cycling_page_margin": "切换頁面邊界",
+    "cycling_scale": "切換縮放模式",
+    "cycling_side_padding": "切換邊距",
+    "download_current_page": "下載目前頁面",
+    "end_of_book": "你已經閱讀完這本書了。",
+    "from_series_metadata": "來自系列元資料",
+    "move_next": "再單擊或按「下一步」移動到下一本。",
+    "move_next_exit": "再單擊或按「下一步」退出閱讀。",
+    "move_previous": "再單擊或按「下一步」退出閱讀。",
+    "notification_poster_set_book": "書籍封面現已設定為目前頁面。",
+    "notification_poster_set_readlist": "閱讀清單封面現已設定為目前頁面。",
+    "notification_poster_set_series": "系列封面現在設定為目前頁面。",
+    "paged_reader_layout": {
+      "double": "雙頁",
+      "double_no_cover": "雙頁（無封面）",
+      "single": "單頁"
+    },
+    "reader_settings": "閱讀器設定",
+    "scale_type": {
+      "continuous_original": "原始大小",
+      "continuous_width": "適應寬度",
+      "height": "適應高度",
+      "original": "原始大小",
+      "screen": "適應螢幕",
+      "width": "適應寬度",
+      "width_shrink_only": "適應寬度 (只缩小)"
+    },
+    "set_current_page_as_book_poster": "將頁面設為書籍封面",
+    "set_current_page_as_readlist_poster": "將頁面設為閱讀清單封面",
+    "set_current_page_as_series_poster": "將頁面設為系列封面",
+    "settings": {
+      "always_fullscreen": "始終全螢幕",
+      "animate_page_transitions": "為頁面過渡效果加入動畫效果",
+      "background_color": "背景顏色",
+      "background_colors": {
+        "black": "黑色",
+        "gray": "灰色",
+        "white": "白色"
+      },
+      "display": "顯示",
+      "general": "一般",
+      "gestures": "手勢",
+      "page_layout": "頁面佈局",
+      "page_margin": "頁面邊界",
+      "paged": "頁面",
+      "reading_mode": "閱讀模式",
+      "scale_type": "縮放模式",
+      "side_padding": "側邊邊距",
+      "side_padding_none": "無",
+      "webtoon": "Webtoon 模式"
+    },
+    "shortcuts": {
+      "close": "關閉",
+      "cycle_page_layout": "切換頁面模式",
+      "cycle_page_margin": "切换頁面邊界",
+      "cycle_scale": "切換縮放模式",
+      "cycle_side_padding": "切換側邊邊距",
+      "first_page": "第一頁",
+      "fullscreen": "進入/退出全螢幕",
+      "last_page": "最後一頁",
+      "left_to_right": "從左到右",
+      "menus": "功能表",
+      "next_page": "下一頁",
+      "previous_page": "上一頁",
+      "reader_navigation": "閱讀器導航",
+      "right_to_left": "從右到左",
+      "settings": "設定",
+      "show_hide_help": "顯示/隱藏說明",
+      "show_hide_settings": "顯示/隱藏設定功能表",
+      "show_hide_thumbnails": "顯示/隱藏縮圖資源管理器",
+      "show_hide_toolbars": "顯示/隱藏工具列",
+      "vertical": "垂直模式",
+      "webtoon": "Webtoon 模式"
+    },
+    "tooltip_incognito": "將不保存閱讀進度"
+  },
+  "browse_book": {
+    "comment": "註釋",
+    "date_created": "建立於",
+    "date_modified": "最後修改時間",
+    "download_file": "下載檔案",
+    "file": "檔案位置",
+    "format": "格式",
+    "isbn": "ISBN",
+    "links": "鏈接",
+    "navigation_within_readlist": "在閱讀清單中導航：{name}",
+    "outdated_tooltip": "這本書的檔案已經改變，必須重新分析這本書",
+    "read_book": "閱讀",
+    "read_incognito": "無痕閱讀",
+    "remove_from_collection": "從收藏中移除書籍",
+    "remove_from_readlist": "从閱讀列表中移除書籍",
+    "size": "檔案大小"
+  },
+  "browse_collection": {
+    "edit_collection": "編輯收藏",
+    "edit_elements": "編輯元素",
+    "manual_ordering": "手動排序"
+  },
+  "browse_readlist": {
+    "edit_elements": "編輯元素",
+    "edit_readlist": "編輯閱讀清單",
+    "manual_ordering": "手動排序"
+  },
+  "browse_series": {
+    "earliest_year_from_release_dates": "系列書籍中最早書籍的發行年份",
+    "remove_from_collection": "從收藏中移除系列",
+    "series_no_summary": "系列書籍沒有概要，所以我們為你挑選一個!",
+    "summary_from_book": "{number}書中的概要："
+  },
+  "collections_expansion_panel": {
+    "manage_collection": "管理收藏",
+    "title": "{name}收藏"
+  },
+  "common": {
+    "age": "年齡",
+    "all_libraries": "所有書庫",
+    "all_of": "全部",
+    "any_of": "任何",
+    "book": "書籍",
+    "books": "書籍",
+    "books_n": "無書籍 | 1 本書 | {count} 本書",
+    "books_total": "{count} / {total} 本書",
+    "cancel": "取消",
+    "cbx": "Comic Book 封存檔",
+    "choose_image": "選擇圖片",
+    "close": "關閉",
+    "collections": "收藏",
+    "copied": "已複製！",
+    "create": "創建",
+    "delete": "刪除",
+    "dimension": "寬:{width}, 高:{height}",
+    "discard": "丟棄",
+    "disk_space": "硬碟空間",
+    "dismiss": "解除",
+    "download": "下載",
+    "drag_drop": "拖放",
+    "duplicate": "重複",
+    "email": "電子郵件",
+    "epub": "Epub",
+    "error": "錯誤",
+    "filename": "檔名",
+    "filter_no_matches": "篩選器沒有符合的結果",
+    "genre": "類型",
+    "go_to_collection": "前往收藏",
+    "go_to_library": "前往書庫",
+    "go_to_readlist": "前往閱讀清單",
+    "go_to_series": "前往系列書",
+    "i_understand": "我明白",
+    "library": "書庫",
+    "locale_name": "繁體中文",
+    "locale_rtl": "false",
+    "lock_all": "鎖定全部",
+    "media": "媒體",
+    "more": "更多",
+    "n_selected": "已選擇{count}",
+    "nothing_to_show": "沒東西可顯示",
+    "ok": "確定",
+    "oneshot": "單發作品",
+    "outdated": "已過時",
+    "page": "頁",
+    "page_number": "頁碼",
+    "pages": "頁",
+    "pages_left": "無剩餘頁 | 剩餘 1 頁 | 剩餘 {count} 頁",
+    "pages_n": "無頁面 | 1 頁 | {count} 頁",
+    "password": "密碼",
+    "pdf": "PDF",
+    "pending_tasks": "無待處理任務 | 1個待處理任務 | {count} 個待處理任務",
+    "pinned_libraries": "已釘選書庫",
+    "publisher": "出版商",
+    "read": "閱讀",
+    "read_on": "於 {date} 閱讀",
+    "readlist": "閱讀列表",
+    "readlists": "閱讀列表",
+    "remember-me": "記住帳號",
+    "reorder": "重新排序",
+    "required": "必填",
+    "reset_filters": "重設篩選器",
+    "roles": "角色",
+    "save_changes": "保存變更",
+    "series": "系列 | 系列",
+    "settings": "設定",
+    "sidecars": "邊車",
+    "tags": "標籤",
+    "ui": "使用者界面",
+    "unavailable": "不可用",
+    "unlock_all": "解鎖全部",
+    "url": "URL",
+    "use_filter_panel_to_change_filter": "使用篩選器修改篩選項",
+    "year": "年份"
+  },
+  "dashboard": {
+    "keep_reading": "繼續閱讀",
+    "on_deck": "導覽",
+    "recently_added_books": "最近新增的書籍",
+    "recently_added_series": "最近新增的系列",
+    "recently_read_books": "最近閱讀的書籍",
+    "recently_released_books": "最近發佈的書籍",
+    "recently_updated_series": "最近更新的系列"
+  },
+  "data_import": {
+    "book_number": "書號：{name}",
+    "book_series": "系列：{name}",
+    "button_import": "匯入",
+    "button_match": "匹配",
+    "comicrack_preambule_html": "您可以匯入現有的 ComicRack 閱讀列表，其為 <code>.cbl</code>格式。<br>Komga 會試著將您提供的系列和書號與您書庫中的相匹配。",
+    "dialog_confirmation": {
+      "body": "{unmatched} / {total} 本書匹配失敗",
+      "body2": "{total} 本中有 {duplicates} 本重複",
+      "create": "仍然創建",
+      "title": "有些書不匹配"
+    },
+    "field_file_label": "ComicRack 閱讀列表 (.cbl)",
+    "field_files_label": "ComicRack 閱讀列表（.cbl）",
+    "import_read_lists": "匯入閱讀列表",
+    "imported_as": "匯入為 {name}",
+    "readlist_created": "已創建閱讀列表：{name}",
+    "requested_number": "請求書號",
+    "requested_series": "請求系列",
+    "results_preambule": "匯入結果如下所示。您還可以為每個提供的檔案檢查不匹配的書籍。",
+    "size_limit": "大小應小於 {size} MB",
+    "tab_title": "資料匯入"
+  },
+  "dialog": {
+    "add_api_key": {
+      "button_confirm": "產生",
+      "context": "API 金鑰可用於驗證 Kobo 同步協議。",
+      "dialog_title": "產生新的 API 金鑰",
+      "field_comment": "注釋",
+      "field_comment_hint": "這個 API 金鑰有甚麼用途？",
+      "info_copy": "請務必立即複製您的 API 金鑰。您將無法再看到它！"
+    },
+    "add_to_collection": {
+      "button_create": "建立",
+      "card_collection_subtitle": "無系列 | 1 系列 | {count} 系列",
+      "dialog_title": "新增到收藏",
+      "field_search_create": "搜尋或創建收藏",
+      "field_search_create_error": "該收藏已存在",
+      "label_no_matching_collection": "没有匹配的收藏"
+    },
+    "add_to_readlist": {
+      "button_create": "創建",
+      "card_readlist_subtitle": "無書籍 | 1 本書 | {count} 本書",
+      "dialog_title": "新增到閱讀列表",
+      "field_search_create": "搜尋或創建閱讀列表",
+      "field_search_create_error": "該閱讀列表已存在",
+      "label_no_matching_readlist": "没有匹配的閱讀列表"
+    },
+    "add_user": {
+      "button_cancel": "取消",
+      "button_confirm": "新增",
+      "dialog_title": "新增使用者",
+      "field_email": "信箱",
+      "field_email_error": "必須是有效的電子信箱地址",
+      "field_password": "密碼"
+    },
+    "analyze_library": {
+      "body": "分析書庫中的所有媒體檔案。該分析獲取有關媒體的資訊。根據書庫的大小，這可能需要很長的時間。",
+      "button_confirm": "分析",
+      "title": "分析書庫"
+    },
+    "book_picker": {
+      "filter": "按序號、標題或發行日期篩選",
+      "title": "選擇書籍"
+    },
+    "delete_apikey": {
+      "button_confirm": "刪除",
+      "confirm_delete": "我明白，删除 API 金鑰「{name}」",
+      "dialog_title": "删除 API 金鑰",
+      "warning_html": "任何使用此 API 金鑰的應用程式或腳本將無法再存取 Komga API。此操作無法復原。"
+    },
+    "delete_book": {
+      "button_confirm": "刪除",
+      "confirm_delete": "是的，删除書籍 “{name}” 及其檔案",
+      "confirm_delete_multiple": "是的，删除 {count} 本書及它們的檔案",
+      "dialog_title": "刪除書籍",
+      "dialog_title_multiple": "刪除書籍",
+      "warning_html": "<b>{name}</b> 連同所存儲媒體檔案將從此伺服器中刪除。此操作<b>無法</b>復原。繼續嗎？",
+      "warning_multiple_html": "{count} 本書連同所存儲的媒體檔案從此伺服器中删除。此操作<b>無法</b>復原。繼續嗎？"
+    },
+    "delete_collection": {
+      "button_confirm": "刪除",
+      "confirm_delete": "是的，删除收藏「{name}」",
+      "confirm_delete_multiple": "是的，删除 {count} 個收藏",
+      "dialog_title": "删除收藏",
+      "dialog_title_multiple": "删除收藏",
+      "warning_html": "收藏 <b>{name}</b>將從此伺服器中删除。您的媒體檔案不會受到影響。此操作<b>無法</b>復原。繼續嗎？",
+      "warning_multiple_html": "將從此伺服器删除 {count} 個收藏。您的媒體檔案不會受到影響。此操作<b>無法</b>復原。繼續嗎？"
+    },
+    "delete_library": {
+      "button_confirm": "刪除",
+      "confirm_delete": "是的，删除書庫「{name}」",
+      "title": "删除書庫",
+      "warning_html": "書庫 <b>{name}</b> 將從此伺服器中删除。您的媒體檔案不會受到影響。此操作<b>無法</b>復原。繼續嗎？"
+    },
+    "delete_readlist": {
+      "button_confirm": "刪除",
+      "confirm_delete": "是的，删除閱讀列表「{name}」",
+      "confirm_delete_multiple": "是的，删除 {count} 個閱讀列表",
+      "dialog_title": "删除閱讀列表",
+      "dialog_title_multiple": "删除閱讀列表",
+      "warning_html": "閱讀列表 <b>{name}</b> 將從此伺服器中删除。您的媒體檔案不會受到影響。此操作<b>無法</b>復原。繼續嗎？",
+      "warning_multiple_html": "將從此伺服器中删除 {count} 個閱讀列表。你的媒體檔案不會受影響。此操作 <b>無法</b>復原。繼續嗎？"
+    },
+    "delete_series": {
+      "button_confirm": "刪除",
+      "confirm_delete": "是的，删除系列「{name}」及其檔案",
+      "confirm_delete_multiple": "是的，删除 {count} 個系列及它們的檔案",
+      "dialog_title": "删除系列",
+      "warning_html": "系列 <b>{name}</b> 及所存儲媒體檔案將從此伺服器中删除。此操作<b>無法</b>復原。繼續嗎？",
+      "warning_multiple_html": "{count} 個連載及所存儲媒體檔案將從此伺服器中删除。此操作<b>無法</b>復原。繼續嗎？"
+    },
+    "delete_user": {
+      "button_confirm": "刪除",
+      "confirm_delete": "是的，删除使用者「{name}」",
+      "dialog_title": "删除使用者",
+      "warning_html": "使用者 <b>{name}</b> 將從此伺服器中删除。此操作<b>無法</b>復原。繼續嗎？"
+    },
+    "edit_books": {
+      "add_author_role_error_duplicate": "已存在",
+      "authors_notice_multiple_edit": "您正在編輯多本書的作者。這將覆蓋每本書的現有作者。",
+      "button_cancel": "取消",
+      "button_confirm": "保存修改",
+      "copy_from": "從 {field} 複製",
+      "dialog_title_multiple": "編輯 {count} 本書 | 編輯 {count} 本書",
+      "dialog_title_single": "編輯 {book}",
+      "field_alternate_title": "副標題",
+      "field_isbn": "ISBN",
+      "field_isbn_error": "ISBN必須是 13 位數",
+      "field_link_label": "標籤",
+      "field_link_url": "URL",
+      "field_link_url_error_protocol": "必須為 http 或 https",
+      "field_link_url_error_url": "必須是有效的 URL",
+      "field_number": "序號",
+      "field_number_sort": "排序序號",
+      "field_number_sort_hint": "您可以用十進制數",
+      "field_release_date": "發佈日期",
+      "field_release_date_error": "必須是 YYYY-MM-DD 格式的有效日期",
+      "field_summary": "概要",
+      "field_tags": "標籤",
+      "field_title": "標題",
+      "number_sort_decrement": "全部減 1",
+      "number_sort_increment": "全部加 1",
+      "tab_authors": "作者",
+      "tab_general": "常規",
+      "tab_links": "鏈結",
+      "tab_poster": "海報",
+      "tab_tags": "標籤",
+      "tags_notice_multiple_edit": "您正在編輯多本書的標籤。這將覆蓋每本書的現有標籤。"
+    },
+    "edit_collection": {
+      "button_cancel": "取消",
+      "button_confirm": "保存修改",
+      "dialog_title": "編輯收藏",
+      "field_manual_ordering": "手動排序",
+      "label_ordering": "預設情况下，收藏中的系列將按名稱排序，您可以啟用手動排序來整理想要的順序。",
+      "tab_general": "常規",
+      "tab_poster": "海報"
+    },
+    "edit_library": {
+      "button_browse": "瀏覽",
+      "button_cancel": "取消",
+      "button_confirm_add": "新增",
+      "button_confirm_edit": "編輯",
+      "button_next": "繼續",
+      "dialog_title_add": "新增書庫",
+      "dialot_title_edit": "編輯書庫",
+      "field_analysis_analyze_dimensions": "分析頁面尺寸",
+      "field_analysis_hash_files": "計算檔案雜湊",
+      "field_analysis_hash_koreader": "計算 KOReader 檔案的雜湊函式",
+      "field_analysis_hash_pages": "計算頁面雜湊",
+      "field_convert_to_cbz": "自動轉換為 CBZ 格式",
+      "field_import_barcode_isbn": "ISBN 條碼",
+      "field_import_comicinfo_book": "書籍元資料",
+      "field_import_comicinfo_collections": "收藏",
+      "field_import_comicinfo_readlists": "閱讀列表",
+      "field_import_comicinfo_series": "系列元資料",
+      "field_import_comicinfo_series_append_volume": "在系列標題中新增卷號",
+      "field_import_epub_book": "書籍元資料",
+      "field_import_epub_series": "系列元資料",
+      "field_import_local_artwork": "本地圖片(插圖)",
+      "field_import_mylar_series": "系列元資料",
+      "field_name": "名稱",
+      "field_oneshotsdirectory": "單發作品目錄",
+      "field_repair_extensions": "自動修復不正確的檔案擴展名",
+      "field_root_folder": "根資料夾",
+      "field_scan_interval": "掃描間隔",
+      "field_scanner_empty_trash_after_scan": "每次掃描後自動清理垃圾",
+      "field_scanner_force_directory_modified_time": "強制目錄修改時間",
+      "field_scanner_scan_startup": "啟動時掃描",
+      "field_series_cover": "系列封面",
+      "file_browser_dialog_button_confirm": "選擇",
+      "file_browser_dialog_title": "書庫的根資料夾",
+      "label_analysis": "分析",
+      "label_file_management": "檔案管理",
+      "label_import_barcode_isbn": "從條碼中匯入 ISBN",
+      "label_import_comicinfo": "匯入含有 ComicInfo.xml 的 CBR/CBZ 壓縮包",
+      "label_import_epub": "匯入EPUB檔案的元資料",
+      "label_import_local": "匯入本地媒體",
+      "label_import_mylar": "匯入 Mylar 生成的元資料",
+      "label_scan_directory_exclusions": "目錄排除項",
+      "label_scan_types": "掃描這些檔案類型",
+      "label_scanner": "掃描器",
+      "label_series_cover": "系列封面",
+      "tab_general": "常規",
+      "tab_metadata": "元資料",
+      "tab_options": "選項",
+      "tooltip_oneshotsdirectory": "留空以禁用",
+      "tooltip_scanner_force_modified_time": "如果書庫在 Google Drive 上則啟用",
+      "tooltip_use_resources": "大型書庫或老舊硬體上開啟會消耗大量資源"
+    },
+    "edit_readlist": {
+      "button_cancel": "取消",
+      "button_confirm": "保存修改",
+      "dialog_title": "編輯閱讀列表",
+      "field_manual_ordering": "手動排序",
+      "field_name": "名稱",
+      "field_summary": "概要",
+      "label_ordering": "預設情况下，閱讀列表中的書籍需要手動排序。您可以禁用手動排序來通過發行日期排序。",
+      "tab_general": "常規",
+      "tab_poster": "海報"
+    },
+    "edit_recommended": {
+      "button_confirm": "儲存更變",
+      "button_reset": "重設為預設值",
+      "dialog_title": "編輯推薦檢視"
+    },
+    "edit_series": {
+      "button_cancel": "取消",
+      "button_confirm": "保存修改",
+      "dialog_title_multiple": "編輯 {count} 個系列 | 編輯 {count} 個系列",
+      "dialog_title_single": "編輯 {series}",
+      "field_age_rating": "年齡限制",
+      "field_age_rating_error": "年齡限制必須為 0 或更高",
+      "field_genres": "風格",
+      "field_labels": "標籤",
+      "field_language": "語言",
+      "field_language_hint": "IETF BCP 47 語言標籤",
+      "field_publisher": "出版商",
+      "field_reading_direction": "閱讀方向",
+      "field_sort_title": "排序標題",
+      "field_status": "狀態",
+      "field_summary": "概要",
+      "field_tags": "標籤",
+      "field_title": "標題",
+      "field_total_book_count": "書籍總數",
+      "field_total_book_count_error": "書籍總數必須為 1 或更多",
+      "mixed": "混合",
+      "tab_general": "常規",
+      "tab_poster": "海報",
+      "tab_sharing": "分享",
+      "tab_tags": "標籤",
+      "tab_titles": "副標題",
+      "tags_notice_multiple_edit": "您正在編輯多個系列的標籤。這將覆蓋每個系列的現有標籤。"
+    },
+    "edit_user": {
+      "button_cancel": "取消",
+      "button_confirm": "保存修改",
+      "dialog_title": "編輯使用者",
+      "label_roles_for": "{name} 的權限"
+    },
+    "edit_user_restrictions": {
+      "age_restriction": {
+        "allow_under": "僅允許適合多少歲以下人士的漫畫",
+        "exclude_over": "排除適合高於多少歲人士的漫畫",
+        "none": "無限制"
+      },
+      "edit_restrictions_for": "編輯 {name} 的限制",
+      "label_age_restriction": "年齡限制",
+      "label_allow_only_labels": "「僅允許」標籤",
+      "label_exclude_labels": "「排除」標籤",
+      "tab_content_restrictions": "内容限制",
+      "tab_shared_libraries": "共享的書庫"
+    },
+    "empty_trash": {
+      "body": "預設情况下，媒體伺服器不會立即删除媒體的資訊。這對裝置暫時斷開連接的情況有所幫助。清理垃圾時，所有丢失媒體相關的資訊都會被删除。",
+      "button_confirm": "清理",
+      "title": "清理書庫垃圾"
+    },
+    "file_browser": {
+      "button_cancel": "取消",
+      "button_confirm_default": "選擇",
+      "dialog_title_default": "檔案瀏覽",
+      "parent_directory": "父目錄"
+    },
+    "filename_chooser": {
+      "button_choose": "選擇",
+      "field_destination_filename": "目標檔案名稱",
+      "label_source_filename": "源檔案名稱",
+      "table": {
+        "existing_file": "現有檔案",
+        "order": "命令"
+      },
+      "title": "目標檔案名稱"
+    },
+    "force_kobo_sync": {
+      "dialog_title": "強制 Kobo 同步",
+      "warning_html": "這將刪除此 API 金鑰的所有同步歷史紀錄。您的 Kobo 將在下次同步時同步所有内容。"
+    },
+    "password_change": {
+      "button_cancel": "取消",
+      "button_confirm": "修改密碼",
+      "dialog_title": "取消密碼",
+      "field_new_password": "新密碼",
+      "field_new_password_error": "需要新密碼。",
+      "field_repeat_password": "確認新密碼",
+      "field_repeat_password_error": "密碼必須相同。"
+    },
+    "refresh_library_metadata": {
+      "body": "刷新書庫中所有媒體檔案的元資料。根據書庫的大小，這可能需要很長時間。",
+      "button_confirm": "刷新",
+      "title": "刷新書庫元資料"
+    },
+    "series_picker": {
+      "label_search_series": "搜尋系列",
+      "no_results": "未找到系列",
+      "title": "選擇系列"
+    },
+    "server_stop": {
+      "button_confirm": "停止",
+      "confirmation_message": "您確定要關閉 Komga 伺服器嗎？",
+      "dialog_title": "關閉伺服器"
+    },
+    "shortcut_help": {
+      "label_description": "說明",
+      "label_key": "按鍵"
+    },
+    "transient_book_details": {
+      "label_candidate": "候選",
+      "label_existing": "現有的",
+      "label_format": "檔案格式",
+      "label_name": "名稱",
+      "label_pages": "頁數",
+      "label_size": "檔案大小",
+      "pages_table": {
+        "filename": "檔案名稱",
+        "height": "高度",
+        "index": "索引",
+        "media_type": "媒體類型",
+        "size": "尺寸",
+        "width": "寬度"
+      },
+      "title": "書籍詳細資料",
+      "title_comparison": "書籍比較"
+    },
+    "transient_book_viewer": {
+      "label_candidate": "候選",
+      "label_existing": "現有的",
+      "page_of_pages": "{page} / {pages}",
+      "title": "查驗書籍",
+      "title_comparison": "書籍比較"
+    }
+  },
+  "duplicate_pages": {
+    "action_auto_delete_remaining": "自動刪除剩餘的資料（{count}）",
+    "action_delete_auto": "自動刪除",
+    "action_delete_manual": "手動刪除",
+    "action_delete_matches": "刪除匹配",
+    "action_ignore": "忽略",
+    "action_ignore_remaining": "忽略剩餘部分（{count}）",
+    "action_manual_delete_remaining": "手動刪除剩餘部分（{count}）",
+    "confirm_auto_delete_remaining": "此頁面上剩餘頁面雜湊 （{count}） 的所有值將被標記為自動刪除。",
+    "confirm_manual_delete_remaining": "此頁面上所有剩餘的頁面雜湊 （{count}） 將被標記為手動刪除。",
+    "delete_to_save": "删除以節省 {size}",
+    "deleted_count": "删除了 {count} 次",
+    "empty_title": "沒有找到重複的頁面",
+    "empty_title_known": "沒有已知重複",
+    "filter": {
+      "count": "數目",
+      "date_added": "新增日期",
+      "date_modified": "修改日期",
+      "delete_count": "删除計數",
+      "delete_size": "節省的空間",
+      "match_count": "符合數量",
+      "size": "大小",
+      "total_size": "總大小"
+    },
+    "info": "删除重複頁面會修改您的檔案。請在使用自動删除之前備份檔案並手動删除。",
+    "known": "已知",
+    "matches_n": "無匹配 | 1 個匹配 | {count} 個匹配",
+    "new": "新增",
+    "saved_size": "節省了 {size}",
+    "title": "重複頁面",
+    "unknown_size": "未知大小",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
+  },
+  "duplicates": {
+    "file_hash": "檔案雜湊",
+    "size": "大小",
+    "title": "重複檔案",
+    "url": "URL"
+  },
+  "enums": {
+    "copy_mode": {
+      "HARDLINK": "硬鏈結/複製檔案",
+      "MOVE": "移動檔案"
+    },
+    "epubreader": {
+      "appearances": {
+        "day": "日間",
+        "night": "夜間",
+        "sepia": "棕褐色"
+      },
+      "column_count": {
+        "auto": "自動",
+        "one": "一列",
+        "two": "兩列"
+      },
+      "reading_direction": {
+        "auto": "自動",
+        "ltr": "從左到右",
+        "rtl": "從右到左"
+      }
+    },
+    "historical_event_type": {
+      "BookConverted": "書籍已轉換",
+      "BookFileDeleted": "書籍檔案已删除",
+      "BookImported": "匯入的書籍",
+      "DuplicatePageDeleted": "重複頁面已删除",
+      "SeriesFolderDeleted": "系列資料夾已删除"
+    },
+    "media_profile": {
+      "DIVINA": "DIVINA",
+      "EPUB": "EPUB",
+      "PDF": "PDF"
+    },
+    "media_status": {
+      "ERROR": "錯誤",
+      "OUTDATED": "過期",
+      "READY": "就緒",
+      "UNKNOWN": "未知",
+      "UNSUPPORTED": "不支援"
+    },
+    "page_hash_action": {
+      "DELETE_AUTO": "自動刪除",
+      "DELETE_MANUAL": "手動刪除",
+      "IGNORE": "忽略"
+    },
+    "reading_direction": {
+      "LEFT_TO_RIGHT": "從左到右",
+      "RIGHT_TO_LEFT": "從右到左",
+      "VERTICAL": "垂直模式",
+      "WEBTOON": "Webtoon (條漫)"
+    },
+    "scan_interval": {
+      "DAILY": "每日",
+      "DISABLED": "禁用",
+      "EVERY_12H": "每 12 小時",
+      "EVERY_6H": "每 6 小時",
+      "HOURLY": "每小時",
+      "WEEKLY": "每週"
+    },
+    "series_cover": {
+      "FIRST": "第一張",
+      "FIRST_UNREAD_OR_FIRST": "第一張未讀或第一張封面",
+      "FIRST_UNREAD_OR_LAST": "第一張未讀或最後一張封面",
+      "LAST": "最後一張"
+    },
+    "series_status": {
+      "ABANDONED": "已斷尾",
+      "ENDED": "已完結",
+      "HIATUS": "有生之年",
+      "ONGOING": "連載中"
+    },
+    "thumbnail_size": {
+      "DEFAULT": "預設(300px)",
+      "LARGE": "大(900px)",
+      "MEDIUM": "中 (600px)",
+      "XLARGE": "超大 (1200px)"
+    }
+  },
+  "epubreader": {
+    "current_chapter": "目前章節",
+    "page_of": "頁 {page} 共 {count}頁",
+    "publisher_font": "出版社",
+    "settings": {
+      "column_count": "列數",
+      "font_family": "字體",
+      "layout": "佈局",
+      "layout_paginated": "分頁",
+      "layout_scroll": "滾動",
+      "navigation_mode": "導航模式",
+      "navigation_options": {
+        "both": "兩者皆用",
+        "buttons": "按鈕",
+        "click": "單擊/點擊"
+      },
+      "page_margins": "頁邊距",
+      "viewing_theme": "觀看主題"
+    },
+    "shortcuts": {
+      "cycle_pagination": "循環列數",
+      "cycle_viewing_theme": "循環觀看主題",
+      "font_size_decrease": "減小字體大小",
+      "font_size_increase": "增加字體大小",
+      "menus": "菜單",
+      "next": "向前",
+      "previous": "向後",
+      "reader_navigation": "讀者導航",
+      "scroll": "更改佈局以滾動",
+      "settings": "設定",
+      "show_hide_toc": "顯示/隱藏目錄"
+    }
+  },
+  "error_codes": {
+    "ERR_1000": "分析期間無法訪問檔案",
+    "ERR_1001": "不支援的媒體類型",
+    "ERR_1002": "不支援加密的 RAR 檔案",
+    "ERR_1003": "不支援結實壓縮的 RAR 檔案",
+    "ERR_1004": "不支持多卷(分割檔)的 RAR 檔案",
+    "ERR_1005": "分析書籍時出現未知錯誤",
+    "ERR_1006": "這本書不包含任何頁面",
+    "ERR_1007": "無法分析某些條目",
+    "ERR_1008": "獲取書籍條目時出現未知錯誤",
+    "ERR_1009": "已存在該名稱的閱讀列表",
+    "ERR_1015": "反序列化 ComicRack CBL 檔案時出錯",
+    "ERR_1016": "目錄不可訪問",
+    "ERR_1017": "無法掃描作為現有書庫一部分的資料夾",
+    "ERR_1018": "檔案未找到",
+    "ERR_1019": "無法匯入屬於現有書庫的檔案",
+    "ERR_1020": "要升级的書籍不屬於提供的系列",
+    "ERR_1021": "目標檔案已存在",
+    "ERR_1022": "無法掃描新匯入的書籍",
+    "ERR_1023": "書籍已經在閱讀列表中",
+    "ERR_1024": "OAuth2 登入錯誤：沒有 email 屬性",
+    "ERR_1025": "OAuth2 登入錯誤：没有使用該電子郵件的本機使用者",
+    "ERR_1026": "OpenID Connect 登錄錯誤：電子郵件未驗證",
+    "ERR_1027": "OpenID Connect 登入錯誤：没有 email_verified 屬性",
+    "ERR_1028": "OpenID Connect 錯誤：没有 email 屬性",
+    "ERR_1029": "ComicRack CBL 檔案中没有書籍",
+    "ERR_1030": "ComicRack CBL 檔案中没有書名元素",
+    "ERR_1031": "ComicRack CBL 檔案中的書籍没有系列或書號",
+    "ERR_1032": "EPUB 檔案的媒體類型錯誤",
+    "ERR_1033": "部分條目缺失",
+    "ERR_1034": "帶有該注譯的 API 金鑰已存在",
+    "ERR_1035": "取得 EPUB TOC 時出錯",
+    "ERR_1036": "取得 EPUB Landmarks 時出錯",
+    "ERR_1037": "取得 EPUB 頁面列表時出錯",
+    "ERR_1038": "取得 EPUB divina 頁面時出錯",
+    "ERR_1039": "取得 EPUB 位置時出錯"
+  },
+  "filter": {
+    "age_rating": "年齡限制",
+    "age_rating_none": "無",
+    "any": "任何",
+    "complete": "完結",
+    "genre": "風格",
+    "in_progress": "正在進行",
+    "language": "語言",
+    "library": "書庫",
+    "media_profile": "媒體簡介",
+    "media_status": "媒體狀態",
+    "oneshot": "單發作品",
+    "publisher": "出版商",
+    "read": "已讀",
+    "release_date": "發行日期",
+    "sharing_label": "共用標籤",
+    "status": "狀態",
+    "tag": "標籤",
+    "unread": "未讀"
+  },
+  "filter_drawer": {
+    "filter": "篩選",
+    "sort": "排序"
+  },
+  "history": {
+    "header": {
+      "book": "書籍",
+      "date": "日期",
+      "details": "詳細資料",
+      "series": "系列",
+      "type": "類型"
+    },
+    "title": "歷史紀錄"
+  },
+  "home": {
+    "theme": "主題",
+    "translation": "語言"
+  },
+  "library_navigation": {
+    "browse": "瀏覽",
+    "browse_books": "書籍",
+    "browse_series": "系列",
+    "collections": "收藏",
+    "readlists": "閱讀列表",
+    "recommended": "推薦"
+  },
+  "login": {
+    "create_user_account": "創建帳戶",
+    "login": "登入",
+    "unclaimed_html": "該 Komga 伺服器尚未啟用，您需要創建一個使用者帳戶才能存取它。<br><br>選擇一個 <strong>信箱</strong> 和 <strong>密碼</strong> 然後點擊 <strong>創建帳戶</strong>。",
+    "browse_as_guest": "Browse as guest"
+  },
+  "media_analysis": {
+    "comment": "註釋",
+    "media_analysis": "媒體分析",
+    "media_type": "媒體類型",
+    "name": "名稱",
+    "size": "大小",
+    "status": "狀態",
+    "url": "URL"
+  },
+  "menu": {
+    "add_to_collection": "新增到收藏",
+    "add_to_readlist": "新增到閱讀列表",
+    "analyze": "分析",
+    "bulk_edit_metadata": "批量編輯元資料",
+    "delete": "刪除",
+    "deselect_all": "取消選中所有",
+    "download_readlist": "下載閱讀列表",
+    "download_series": "下載系列",
+    "edit": "編輯",
+    "edit_metadata": "編輯元資料",
+    "empty_trash": "清理垃圾",
+    "mark_read": "標記為已讀",
+    "mark_unread": "標記為未讀",
+    "pin": "釘選",
+    "refresh_metadata": "刷新元資料",
+    "scan_library_files": "掃描書庫檔案",
+    "scan_library_files_deep": "深度掃描書庫檔案",
+    "select_all": "選擇所有",
+    "unpin": "解除釘選"
+  },
+  "metrics": {
+    "library_books": "每個書庫的書籍數",
+    "library_disk_space": "書庫磁碟空間",
+    "library_series": "每個書庫的系列數",
+    "library_sidecars": "每個書庫的邊車",
+    "tasks_executed": "已執行的任務",
+    "tasks_total_time": "任務總時間",
+    "title": "性能指標"
+  },
+  "missing_posters": {
+    "title": "沒有海報"
+  },
+  "navigation": {
+    "home": "主頁",
+    "libraries": "書庫",
+    "logout": "登出"
+  },
+  "no_libraries_pinned": {
+    "subtitle": "你可在在三點選單釘選書庫",
+    "title": "沒有已釘選書庫"
+  },
+  "page_not_found": {
+    "go_back_to_home_page": "返回主頁",
+    "page_does_not_exist": "您要查找的頁面不存在。",
+    "page_not_found": "找不到頁面"
+  },
+  "read_more": {
+    "less": "閱讀更少",
+    "more": "閱讀更多"
+  },
+  "readlist_import": {
+    "row": {
+      "duplicate_book": "重複書籍",
+      "error_choose_book": "選擇一本書"
+    }
+  },
+  "readlists_expansion_panel": {
+    "manage_readlist": "管理閱讀列表",
+    "title": "閱讀列表 {name}"
+  },
+  "search": {
+    "no_results": "搜尋没有任何结果",
+    "search": "搜尋",
+    "search_for_something_else": "嘗試尋找其他的東西",
+    "search_results_for": "「{name}」的搜尋结果"
+  },
+  "searchbox": {
+    "in_library": "在 {library} 中",
+    "no_results": "無结果",
+    "search_all": "搜尋全部…"
+  },
+  "server": {
+    "server_management": {
+      "button_cancel_all_tasks": "取消所有任務",
+      "button_empty_trash": "清理所有書庫的垃圾",
+      "button_scan_libraries": "掃描所有書庫",
+      "button_scan_libraries_deep": "深度掃描所有書庫",
+      "button_shutdown": "關機",
+      "download_log": "下載日誌檔案",
+      "notification_tasks_cancelled": "無可取消任務 | 取消了一個任務 | 取消了 {count} 個任務",
+      "section_title": "伺服器管理"
+    },
+    "tab_title": "伺服器",
+    "updates": "更新"
+  },
+  "server_settings": {
+    "config_precedence": "優先於設定檔",
+    "dialog_regenerate_thumbnails": {
+      "body": "縮圖大小已變更。您想重新產生書籍縮圖嗎？",
+      "btn_alternate": "是，所有書籍",
+      "btn_cancel": "不是",
+      "btn_confirm": "是的，但前提是更大",
+      "title": "重新產生縮圖"
+    },
+    "hint_kobo_port": "僅在同步封面和下載出現問題時設定",
+    "label_delete_empty_collections": "掃描後刪除空的收藏",
+    "label_delete_empty_readlists": "掃描後刪除空的讀取清單",
+    "label_kepubify_path": "kepubify 的位置",
+    "label_kobo_port": "Kobo 同步外部通訊埠",
+    "label_kobo_proxy": "代理 Kobo 同步請求至 Kobo 商店",
+    "label_rememberme_duration": "記住我的持續時間（天）",
+    "label_server_context_path": "基本網址",
+    "label_server_port": "伺服器連接埠",
+    "label_task_pool_size": "任務執行緒",
+    "label_thumbnail_size": "縮圖尺寸",
+    "requires_restart": "需要重啟才能生效",
+    "server_settings": "伺服器設定"
+  },
+  "settings_user": {
+    "change_password": "更改密碼",
+    "edit_restrictions": "編輯限制",
+    "edit_user": "編輯使用者",
+    "latest_activity": "最新活動：{date}",
+    "no_recent_activity": "近期無活動",
+    "role_administrator": "管理員",
+    "role_user": "使用者"
+  },
+  "sort": {
+    "books_count": "書籍數量",
+    "date_added": "新增日期",
+    "date_read": "閱讀日期",
+    "date_updated": "更新日期",
+    "file_name": "檔案名稱",
+    "file_size": "檔案大小",
+    "folder_name": "資料夾名",
+    "name": "名稱",
+    "number": "卷數",
+    "page_count": "頁數",
+    "random": "隨機",
+    "release_date": "發佈日期",
+    "series": "系列"
+  },
+  "theme": {
+    "dark": "深色",
+    "light": "淺色",
+    "system": "系統"
+  },
+  "thumbnail_card": {
+    "tooltip_delete": "刪除",
+    "tooltip_generated": "生成的插圖",
+    "tooltip_mark_as_selected": "標為已選",
+    "tooltip_selected": "已選中",
+    "tooltip_sidecar": "本地插圖",
+    "tooltip_to_be_deleted": "將被删除",
+    "tooltip_to_be_uploaded": "將被上傳",
+    "tooltip_too_big": "檔案太大！",
+    "tooltip_user_uploaded": "使用者上傳的"
+  },
+  "titles_more": {
+    "less": "更少標題",
+    "more": "更多標題"
+  },
+  "ui_settings": {
+    "general": "一般",
+    "label_oauth2_auto_login": "自動 OAuth2 登入",
+    "label_oauth2_hide_login": "如果啟用了 OAuth2，則隱藏登入欄位",
+    "label_poster_blur_unread": "為未讀書籍和系列模糊海報",
+    "label_poster_stretch": "拉伸封面以適應卡片",
+    "label_series_groups": "系列分組",
+    "section_oauth2": "OAuth2",
+    "series_groups": {
+      "alpha": "按字母順序",
+      "japanese": "五十音 (日語)"
+    },
+    "tooltip_oauth2_auto_login": "需要單一 OAuth2 提供者，並啟用「隱藏登入欄位」"
+  },
+  "updates": {
+    "available": "有可用更新",
+    "latest_installed": "已安装最新版本的 Komga"
+  },
+  "user_roles": {
+    "ADMIN": "管理員",
+    "FILE_DOWNLOAD": "允许下載",
+    "KOBO_SYNC": "Kobo 同步",
+    "KOREADER_SYNC": "KOReader 同步",
+    "PAGE_STREAMING": "頁面串流",
+    "USER": "使用者"
+  },
+  "users": {
+    "api_keys": "API 金鑰",
+    "authentication_activity": "身份驗證活動",
+    "users": "使用者"
+  },
+  "validation": {
+    "context_path": "必須以“/”開頭，不能以“/-_”結尾，並且僅包含“/-_a-z0-9”",
+    "one_or_more": "必須為 1 或更大",
+    "tcp_port": "必須介於 1 到 65535 之間",
+    "zero_or_more": "必須為 0 或更大"
+  },
+  "welcome": {
+    "add_library": "新增書庫",
+    "no_libraries_yet": "還没有新增任何書庫！",
+    "welcome_message": "歡迎使用 Komga"
+  },
+  "download_manager": {
+    "title": "下載管理器",
+    "subtitle": "使用gallery-dl從外部來源下載漫畫。",
+    "queue_title": "下載佇列",
+    "add_download": "新增下載",
+    "clear": "清理",
+    "clear_completed": "清理已完成",
+    "clear_failed": "清理失敗項",
+    "clear_cancelled": "清理已取消",
+    "clear_pending": "清理待處理",
+    "no_downloads": "佇列中沒有下載。使用上方按鈕新增漫畫URL。",
+    "unknown_title": "未知",
+    "downloads_folder": "下載資料夾",
+    "cancel": "取消",
+    "retry": "重試",
+    "view_error": "檢視錯誤",
+    "delete": "刪除",
+    "close": "關閉",
+    "dialog_add_title": "新增下載",
+    "dialog_add_info": "輸入支援網站（如MangaDex）的漫畫URL。請確保已安裝gallery-dl。",
+    "field_url": "漫畫URL",
+    "field_url_required": "URL為必填",
+    "field_title": "標題（選填）",
+    "field_title_hint": "留空自動取得",
+    "field_library": "目標媒體庫（選填）",
+    "field_library_hint": "留空使用下載資料夾",
+    "field_priority": "優先順序",
+    "dialog_delete_title": "刪除下載？",
+    "dialog_delete_confirm": "確定要刪除：",
+    "dialog_delete_info": "這將從下載佇列中移除。",
+    "dialog_error_title": "下載錯誤",
+    "header_title": "標題",
+    "header_status": "狀態",
+    "header_progress": "進度",
+    "header_library": "媒體庫",
+    "header_created": "建立時間",
+    "header_actions": "操作",
+    "snack_added": "下載已新增至佇列",
+    "snack_cancelled": "下載已取消",
+    "snack_retrying": "正在重試下載",
+    "snack_deleted": "下載已刪除",
+    "snack_load_failed": "載入下載失敗",
+    "snack_add_failed": "新增下載失敗",
+    "snack_cancel_failed": "取消失敗",
+    "snack_retry_failed": "重試失敗",
+    "snack_delete_failed": "刪除失敗",
+    "snack_clear_failed": "清理失敗"
+  },
+  "plugin_manager": {
+    "title": "外掛管理",
+    "subtitle": "管理Komga的中繼資料、下載等外掛。",
+    "installed_plugins": "已安裝外掛",
+    "install_plugin": "安裝外掛",
+    "no_plugins": "沒有已安裝的外掛。",
+    "configure": "設定",
+    "view_logs": "檢視日誌",
+    "uninstall": "解除安裝",
+    "dialog_install_title": "安裝外掛",
+    "dialog_install_info": "上傳JAR檔案或提供URL進行安裝。",
+    "field_plugin_file": "外掛檔案（JAR）",
+    "field_plugin_url": "或外掛URL",
+    "install": "安裝",
+    "dialog_uninstall_title": "解除安裝外掛？",
+    "dialog_uninstall_confirm": "確定要解除安裝：",
+    "dialog_uninstall_info": "此操作無法復原。",
+    "save": "儲存",
+    "logs_title": "日誌",
+    "log_all": "全部",
+    "log_debug": "除錯",
+    "log_info": "資訊",
+    "log_warn": "警告",
+    "log_error": "錯誤",
+    "stack_trace": "堆疊追蹤",
+    "no_logs": "沒有找到日誌",
+    "header_name": "名稱",
+    "header_version": "版本",
+    "header_type": "類型",
+    "header_author": "作者",
+    "header_enabled": "啟用",
+    "header_actions": "操作",
+    "snack_enabled": "外掛已啟用",
+    "snack_disabled": "外掛已停用",
+    "snack_uninstalled": "外掛已解除安裝",
+    "snack_config_saved": "設定已儲存",
+    "snack_logs_cleared": "日誌已清除",
+    "snack_installed": "Plugin installation will be available soon",
+    "snack_load_failed": "Failed to load plugins",
+    "snack_toggle_failed": "Failed to toggle plugin",
+    "snack_install_failed": "Failed to install plugin",
+    "snack_uninstall_failed": "Failed to uninstall plugin",
+    "snack_config_load_failed": "Failed to load config",
+    "snack_config_save_failed": "Failed to save config",
+    "snack_logs_load_failed": "Failed to load logs",
+    "snack_logs_clear_failed": "Failed to clear logs"
+  },
+  "settings_backup": {
+    "title": "資料庫備份與還原",
+    "create_title": "建立新備份",
+    "create_description": "建立Komga資料庫的備份。",
+    "create_backup": "建立備份",
+    "create_full_backup": "完整備份（主資料庫+任務）",
+    "cleanup_title": "清理舊備份",
+    "cleanup_description": "刪除舊備份以釋放磁碟空間。",
+    "field_keep_count": "保留備份數量",
+    "clean_old_backups": "清理舊備份",
+    "available_title": "可用備份",
+    "no_backups": "沒有找到備份。",
+    "download": "下載",
+    "delete": "刪除",
+    "restore": "還原（需要重新啟動）",
+    "dialog_delete_title": "刪除備份？",
+    "dialog_delete_confirm": "確定要刪除：",
+    "dialog_delete_info": "此操作無法復原。",
+    "dialog_restore_title": "還原備份？",
+    "dialog_restore_warning": "還原備份將：",
+    "dialog_restore_item1": "取代目前的資料庫",
+    "dialog_restore_item2": "需要重新啟動應用程式",
+    "dialog_restore_item3": "可能遺失最近的變更",
+    "dialog_restore_confirm": "從備份還原：",
+    "restore_and_restart": "還原並重新啟動",
+    "header_filename": "檔案名稱",
+    "header_created": "建立日期",
+    "header_size": "大小",
+    "header_type": "類型",
+    "header_actions": "操作",
+    "snack_created": "備份建立成功",
+    "snack_full_created": "完整備份建立成功",
+    "snack_deleted": "備份刪除成功",
+    "snack_downloaded": "備份下載成功",
+    "restarting_countdown": "{seconds}秒後重新啟動...",
+    "restarting_message": "伺服器重新啟動中...請稍候。",
+    "snack_load_failed": "Failed to load backups",
+    "snack_create_failed": "Failed to create backup",
+    "snack_full_create_failed": "Failed to create full backup",
+    "snack_clean_failed": "Failed to clean backups",
+    "snack_download_failed": "Failed to download backup",
+    "snack_delete_failed": "Failed to delete backup",
+    "snack_restore_failed": "Failed to restore backup"
+  }
+}

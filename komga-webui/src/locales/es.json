@@ -1,0 +1,1234 @@
+{
+  "$vuetify": {
+    "dataFooter": {
+      "pageText": "{0}-{1} de {2}"
+    },
+    "dataIterator": {
+      "loadingText": "Cargando elementos...",
+      "noResultsText": "No se encontraron registros coincidentes"
+    },
+    "dataTable": {
+      "itemsPerPageText": "Filas por página:",
+      "sortBy": "Ordenar por"
+    },
+    "fileInput": {
+      "counter": "{0} archivos",
+      "counterSize": "{0} archivos ({1} en total)"
+    },
+    "noDataText": "No hay datos disponibles"
+  },
+  "account_settings": {
+    "account_settings": "Ajustes de cuenta",
+    "api_key": {
+      "created_date": "Fecha de creación: {date}",
+      "force_kobo_sync": "Forzar sinc. Kobo",
+      "generate_api_key": "Generar clave API",
+      "no_keys": "Aún no se han creado claves API"
+    },
+    "change_password": "cambiar contraseña",
+    "details": "Detalles",
+    "my_account": "Mi cuenta"
+  },
+  "announcements": {
+    "mark_all_read": "Marcar todo como leído",
+    "mark_read": "Marcar como leído",
+    "tab_title": "Anuncios"
+  },
+  "authentication_activity": {
+    "api_key": "Clave API",
+    "datetime": "Fecha y hora",
+    "email": "Correo electrónico",
+    "error": "Error",
+    "ip": "IP",
+    "source": "Fuente",
+    "success": "Éxito",
+    "user_agent": "Agente de usuario"
+  },
+  "author_roles": {
+    "colorist": "coloristas",
+    "cover": "cubierta",
+    "editor": "editores",
+    "inker": "entintadores",
+    "letterer": "letristas",
+    "penciller": "dibujantes",
+    "translator": "traductores",
+    "writer": "escritores"
+  },
+  "book_card": {
+    "error": "Error",
+    "no_release_date": "Sin fecha de publicación",
+    "unknown": "Análisis pendiente",
+    "unread": "No leído",
+    "unsupported": "No soportado"
+  },
+  "book_import": {
+    "button_browse": "Examinar",
+    "button_import": "Importar",
+    "button_scan": "Escanear",
+    "button_select_series": "Seleccionar serie",
+    "field_import_path": "Importar desde carpeta",
+    "info_part1": "Esta pantalla te permitirá importar archivos que están fuera de tus bibliotecas existentes. Solo se pueden importar archivos a series ya existentes, en cuyo caso Komga moverá o copiará los archivos hacia el directorio de la serie seleccionada.",
+    "info_part2": "Si eliges un número para un libro y ya existe un libro con ese número, podrás comparar los 2 libros. Si decides importar el libro, Komga actualizará el libro existente con el nuevo, efectivamente reemplazando el archivo antiguo por el nuevo.",
+    "no_files_found": "No se encontraron archivos",
+    "notification": {
+      "go_to_book": "Ir a libro",
+      "import_failure": "Error al importar libro: {file}",
+      "import_successful": "Libro importado correctamente: {book}",
+      "source_file": "Archivo fuente: {file}"
+    },
+    "row": {
+      "error_analyze_first": "El libro necesita ser analizado primero",
+      "error_choose_series": "Seleccione una serie",
+      "error_only_import_no_errors": "Solo es posible importar libros sin errores",
+      "warning_upgrade": "El libro existente será actualizado"
+    },
+    "table": {
+      "destination_name": "Nombre de destino",
+      "file_name": "Nombre de archivo",
+      "number": "Número",
+      "series": "Serie"
+    },
+    "title": "Importar",
+    "try_another_directory": "Intenta buscar en otro directorio"
+  },
+  "bookreader": {
+    "beginning_of_book": "Está al principio del libro.",
+    "changing_reading_direction": "Cambiando dirección de lectura a",
+    "cycling_page_layout": "Alternando disposición de página",
+    "cycling_page_margin": "Alternando margen de página",
+    "cycling_scale": "Alternando escalado",
+    "cycling_side_padding": "Alternando espaciado lateral",
+    "download_current_page": "Descargar página actual",
+    "end_of_book": "Ha llegado al final del libro.",
+    "from_series_metadata": "desde metadatos de la serie",
+    "move_next": "Haga clic o presione en «Siguiente» de nuevo para moverse al siguiente libro.",
+    "move_next_exit": "Haga clic o presione en «Siguiente» de nuevo para salir del lector.",
+    "move_previous": "Haga clic o presione en «Anterior» de nuevo para moverse al libro anterior.",
+    "notification_poster_set_book": "El póster del libro se ha establecido a la página actual.",
+    "notification_poster_set_readlist": "El póster de la lista de lectura se ha establecido a la página actual.",
+    "notification_poster_set_series": "El póster de la serie se ha establecido a la página actual.",
+    "paged_reader_layout": {
+      "double": "Doble página",
+      "double_no_cover": "Doble página (sin portada)",
+      "single": "Página única"
+    },
+    "reader_settings": "Ajustes del lector",
+    "scale_type": {
+      "continuous_original": "Original",
+      "continuous_width": "Ajustar al ancho",
+      "height": "Ajustar a la altura",
+      "original": "Original",
+      "screen": "Pantalla",
+      "width": "Ajustar al ancho",
+      "width_shrink_only": "Ajustar al ancho (solo encoger)"
+    },
+    "set_current_page_as_book_poster": "Usar página como póster del libro",
+    "set_current_page_as_readlist_poster": "Usar página como póster de la lista de lectura",
+    "set_current_page_as_series_poster": "Usar página como póster de la serie",
+    "settings": {
+      "always_fullscreen": "Siempre en pantalla completa",
+      "animate_page_transitions": "Animar las transiciones de página",
+      "background_color": "Color de fondo",
+      "background_colors": {
+        "black": "Negro",
+        "gray": "Gris",
+        "white": "Blanco"
+      },
+      "display": "Visualización",
+      "general": "General",
+      "gestures": "Gestos",
+      "page_layout": "Disposición de página",
+      "page_margin": "Margen de página",
+      "paged": "Opciones de paginado del lector",
+      "reading_mode": "Modo de lectura",
+      "scale_type": "Tipo de escalado",
+      "side_padding": "Espaciado lateral",
+      "side_padding_none": "Ninguno",
+      "webtoon": "Opciones del lector de webtoon"
+    },
+    "shortcuts": {
+      "close": "Cerrar",
+      "cycle_page_layout": "Alternar disposición de página",
+      "cycle_page_margin": "Alternar margen de página",
+      "cycle_scale": "Alternar escalado",
+      "cycle_side_padding": "Alternar espaciado lateral",
+      "first_page": "Primera página",
+      "fullscreen": "Entrar/salir de pantalla completa",
+      "last_page": "Última página",
+      "left_to_right": "Izquierda a derecha",
+      "menus": "Menús",
+      "next_page": "Página siguiente",
+      "previous_page": "Página anterior",
+      "reader_navigation": "Navegación del lector",
+      "right_to_left": "Derecha a izquierda",
+      "settings": "Ajustes",
+      "show_hide_help": "Mostrar/ocultar ayuda",
+      "show_hide_settings": "Mostrar/ocultar menú de ajustes",
+      "show_hide_thumbnails": "Mostrar/ocultar explorador de miniaturas",
+      "show_hide_toolbars": "Mostrar/ocultar barras de herramientas",
+      "vertical": "Vertical",
+      "webtoon": "Webtoon"
+    },
+    "tooltip_incognito": "El progreso de lectura no se guardará"
+  },
+  "browse_book": {
+    "comment": "COMENTARIO",
+    "date_created": "CREADO",
+    "date_modified": "ÚLTIMA MODIFICACIÓN",
+    "download_file": "Descargar archivo",
+    "file": "ARCHIVO",
+    "format": "FORMATO",
+    "isbn": "ISBN",
+    "links": "ENLACES",
+    "navigation_within_readlist": "Navegación en la lista de lectura: {name}",
+    "outdated_tooltip": "El archivo de este libro ha cambiado, este libro debe volver a analizarse",
+    "read_book": "Leer libro",
+    "read_incognito": "Leer privadamente",
+    "remove_from_collection": "Remover libro de la colección",
+    "remove_from_readlist": "Remover libro de la lista de lectura",
+    "size": "TAMAÑO"
+  },
+  "browse_collection": {
+    "edit_collection": "Editar colección",
+    "edit_elements": "Editar elementos",
+    "manual_ordering": "orden manual"
+  },
+  "browse_readlist": {
+    "edit_elements": "Editar elementos",
+    "edit_readlist": "Editar lista de lectura",
+    "manual_ordering": "ordenación manual"
+  },
+  "browse_series": {
+    "earliest_year_from_release_dates": "Este es el año más antiguo de las fechas de publicación de todos los libros de la serie",
+    "remove_from_collection": "Remover serie de la colección",
+    "series_no_summary": "Esta serie no tiene resumen, ¡así que escogimos uno por usted!",
+    "summary_from_book": "Resumen del libro {number}:"
+  },
+  "collections_expansion_panel": {
+    "manage_collection": "Administrar colección",
+    "title": "Colección {name}"
+  },
+  "common": {
+    "age": "Edad",
+    "all_libraries": "Todas las bibliotecas",
+    "all_of": "Todo de",
+    "any_of": "Cualquiera de",
+    "book": "Libro",
+    "books": "Libros",
+    "books_n": "Sin libros | 1 libro | {count} libros",
+    "books_total": "{count} / {total} libros",
+    "cancel": "Cancelar",
+    "cbx": "Archivos de cómic",
+    "choose_image": "Elegir una imagen",
+    "close": "Cerrar",
+    "collections": "Colecciones",
+    "copied": "¡Copiado!",
+    "create": "Crear",
+    "delete": "Eliminar",
+    "dimension": "anch.: {width}, alt.: {height}",
+    "discard": "Descartar",
+    "disk_space": "Espacio en disco",
+    "dismiss": "Descartar",
+    "download": "Descargar",
+    "drag_drop": "arrastrar y soltar",
+    "duplicate": "Duplicado",
+    "email": "Correo electrónico",
+    "epub": "Epub",
+    "error": "Error",
+    "filename": "Nombre de archivo",
+    "filter_no_matches": "El filtro activo no tiene coincidencias",
+    "genre": "Género",
+    "go_to_collection": "Ir a la colección",
+    "go_to_library": "Ir a la biblioteca",
+    "go_to_readlist": "Ir a la lista de lectura",
+    "go_to_series": "Ir a la serie",
+    "i_understand": "Entiendo",
+    "library": "Biblioteca",
+    "locale_name": "Español",
+    "locale_rtl": "false",
+    "lock_all": "Bloquear todas",
+    "media": "Multimedia",
+    "more": "Más",
+    "n_selected": "{count} seleccionado(s)",
+    "nothing_to_show": "Nada que mostrar",
+    "ok": "OK",
+    "oneshot": "One-shot",
+    "outdated": "Desactualizado",
+    "page": "Página",
+    "page_number": "Número de página",
+    "pages": "páginas",
+    "pages_left": "No quedan páginas | Queda 1 página | Quedan {count} páginas",
+    "pages_n": "Sin páginas | 1 página | {count} páginas",
+    "password": "Contraseña",
+    "pdf": "PDF",
+    "pending_tasks": "Sin tareas pendientes | 1 tarea pendiente | {count} tareas pendientes",
+    "pinned_libraries": "Librerías ancladas",
+    "publisher": "Editorial",
+    "read": "Leer",
+    "read_on": "Leer la {date}",
+    "readlist": "Lista de lectura",
+    "readlists": "Listas de lectura",
+    "remember-me": "Recordarme",
+    "reorder": "Reordenar",
+    "required": "Requerido",
+    "reset_filters": "Reiniciar filtros",
+    "roles": "Funciones",
+    "save_changes": "Guardar cambios",
+    "series": "Serie | Series",
+    "settings": "Ajustes",
+    "sidecars": "Sidecars",
+    "tags": "Etiquetas",
+    "ui": "Interfaz de usuario",
+    "unavailable": "No disponible",
+    "unlock_all": "Desbloquear todas",
+    "url": "URL",
+    "use_filter_panel_to_change_filter": "Use el panel de filtros para cambiar el filtro activo",
+    "year": "año"
+  },
+  "dashboard": {
+    "keep_reading": "Seguir leyendo",
+    "on_deck": "En curso",
+    "recently_added_books": "Libros añadidos recientemente",
+    "recently_added_series": "Series añadidas recientemente",
+    "recently_read_books": "Libros leídos recientemente",
+    "recently_released_books": "Libros publicados recientemente",
+    "recently_updated_series": "Series actualizadas recientemente"
+  },
+  "data_import": {
+    "book_number": "Número de libro: {name}",
+    "book_series": "Serie: {name}",
+    "button_import": "Importar",
+    "button_match": "Emparejar",
+    "comicrack_preambule_html": "Puedes importar listas de lectura de ComicRack en formato <code>.cbl</code>.<br>Komga intentará hacer coincidir las series y los número de libros proporcionados con las series y libros en tus bibliotecas.",
+    "dialog_confirmation": {
+      "body": "{unmatched} / {total} libros no emparejados",
+      "body2": "{duplicates} / {total} libros están duplicados",
+      "create": "Crear de todos modos",
+      "title": "Algunos libros no están emparejados"
+    },
+    "field_file_label": "Lista de lectura de ComicRack (.cbl)",
+    "field_files_label": "Listas de lectura de ComicRack (.cbl)",
+    "import_read_lists": "Importar listas de lectura",
+    "imported_as": "Importado como {name}",
+    "readlist_created": "Lista de lectura creada: {name}",
+    "requested_number": "Número solicitado",
+    "requested_series": "Serie solicitada",
+    "results_preambule": "El resultado de la importación se muestra abajo. También puede comprobar los libros sin emparejar para cada archivo proporcionado.",
+    "size_limit": "El tamaño debe ser menor a {size} MB",
+    "tab_title": "Importación de datos"
+  },
+  "dialog": {
+    "add_api_key": {
+      "button_confirm": "Generar",
+      "context": "Las claves API se pueden utilizar para autenticarse a través del protocolo Kobo Sync.",
+      "dialog_title": "Generar nueva clave API",
+      "field_comment": "Comentario",
+      "field_comment_hint": "¿Para qué es esta clave API?",
+      "info_copy": "Asegúrate de copiar tu clave API ahora. ¡No podrás verla de nuevo!"
+    },
+    "add_to_collection": {
+      "button_create": "Crear",
+      "card_collection_subtitle": "Sin series | 1 serie | {count} series",
+      "dialog_title": "Añadir a colección",
+      "field_search_create": "Buscar o crear una colección",
+      "field_search_create_error": "Ya existe una colección con este nombre",
+      "label_no_matching_collection": "Ninguna colección coincide"
+    },
+    "add_to_readlist": {
+      "button_create": "Crear",
+      "card_readlist_subtitle": "Sin libros | 1 libro | {count} libros",
+      "dialog_title": "Añadir a lista de lectura",
+      "field_search_create": "Buscar o crear una lista de lectura",
+      "field_search_create_error": "Ya existe una lista de lectura con este nombre",
+      "label_no_matching_readlist": "Ninguna lista de lectura coincide"
+    },
+    "add_user": {
+      "button_cancel": "Cancelar",
+      "button_confirm": "Agregar",
+      "dialog_title": "Añadir usuario",
+      "field_email": "Correo electrónico",
+      "field_email_error": "Debe ser una dirección de correo electrónico válida",
+      "field_password": "Contraseña"
+    },
+    "analyze_library": {
+      "body": "Analiza todos los archivos multimedia en la biblioteca. El análisis obtiene información sobre los medios. Dependiendo del tamaño de su biblioteca, esto podría tomar mucho tiempo.",
+      "button_confirm": "Analizar",
+      "title": "Analizar biblioteca"
+    },
+    "book_picker": {
+      "filter": "Filtrar por número de libro, título o fecha de publicación",
+      "title": "Seleccionar un libro"
+    },
+    "delete_apikey": {
+      "button_confirm": "Eliminar",
+      "confirm_delete": "Entiendo, eliminar la clave API «{name}»",
+      "dialog_title": "Eliminar clave API",
+      "warning_html": "Cualquier aplicación o script que use esta clave API no podrá acceder más a la API de Komga. No puedes deshacer esta acción."
+    },
+    "delete_book": {
+      "button_confirm": "Borrar",
+      "confirm_delete": "Sí, borrar el libro «{name}» y sus archivos",
+      "confirm_delete_multiple": "Sí, borrar {count} libros y sus archivos",
+      "dialog_title": "Borrar libro",
+      "dialog_title_multiple": "Borrar libros",
+      "warning_html": "El libro <b>{name}</b> será eliminado de este servidor junto con todos los archivos almacenados. Esto <b>no</b> se puede deshacer. ¿Continuar?",
+      "warning_multiple_html": "{count} libros serán eliminados de este servidor junto con sus archivos almacenados. Esto <b>no</b> se puede deshacer. ¿Continuar?"
+    },
+    "delete_collection": {
+      "button_confirm": "Eliminar",
+      "confirm_delete": "Sí, eliminar la colección «{name}»",
+      "confirm_delete_multiple": "Sí, eliminar {count} colecciones",
+      "dialog_title": "Eliminar colección",
+      "dialog_title_multiple": "Eliminar colecciones",
+      "warning_html": "La colección <b>{name}</b> será removida de este servidor. Sus archivos no serán afectados. Esto <b>no</b> se puede deshacer. ¿Continuar?",
+      "warning_multiple_html": "{count} colecciones serán removidas de este servidor. Sus archivos no serán afectados. Esto <b>no</b> se puede deshacer. ¿Continuar?"
+    },
+    "delete_library": {
+      "button_confirm": "Eliminar",
+      "confirm_delete": "Sí, eliminar la biblioteca «{name}»",
+      "title": "Eliminar biblioteca",
+      "warning_html": "La biblioteca <b>{name}</b> será removida de este servidor. Sus archivos no serán afectados. Esto <b>no</b> se puede deshacer. ¿Continuar?"
+    },
+    "delete_readlist": {
+      "button_confirm": "Eliminar",
+      "confirm_delete": "Sí, eliminar la lista de lectura «{name}»",
+      "confirm_delete_multiple": "Sí, eliminar {count} listas de lectura",
+      "dialog_title": "Eliminar lista de lectura",
+      "dialog_title_multiple": "Eliminar listas de lectura",
+      "warning_html": "La lista de lectura <b>{name}</b> será removida de este servidor. Sus archivos no serán afectados. Esto <b>no</b> se puede deshacer. ¿Continuar?",
+      "warning_multiple_html": "{count} listas de lectura serán removidas de este servidor. Sus archivos no serán afectados. Esto <b>no</b> se puede deshacer. ¿Continuar?"
+    },
+    "delete_series": {
+      "button_confirm": "Borrar",
+      "confirm_delete": "Sí, borrar la serie «{name}» y sus archivos",
+      "confirm_delete_multiple": "Sí, borrar {count} series y sus archivos",
+      "dialog_title": "Borrar serie(s)",
+      "warning_html": "La serie <b>{name}</b> será removida de este servidor junto con sus archivos almacenados. Esto <b>no</b> se puede deshacer. ¿Continuar?",
+      "warning_multiple_html": "{count} series serán removidas de este servidor junto con sus archivos almacenados. Esto <b>no</b> se puede deshacer. ¿Continuar?"
+    },
+    "delete_user": {
+      "button_confirm": "Eliminar",
+      "confirm_delete": "Sí, eliminar el usuario «{name}»",
+      "dialog_title": "Eliminar usuario",
+      "warning_html": "El usuario <b>{name}</b> será eliminado de este servidor. Esto <b>no</b> se puede deshacer. ¿Continuar?"
+    },
+    "edit_books": {
+      "add_author_role_error_duplicate": "Ya existe",
+      "authors_notice_multiple_edit": "Estás editando los autores de varios libros. Esto sobrescribirá los autores ya existentes de cada libro.",
+      "button_cancel": "Cancelar",
+      "button_confirm": "Guardar cambios",
+      "copy_from": "Copiar desde {field}",
+      "dialog_title_multiple": "Editar {count} libro | Editar {count} libros",
+      "dialog_title_single": "Editar {book}",
+      "field_alternate_title": "Título alternativo",
+      "field_isbn": "ISBN",
+      "field_isbn_error": "Debe ser un código ISBN 13 válido",
+      "field_link_label": "Rótulo",
+      "field_link_url": "URL",
+      "field_link_url_error_protocol": "Debe ser http o https",
+      "field_link_url_error_url": "Debe ser una URL válida",
+      "field_number": "Número",
+      "field_number_sort": "Número de orden",
+      "field_number_sort_hint": "Puede utilizar números decimales",
+      "field_release_date": "Fecha de publicación",
+      "field_release_date_error": "Debe ser una fecha válida en formato AAAA-MM-DD",
+      "field_summary": "Resumen",
+      "field_tags": "Etiquetas",
+      "field_title": "Título",
+      "number_sort_decrement": "Disminuir todo en 1",
+      "number_sort_increment": "Incrementar todo en 1",
+      "tab_authors": "Autores",
+      "tab_general": "General",
+      "tab_links": "Enlaces",
+      "tab_poster": "Póster",
+      "tab_tags": "Etiquetas",
+      "tags_notice_multiple_edit": "Estás editando las etiquetas de varios libros. Esto sobrescribirá las etiquetas ya existentes de cada libro."
+    },
+    "edit_collection": {
+      "button_cancel": "Cancelar",
+      "button_confirm": "Guardar cambios",
+      "dialog_title": "Editar colección",
+      "field_manual_ordering": "Orden manual",
+      "label_ordering": "Por defecto, las series de una colección se ordenan por nombre. Puedes habilitar el orden manual para definir tu propio orden.",
+      "tab_general": "General",
+      "tab_poster": "Póster"
+    },
+    "edit_library": {
+      "button_browse": "Explorar",
+      "button_cancel": "Cancelar",
+      "button_confirm_add": "Agregar",
+      "button_confirm_edit": "Editar",
+      "button_next": "Siguiente",
+      "dialog_title_add": "Agregar biblioteca",
+      "dialot_title_edit": "Editar biblioteca",
+      "field_analysis_analyze_dimensions": "Analizar la dimensión de las páginas",
+      "field_analysis_hash_files": "Calcular hash de los archivos",
+      "field_analysis_hash_koreader": "Calcular hash de archivos para KOReader",
+      "field_analysis_hash_pages": "Calcular hash de las páginas",
+      "field_convert_to_cbz": "Automáticamente convertir a CBZ",
+      "field_import_barcode_isbn": "Código de barras ISBN",
+      "field_import_comicinfo_book": "Metadatos de libro",
+      "field_import_comicinfo_collections": "Colecciones",
+      "field_import_comicinfo_readlists": "Listas de lectura",
+      "field_import_comicinfo_series": "Metadatos de serie",
+      "field_import_comicinfo_series_append_volume": "Añadir volumen al título de la serie",
+      "field_import_epub_book": "Metadatos de libro",
+      "field_import_epub_series": "Metadatos de serie",
+      "field_import_local_artwork": "Ilustración local",
+      "field_import_mylar_series": "Metadatos de serie",
+      "field_name": "Nombre",
+      "field_oneshotsdirectory": "Directorio de one-shots",
+      "field_repair_extensions": "Reparar automáticamente las extensiones de archivo incorrectas",
+      "field_root_folder": "Carpeta raíz",
+      "field_scan_interval": "Intervalo de escaneo",
+      "field_scanner_empty_trash_after_scan": "Vaciar papelera automáticamente luego de cada escaneo",
+      "field_scanner_force_directory_modified_time": "Forzar fecha de modificación de los directorios",
+      "field_scanner_scan_startup": "Escanear al iniciar",
+      "field_series_cover": "Portada de las series",
+      "file_browser_dialog_button_confirm": "Elegir",
+      "file_browser_dialog_title": "Directorio raíz de la biblioteca",
+      "label_analysis": "Análisis",
+      "label_file_management": "Administración de archivos",
+      "label_import_barcode_isbn": "Importar ISBN desde el código de barras",
+      "label_import_comicinfo": "Importar metadatos para archivos CBR/CBZ que contengan un archivo ComicInfo.xml",
+      "label_import_epub": "Importar metadatos desde archivos EPUB",
+      "label_import_local": "Importar recursos multimedia locales",
+      "label_import_mylar": "Importar metadatos generados por Mylar",
+      "label_scan_directory_exclusions": "Exclusiones de directorios",
+      "label_scan_types": "Escanear por estos tipos de archivo",
+      "label_scanner": "Escáner",
+      "label_series_cover": "Portada de serie",
+      "tab_general": "General",
+      "tab_metadata": "Metadatos",
+      "tab_options": "Opciones",
+      "tooltip_oneshotsdirectory": "Dejar vacío para deshabilitar",
+      "tooltip_scanner_force_modified_time": "Habilitar si la biblioteca está en Google Drive",
+      "tooltip_use_resources": "Puede consumir muchos recursos en bibliotecas grandes o hardware lento"
+    },
+    "edit_readlist": {
+      "button_cancel": "Cancelar",
+      "button_confirm": "Guardar cambios",
+      "dialog_title": "Modificar lista de lectura",
+      "field_manual_ordering": "Orden manual",
+      "field_name": "Nombre",
+      "field_summary": "Resumen",
+      "label_ordering": "Por defecto, los libros de una lista de lectura se ordenan manualmente. Puedes desactivar la ordenación manual para ordenar los libros por fecha de publicación.",
+      "tab_general": "General",
+      "tab_poster": "Póster"
+    },
+    "edit_recommended": {
+      "button_confirm": "Guardar cambios",
+      "button_reset": "Reiniciar al valor por defecto",
+      "dialog_title": "Editar visualización de recomendados"
+    },
+    "edit_series": {
+      "button_cancel": "Cancelar",
+      "button_confirm": "Guardar cambios",
+      "dialog_title_multiple": "Editar {count} serie | Editar {count} series",
+      "dialog_title_single": "Editar {series}",
+      "field_age_rating": "Clasificación de edad",
+      "field_age_rating_error": "La clasificación de edad debe ser 0 o más",
+      "field_genres": "Géneros",
+      "field_labels": "Rótulos",
+      "field_language": "Idioma",
+      "field_language_hint": "Etiqueta de idioma IETF BCP 47",
+      "field_publisher": "Editorial",
+      "field_reading_direction": "Dirección de lectura",
+      "field_sort_title": "Título para el orden",
+      "field_status": "Estado",
+      "field_summary": "Resumen",
+      "field_tags": "Etiquetas",
+      "field_title": "Título",
+      "field_total_book_count": "Cantidad total de libros",
+      "field_total_book_count_error": "La cantidad total de libros debe ser 1 o más",
+      "mixed": "MIXTO",
+      "tab_general": "General",
+      "tab_poster": "Póster",
+      "tab_sharing": "Compartiendo",
+      "tab_tags": "Etiquetas",
+      "tab_titles": "Títulos alternativos",
+      "tags_notice_multiple_edit": "Estás editando las etiquetas de varias series. Esto sobrescribirá las etiquetas ya existentes de cada serie."
+    },
+    "edit_user": {
+      "button_cancel": "Cancelar",
+      "button_confirm": "Guardar cambios",
+      "dialog_title": "Editar usuario",
+      "label_roles_for": "Funciones para {name}"
+    },
+    "edit_user_restrictions": {
+      "age_restriction": {
+        "allow_under": "Permitir solo para menores de",
+        "exclude_over": "Excluir para mayores de",
+        "none": "Sin restricción"
+      },
+      "edit_restrictions_for": "Editar restricciones para {name}",
+      "label_age_restriction": "Restricción de edad",
+      "label_allow_only_labels": "Permitir solo los rótulos",
+      "label_exclude_labels": "Excluir los rótulos",
+      "tab_content_restrictions": "Restricciones de contenido",
+      "tab_shared_libraries": "Bibliotecas compartidas"
+    },
+    "empty_trash": {
+      "body": "Por defecto, el servidor de medios no elimina la información de los medios de inmediato. Esto ayuda si una unidad se desconecta temporalmente. Cuando vacía la papelera de una biblioteca, toda la información de medios faltantes es eliminada.",
+      "button_confirm": "Vaciar",
+      "title": "Vaciar la papelera de la biblioteca"
+    },
+    "file_browser": {
+      "button_cancel": "Cancelar",
+      "button_confirm_default": "Elegir",
+      "dialog_title_default": "Explorador de archivos",
+      "parent_directory": "Directorio superior"
+    },
+    "filename_chooser": {
+      "button_choose": "Seleccionar",
+      "field_destination_filename": "Nombre de archivo destino",
+      "label_source_filename": "Nombre del archivo fuente",
+      "table": {
+        "existing_file": "Archivo existente",
+        "order": "Ordenar"
+      },
+      "title": "Nombre de archivo destino"
+    },
+    "force_kobo_sync": {
+      "dialog_title": "Forzar sinc. Kobo",
+      "warning_html": "Esto eliminará todo el historial de sincronización para esta clave API. Tu Kobo sincronizará todo en la próxima sincronización."
+    },
+    "password_change": {
+      "button_cancel": "Cancelar",
+      "button_confirm": "Cambiar contraseña",
+      "dialog_title": "Cambiar contraseña",
+      "field_new_password": "Nueva contraseña",
+      "field_new_password_error": "Se requiere una nueva contraseña.",
+      "field_repeat_password": "Repetir nueva contraseña",
+      "field_repeat_password_error": "Las contraseñas deben ser idénticas."
+    },
+    "refresh_library_metadata": {
+      "body": "Actualiza los metadatos de todos los archivos multimedia en la biblioteca. Dependiendo del tamaño de su biblioteca, esto podría tomar mucho tiempo.",
+      "button_confirm": "Actualizar",
+      "title": "Actualizar metadatos para la biblioteca"
+    },
+    "series_picker": {
+      "label_search_series": "Buscar serie",
+      "no_results": "No se han encontrado series",
+      "title": "Seleccionar serie"
+    },
+    "server_stop": {
+      "button_confirm": "Detener",
+      "confirmation_message": "¿Está seguro de que quiere detener Komga?",
+      "dialog_title": "Apagar servidor"
+    },
+    "shortcut_help": {
+      "label_description": "Descripción",
+      "label_key": "Tecla"
+    },
+    "transient_book_details": {
+      "label_candidate": "Candidato",
+      "label_existing": "Existente",
+      "label_format": "Formato",
+      "label_name": "Nombre",
+      "label_pages": "Páginas",
+      "label_size": "Tamaño",
+      "pages_table": {
+        "filename": "Nombre de archivo",
+        "height": "Alto",
+        "index": "Índice",
+        "media_type": "Tipo de medio",
+        "size": "Tamaño",
+        "width": "Ancho"
+      },
+      "title": "Detalles del libro",
+      "title_comparison": "Comparación de libro"
+    },
+    "transient_book_viewer": {
+      "label_candidate": "Candidato",
+      "label_existing": "Existente",
+      "page_of_pages": "{page} / {pages}",
+      "title": "Inspeccionar libro",
+      "title_comparison": "Comparación de libro"
+    }
+  },
+  "duplicate_pages": {
+    "action_auto_delete_remaining": "Borrar automáticamente los restantes ({count})",
+    "action_delete_auto": "Borrado automático",
+    "action_delete_manual": "Borrado manual",
+    "action_delete_matches": "Borrar coincidencias",
+    "action_ignore": "Ignorar",
+    "action_ignore_remaining": "Ignorar restantes ({count})",
+    "action_manual_delete_remaining": "Borrar manualmente los restantes ({count})",
+    "confirm_auto_delete_remaining": "Todos los hashes de página restantes de esta página ({count}) serán marcados para su borrado automático.",
+    "confirm_manual_delete_remaining": "Todos los hashes de página restantes de esta página ({count}) serán marcados para su borrado manual.",
+    "delete_to_save": "Borrar para recuperar {size}",
+    "deleted_count": "Borrado {count} veces",
+    "empty_title": "No se encontraron páginas duplicadas",
+    "empty_title_known": "Sin duplicados",
+    "filter": {
+      "count": "Cantidad",
+      "date_added": "Fecha en que se añadió",
+      "date_modified": "Fecha de modificación",
+      "delete_count": "Cantidad de borrados",
+      "delete_size": "Espacio recuperado",
+      "match_count": "Cantidad de coincidencias",
+      "size": "Tamaño",
+      "total_size": "Tamaño total"
+    },
+    "info": "Borrar las páginas duplicadas modificará sus archivos. Respalde sus archivos y use el borrado manual antes de usar el borrado automático.",
+    "known": "Conocidas",
+    "matches_n": "Sin resultados | 1 resultado | {count} resultados",
+    "new": "Nuevas",
+    "saved_size": "Se recuperó {size}",
+    "title": "Páginas duplicadas",
+    "unknown_size": "Tamaño desconocido",
+    "action_remove_all": "Remove all from list",
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
+  },
+  "duplicates": {
+    "file_hash": "Hash del archivo",
+    "size": "Tamaño",
+    "title": "Archivos duplicados",
+    "url": "URL"
+  },
+  "enums": {
+    "copy_mode": {
+      "HARDLINK": "Crear enlace físico/Copiar archivos",
+      "MOVE": "Mover archivos"
+    },
+    "epubreader": {
+      "appearances": {
+        "day": "Día",
+        "night": "Noche",
+        "sepia": "Sepia"
+      },
+      "column_count": {
+        "auto": "Auto",
+        "one": "Uno",
+        "two": "Dos"
+      },
+      "reading_direction": {
+        "auto": "Automático",
+        "ltr": "Izquierda a derecha",
+        "rtl": "Derecha a izquierda"
+      }
+    },
+    "historical_event_type": {
+      "BookConverted": "Libro convertido",
+      "BookFileDeleted": "Archivo de libro eliminado",
+      "BookImported": "Libro importado",
+      "DuplicatePageDeleted": "Página duplicada eliminada",
+      "SeriesFolderDeleted": "Carpeta de serie eliminada"
+    },
+    "media_profile": {
+      "DIVINA": "DIVINA",
+      "EPUB": "EPUB",
+      "PDF": "PDF"
+    },
+    "media_status": {
+      "ERROR": "Error",
+      "OUTDATED": "Desactualizado",
+      "READY": "Listo",
+      "UNKNOWN": "Desconocido",
+      "UNSUPPORTED": "No soportado"
+    },
+    "page_hash_action": {
+      "DELETE_AUTO": "Borrado automático",
+      "DELETE_MANUAL": "Borrado manual",
+      "IGNORE": "Ignorar"
+    },
+    "reading_direction": {
+      "LEFT_TO_RIGHT": "Izquierda a derecha",
+      "RIGHT_TO_LEFT": "Derecha a izquierda",
+      "VERTICAL": "Vertical",
+      "WEBTOON": "Webtoon"
+    },
+    "scan_interval": {
+      "DAILY": "Diariamente",
+      "DISABLED": "Deshabilitado",
+      "EVERY_12H": "Cada 12 horas",
+      "EVERY_6H": "Cada 6 horas",
+      "HOURLY": "Cada hora",
+      "WEEKLY": "Semanalmente"
+    },
+    "series_cover": {
+      "FIRST": "El primero",
+      "FIRST_UNREAD_OR_FIRST": "El primero sin leer de lo contrario el primero",
+      "FIRST_UNREAD_OR_LAST": "El primero sin leer de lo contrario el último",
+      "LAST": "El último"
+    },
+    "series_status": {
+      "ABANDONED": "Abandonado",
+      "ENDED": "Finalizado",
+      "HIATUS": "Interrumpido",
+      "ONGOING": "En curso"
+    },
+    "thumbnail_size": {
+      "DEFAULT": "Por defecto (300px)",
+      "LARGE": "Grande (900px)",
+      "MEDIUM": "Mediano (600px)",
+      "XLARGE": "Extra grande (1200px)"
+    }
+  },
+  "epubreader": {
+    "current_chapter": "Capítulo actual",
+    "page_of": "Página {page} de {count}",
+    "publisher_font": "Editorial",
+    "settings": {
+      "column_count": "Número de columnas",
+      "font_family": "Fuente",
+      "layout": "Diseño",
+      "layout_paginated": "Paginado",
+      "layout_scroll": "Desplazarse",
+      "navigation_mode": "Modo de navegación",
+      "navigation_options": {
+        "both": "Ambos",
+        "buttons": "Botones",
+        "click": "Clic / Toque"
+      },
+      "page_margins": "Márgenes de la página",
+      "viewing_theme": "Tema de visualización"
+    },
+    "shortcuts": {
+      "cycle_pagination": "Alternar cantidad de columnas",
+      "cycle_viewing_theme": "Alternar tema de visualización",
+      "font_size_decrease": "Reducir el tamaño de la letra",
+      "font_size_increase": "Aumentar el tamaño de la letra",
+      "menus": "Menús",
+      "next": "Avanzar",
+      "previous": "Retroceder",
+      "reader_navigation": "Navegación del lector",
+      "scroll": "Cambiar el diseño para desplazarse",
+      "settings": "Ajustes",
+      "show_hide_toc": "Mostrar/ocultar índice de contenidos"
+    }
+  },
+  "error_codes": {
+    "ERR_1000": "No se pudo acceder al archivo durante el análisis",
+    "ERR_1001": "Tipo de medio no soportado",
+    "ERR_1002": "Archivos RAR encriptados no están soportados",
+    "ERR_1003": "Archivos RAR sólidos no están soportados",
+    "ERR_1004": "Archivos RAR multivolumen no están soportados",
+    "ERR_1005": "Error desconocido durante análisis de libro",
+    "ERR_1006": "El libro no contiene ninguna página",
+    "ERR_1007": "Algunas entradas no pudieron ser analizadas",
+    "ERR_1008": "Error desconocido al obtener las entradas del libro",
+    "ERR_1009": "Ya existe una lista de lectura con ese nombre",
+    "ERR_1015": "Error al deserializar ComicRack CBL",
+    "ERR_1016": "Directorio no accesible o no es un directorio",
+    "ERR_1017": "No se puede escanear una carpeta que es parte de una biblioteca existente",
+    "ERR_1018": "Archivo no encontrado",
+    "ERR_1019": "No se puede importar un archivo que es parte de una biblioteca existente",
+    "ERR_1020": "El libro a actualizar no pertenece a la serie proporcionada",
+    "ERR_1021": "El archivo de destino ya existe",
+    "ERR_1022": "No se ha podido escanear el libro recién importado",
+    "ERR_1023": "Libro ya presente en lista de lectura",
+    "ERR_1024": "Error de inicio de sesión OAuth2: sin atributo email",
+    "ERR_1025": "Error de inicio de sesión OAuth2: no existe usuario local con ese correo",
+    "ERR_1026": "Error de inicio de sesión de OpenID Connect: correo no verificado",
+    "ERR_1027": "Error de inicio de sesión de OpenID Connect: sin atributo email_verified",
+    "ERR_1028": "Error de inicio de sesión de OpenID Connect: sin atributo email",
+    "ERR_1029": "El ComicRack CBL no contiene ningún elemento Libro",
+    "ERR_1030": "El ComicRack CBL no tiene ningún elemento Nombre",
+    "ERR_1031": "Al libro del ComicRack CBL le falta la serie o el número",
+    "ERR_1032": "El archivo EPUB tiene un tipo de medio incorrecto",
+    "ERR_1033": "Faltan algunos datos",
+    "ERR_1034": "Una clave API con ese comentario ya existe",
+    "ERR_1035": "Error al obtener el índice del EPUB",
+    "ERR_1036": "Error al obtener los puntos de referencia del EPUB",
+    "ERR_1037": "Error al obtener la lista de páginas del EPUB",
+    "ERR_1038": "Error al obtener las páginas divina del EPUB",
+    "ERR_1039": "Error al obtener las posiciones EPUB"
+  },
+  "filter": {
+    "age_rating": "clasificación de edad",
+    "age_rating_none": "Ninguna",
+    "any": "Cualquiera",
+    "complete": "Completado",
+    "genre": "género",
+    "in_progress": "En progreso",
+    "language": "idioma",
+    "library": "biblioteca",
+    "media_profile": "Perfil multimedia",
+    "media_status": "Estado multimedia",
+    "oneshot": "One-shot",
+    "publisher": "editorial",
+    "read": "Leído",
+    "release_date": "fecha de publicación",
+    "sharing_label": "Rótulo de compartido",
+    "status": "estado",
+    "tag": "etiqueta",
+    "unread": "Sin leer"
+  },
+  "filter_drawer": {
+    "filter": "filtro",
+    "sort": "orden"
+  },
+  "history": {
+    "header": {
+      "book": "Libro",
+      "date": "Fecha",
+      "details": "Detalles",
+      "series": "Serie",
+      "type": "Tipo"
+    },
+    "title": "Historial"
+  },
+  "home": {
+    "theme": "Tema",
+    "translation": "Traducción"
+  },
+  "library_navigation": {
+    "browse": "Explorar",
+    "browse_books": "Libros",
+    "browse_series": "Series",
+    "collections": "Colecciones",
+    "readlists": "Listas de lectura",
+    "recommended": "Recomendado"
+  },
+  "login": {
+    "create_user_account": "Crear cuenta de usuario",
+    "login": "Iniciar sesión",
+    "unclaimed_html": "Este servidor Komga no está activo aún, debes crear una cuenta de usuario para poder acceder a él.<br><br>Escoge un <strong>correo electrónico</strong> y una <strong>contraseña</strong>, y haz clic en <strong>Crear cuenta de usuario</strong>.",
+    "browse_as_guest": "Browse as guest"
+  },
+  "media_analysis": {
+    "comment": "Comentario",
+    "media_analysis": "Análisis de medios",
+    "media_type": "Tipo de medio",
+    "name": "Nombre",
+    "size": "Tamaño",
+    "status": "Estado",
+    "url": "URL"
+  },
+  "menu": {
+    "add_to_collection": "Añadir a colección",
+    "add_to_readlist": "Añadir a lista de lectura",
+    "analyze": "Analizar",
+    "bulk_edit_metadata": "Editar metadatos en masa",
+    "delete": "Eliminar",
+    "deselect_all": "Deseleccionar todo",
+    "download_readlist": "Descargar lista de lectura",
+    "download_series": "Descargar serie",
+    "edit": "Editar",
+    "edit_metadata": "Editar metadatos",
+    "empty_trash": "Vaciar papelera",
+    "mark_read": "Marcar como leído",
+    "mark_unread": "Marcar como no leído",
+    "pin": "Anclar",
+    "refresh_metadata": "Actualizar metadatos",
+    "scan_library_files": "Escanear los archivos de la biblioteca",
+    "scan_library_files_deep": "Escanear los archivos de la biblioteca (en profundidad)",
+    "select_all": "Seleccionar todo",
+    "unpin": "Desanclar"
+  },
+  "metrics": {
+    "library_books": "Libros por biblioteca",
+    "library_disk_space": "Espacio en disco por biblioteca",
+    "library_series": "Series por biblioteca",
+    "library_sidecars": "Sidecars por biblioteca",
+    "tasks_executed": "Tareas ejecutadas",
+    "tasks_total_time": "Tiempo total de tareas",
+    "title": "Métricas"
+  },
+  "missing_posters": {
+    "title": "Faltan pósters"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "libraries": "Bibliotecas",
+    "logout": "Cerrar sesión"
+  },
+  "no_libraries_pinned": {
+    "subtitle": "Puedes anclar una librería desde el menú de 3 puntos",
+    "title": "No hay librerías ancladas"
+  },
+  "page_not_found": {
+    "go_back_to_home_page": "Volver a la página principal",
+    "page_does_not_exist": "La página que buscas no existe.",
+    "page_not_found": "Página no encontrada"
+  },
+  "read_more": {
+    "less": "Leer menos",
+    "more": "Leer más"
+  },
+  "readlist_import": {
+    "row": {
+      "duplicate_book": "Libro duplicado",
+      "error_choose_book": "Elige un libro"
+    }
+  },
+  "readlists_expansion_panel": {
+    "manage_readlist": "Administrar lista de lectura",
+    "title": "Lista de lectura {name}"
+  },
+  "search": {
+    "no_results": "La búsqueda no arrojó resultados",
+    "search": "Buscar",
+    "search_for_something_else": "Intente buscar otra cosa",
+    "search_results_for": "Resultados de búsqueda para «{name}»"
+  },
+  "searchbox": {
+    "in_library": "en {library}",
+    "no_results": "Sin resultados",
+    "search_all": "Buscar todo…"
+  },
+  "server": {
+    "server_management": {
+      "button_cancel_all_tasks": "Cancelar todas las tareas",
+      "button_empty_trash": "Vaciar la papelera de todas las bibliotecas",
+      "button_scan_libraries": "Escanear todas las bibliotecas",
+      "button_scan_libraries_deep": "Escanear todas las bibliotecas (en profundidad)",
+      "button_shutdown": "Apagar",
+      "download_log": "Descargar archivo de registros",
+      "notification_tasks_cancelled": "No hay tareas para cancelar | Una tarea cancelada | {count} tareas canceladas",
+      "section_title": "Administración del servidor"
+    },
+    "tab_title": "Servidor",
+    "updates": "Actualizaciones"
+  },
+  "server_settings": {
+    "config_precedence": "Tiene prioridad sobre el archivo de configuración",
+    "dialog_regenerate_thumbnails": {
+      "body": "El tamaño de las miniaturas ha cambiado. ¿Quiere regenerar las miniaturas de los libros?",
+      "btn_alternate": "Sí, todos los libros",
+      "btn_cancel": "No",
+      "btn_confirm": "Sí, pero solo si son más grandes",
+      "title": "Regenerar miniaturas"
+    },
+    "hint_kobo_port": "Establecer solo en caso de problemas de sincronización con carátulas y descargas",
+    "label_delete_empty_collections": "Eliminar las colecciones vacías después de escanear",
+    "label_delete_empty_readlists": "Eliminar las listas de lectura vacías después de escanear",
+    "label_kepubify_path": "Ruta a kepubify",
+    "label_kobo_port": "Puerto externo Kobo Sync",
+    "label_kobo_proxy": "Hacer proxy a las solicitudes Kobo Sync hacia Kobo Store",
+    "label_rememberme_duration": "Duración de «recordarme» (en días)",
+    "label_server_context_path": "URL base",
+    "label_server_port": "Puerto del servidor",
+    "label_task_pool_size": "Hilos de tareas",
+    "label_thumbnail_size": "Tamaño de miniaturas",
+    "requires_restart": "Se necesita reiniciar para tener efecto",
+    "server_settings": "Ajustes del servidor"
+  },
+  "settings_user": {
+    "change_password": "Cambiar contraseña",
+    "edit_restrictions": "Editar restricciones",
+    "edit_user": "Editar usuario",
+    "latest_activity": "Última actividad: {date}",
+    "no_recent_activity": "Sin actividad reciente",
+    "role_administrator": "Administrador",
+    "role_user": "Usuario"
+  },
+  "sort": {
+    "books_count": "Cantidad de libros",
+    "date_added": "Fecha de adición",
+    "date_read": "Fecha de lectura",
+    "date_updated": "Fecha de actualización",
+    "file_name": "Nombre de archivo",
+    "file_size": "Tamaño de archivo",
+    "folder_name": "Nombre de carpeta",
+    "name": "Nombre",
+    "number": "Número",
+    "page_count": "Número de páginas",
+    "random": "Aleatorio",
+    "release_date": "Fecha de publicación",
+    "series": "Serie"
+  },
+  "theme": {
+    "dark": "Oscuro",
+    "light": "Claro",
+    "system": "Sistema"
+  },
+  "thumbnail_card": {
+    "tooltip_delete": "Eliminar",
+    "tooltip_generated": "Ilustración generada",
+    "tooltip_mark_as_selected": "Marcar como seleccionado",
+    "tooltip_selected": "Seleccionado",
+    "tooltip_sidecar": "Ilustración local",
+    "tooltip_to_be_deleted": "A eliminar",
+    "tooltip_to_be_uploaded": "A subir",
+    "tooltip_too_big": "¡Archivo muy grande!",
+    "tooltip_user_uploaded": "Subido por usuario"
+  },
+  "titles_more": {
+    "less": "Menos títulos",
+    "more": "Más títulos"
+  },
+  "ui_settings": {
+    "general": "General",
+    "label_oauth2_auto_login": "Inicio de sesión OAuth2 automático",
+    "label_oauth2_hide_login": "Ocultar los campos de inicio de sesión si OAuth2 está habilitado",
+    "label_poster_blur_unread": "Difuminar póster para los libros y series no leídos",
+    "label_poster_stretch": "Estirar póster para ajustarlo a la tarjeta",
+    "label_series_groups": "Agrupación de series",
+    "section_oauth2": "OAuth2",
+    "series_groups": {
+      "alpha": "Alfabéticamente",
+      "japanese": "Gojūon (Japonés)"
+    },
+    "tooltip_oauth2_auto_login": "Requiere un proveedor OAuth2 y habilitar «ocultar campos de inicio de sesión»"
+  },
+  "updates": {
+    "available": "Hay actualizaciones disponibles",
+    "latest_installed": "La última versión de Komga ya está instalada"
+  },
+  "user_roles": {
+    "ADMIN": "Administrador",
+    "FILE_DOWNLOAD": "Descarga de archivos",
+    "KOBO_SYNC": "Sincronizar con Kobo",
+    "KOREADER_SYNC": "Sincronizar con KOReader",
+    "PAGE_STREAMING": "Streaming de páginas",
+    "USER": "Usuario"
+  },
+  "users": {
+    "api_keys": "Claves API",
+    "authentication_activity": "Actividad de autenticación",
+    "users": "Usuarios"
+  },
+  "validation": {
+    "context_path": "Debe empezar con '/', no terminar con '/-_' y contener solo '/-_a-z0-9'",
+    "one_or_more": "Debe ser 1 o más",
+    "tcp_port": "Debe estar entre 1 y 65535",
+    "zero_or_more": "Debe ser 0 o más"
+  },
+  "welcome": {
+    "add_library": "Agregar biblioteca",
+    "no_libraries_yet": "¡Aún no has agregado bibliotecas!",
+    "welcome_message": "Bienvenido a Komga"
+  },
+  "download_manager": {
+    "title": "Gestor de descargas",
+    "subtitle": "Descargar manga de fuentes externas usando gallery-dl.",
+    "queue_title": "Cola de descargas",
+    "add_download": "Añadir descarga",
+    "clear": "Limpiar",
+    "clear_completed": "Limpiar completadas",
+    "clear_failed": "Limpiar fallidas",
+    "clear_cancelled": "Limpiar canceladas",
+    "clear_pending": "Limpiar pendientes",
+    "no_downloads": "No hay descargas en la cola. Añade una URL de manga con el botón de arriba.",
+    "unknown_title": "Desconocido",
+    "downloads_folder": "Carpeta de descargas",
+    "cancel": "Cancelar",
+    "retry": "Reintentar",
+    "view_error": "Ver error",
+    "delete": "Eliminar",
+    "close": "Cerrar",
+    "dialog_add_title": "Añadir descarga",
+    "dialog_add_info": "Introduce una URL de manga de sitios compatibles (ej: MangaDex). Asegúrate de que gallery-dl esté instalado.",
+    "field_url": "URL del manga",
+    "field_url_required": "La URL es obligatoria",
+    "field_title": "Título (Opcional)",
+    "field_title_hint": "Dejar vacío para detectar automáticamente",
+    "field_library": "Biblioteca de destino (Opcional)",
+    "field_library_hint": "Dejar vacío para carpeta de descargas",
+    "field_priority": "Prioridad",
+    "dialog_delete_title": "¿Eliminar descarga?",
+    "dialog_delete_confirm": "¿Estás seguro de que quieres eliminar:",
+    "dialog_delete_info": "Esto lo eliminará de la cola de descargas.",
+    "dialog_error_title": "Error de descarga",
+    "header_title": "Título",
+    "header_status": "Estado",
+    "header_progress": "Progreso",
+    "header_library": "Biblioteca",
+    "header_created": "Creado",
+    "header_actions": "Acciones",
+    "snack_added": "Descarga añadida a la cola",
+    "snack_cancelled": "Descarga cancelada",
+    "snack_retrying": "Reintentando descarga",
+    "snack_deleted": "Descarga eliminada",
+    "snack_load_failed": "Error al cargar descargas",
+    "snack_add_failed": "Error al añadir descarga",
+    "snack_cancel_failed": "Error al cancelar descarga",
+    "snack_retry_failed": "Error al reintentar descarga",
+    "snack_delete_failed": "Error al eliminar descarga",
+    "snack_clear_failed": "Error al limpiar descargas"
+  },
+  "plugin_manager": {
+    "title": "Gestión de plugins",
+    "subtitle": "Gestionar plugins de Komga para metadatos, descargas y más.",
+    "installed_plugins": "Plugins instalados",
+    "install_plugin": "Instalar plugin",
+    "no_plugins": "No hay plugins instalados. Instala tu primer plugin con el botón de arriba.",
+    "configure": "Configurar",
+    "view_logs": "Ver logs",
+    "uninstall": "Desinstalar",
+    "dialog_install_title": "Instalar plugin",
+    "dialog_install_info": "Sube un archivo JAR o proporciona una URL para instalar.",
+    "field_plugin_file": "Archivo de plugin (JAR)",
+    "field_plugin_url": "O URL del plugin",
+    "install": "Instalar",
+    "dialog_uninstall_title": "¿Desinstalar plugin?",
+    "dialog_uninstall_confirm": "¿Estás seguro de que quieres desinstalar:",
+    "dialog_uninstall_info": "Esta acción no se puede deshacer.",
+    "save": "Guardar",
+    "logs_title": "Logs",
+    "log_all": "Todos",
+    "log_debug": "Debug",
+    "log_info": "Info",
+    "log_warn": "Aviso",
+    "log_error": "Error",
+    "stack_trace": "Stack Trace",
+    "no_logs": "No se encontraron logs",
+    "header_name": "Nombre",
+    "header_version": "Versión",
+    "header_type": "Tipo",
+    "header_author": "Autor",
+    "header_enabled": "Activado",
+    "header_actions": "Acciones",
+    "snack_enabled": "Plugin activado",
+    "snack_disabled": "Plugin desactivado",
+    "snack_uninstalled": "Plugin desinstalado",
+    "snack_config_saved": "Configuración guardada",
+    "snack_logs_cleared": "Logs eliminados",
+    "snack_installed": "Plugin installation will be available soon",
+    "snack_load_failed": "Failed to load plugins",
+    "snack_toggle_failed": "Failed to toggle plugin",
+    "snack_install_failed": "Failed to install plugin",
+    "snack_uninstall_failed": "Failed to uninstall plugin",
+    "snack_config_load_failed": "Failed to load config",
+    "snack_config_save_failed": "Failed to save config",
+    "snack_logs_load_failed": "Failed to load logs",
+    "snack_logs_clear_failed": "Failed to clear logs"
+  },
+  "settings_backup": {
+    "title": "Copia de seguridad y restauración",
+    "create_title": "Crear nueva copia",
+    "create_description": "Crea una copia de seguridad de tu base de datos Komga.",
+    "create_backup": "Crear copia",
+    "create_full_backup": "Copia completa (Principal + Tareas)",
+    "cleanup_title": "Limpiar copias antiguas",
+    "cleanup_description": "Elimina copias antiguas para liberar espacio.",
+    "field_keep_count": "Copias a conservar",
+    "clean_old_backups": "Limpiar antiguas",
+    "available_title": "Copias disponibles",
+    "no_backups": "No se encontraron copias. Crea tu primera copia con el botón de arriba.",
+    "download": "Descargar",
+    "delete": "Eliminar",
+    "restore": "Restaurar (requiere reinicio)",
+    "dialog_delete_title": "¿Eliminar copia?",
+    "dialog_delete_confirm": "¿Estás seguro de eliminar:",
+    "dialog_delete_info": "Esta acción no se puede deshacer.",
+    "dialog_restore_title": "¿Restaurar copia?",
+    "dialog_restore_warning": "Restaurar una copia:",
+    "dialog_restore_item1": "Reemplazará tu base de datos actual",
+    "dialog_restore_item2": "Requiere reiniciar la aplicación",
+    "dialog_restore_item3": "Podría perder cambios recientes",
+    "dialog_restore_confirm": "Restaurar desde:",
+    "restore_and_restart": "Restaurar y reiniciar",
+    "header_filename": "Nombre",
+    "header_created": "Fecha",
+    "header_size": "Tamaño",
+    "header_type": "Tipo",
+    "header_actions": "Acciones",
+    "snack_created": "Copia creada correctamente",
+    "snack_full_created": "Copia completa creada",
+    "snack_deleted": "Copia eliminada",
+    "snack_downloaded": "Copia descargada",
+    "restarting_countdown": "Reiniciando en {seconds} segundos...",
+    "restarting_message": "Reiniciando servidor... Por favor espere.",
+    "snack_load_failed": "Failed to load backups",
+    "snack_create_failed": "Failed to create backup",
+    "snack_full_create_failed": "Failed to create full backup",
+    "snack_clean_failed": "Failed to clean backups",
+    "snack_download_failed": "Failed to download backup",
+    "snack_delete_failed": "Failed to delete backup",
+    "snack_restore_failed": "Failed to restore backup"
+  }
+}
