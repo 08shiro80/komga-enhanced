@@ -33,6 +33,8 @@ data class LibraryDto(
   val hashPages: Boolean,
   val hashKoreader: Boolean,
   val analyzeDimensions: Boolean,
+  val defaultBookSortField: BookSortFieldDto,
+  val defaultBookSortOrder: BookSortOrderDto,
   val oneshotsDirectory: String?,
   val unavailable: Boolean,
 )
@@ -68,6 +70,8 @@ fun Library.toDto(includeRoot: Boolean) =
     hashPages = hashPages,
     hashKoreader = hashKoreader,
     analyzeDimensions = analyzeDimensions,
+    defaultBookSortField = defaultBookSortField.toDto(),
+    defaultBookSortOrder = defaultBookSortOrder.toDto(),
     oneshotsDirectory = oneshotsDirectory,
     unavailable = unavailableDate != null,
   )

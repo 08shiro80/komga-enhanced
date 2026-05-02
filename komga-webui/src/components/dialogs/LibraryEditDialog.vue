@@ -291,6 +291,31 @@
                       />
                     </v-col>
                   </v-row>
+                  <v-row>
+                    <v-col>
+                      <span class="text-subtitle-1 text--primary">{{
+                          $t('dialog.edit_library.label_default_book_sort')
+                        }}</span>
+                      <v-row>
+                        <v-col>
+                          <v-select :items="bookSortFields"
+                                    v-model="form.defaultBookSortField"
+                                    :label="$t('sort.name')"
+                                    solo
+                                    flat
+                          />
+                        </v-col>
+                        <v-col>
+                          <v-select :items="bookSortOrders"
+                                    v-model="form.defaultBookSortOrder"
+                                    :label="$t('sort.sort')"
+                                    solo
+                                    flat
+                          />
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
 
                 </v-container>
               </v-card>
@@ -468,7 +493,7 @@ import FileBrowserDialog from '@/components/dialogs/FileBrowserDialog.vue'
 import Vue from 'vue'
 import {required} from 'vuelidate/lib/validators'
 import {ERROR} from '@/types/events'
-import {ScanIntervalDto, SeriesCoverDto} from '@/types/enum-libraries'
+import {BookSortFieldDto, BookSortOrderDto, ScanIntervalDto, SeriesCoverDto} from '@/types/enum-libraries'
 import {LibraryDto} from '@/types/komga-libraries'
 
 export default Vue.extend({
@@ -502,6 +527,8 @@ export default Vue.extend({
         convertToCbz: false,
         emptyTrashAfterScan: false,
         seriesCover: SeriesCoverDto.FIRST as SeriesCoverDto,
+        defaultBookSortField: BookSortFieldDto.NUMBER as BookSortFieldDto,
+        defaultBookSortOrder: BookSortOrderDto.ASC as BookSortOrderDto,
         hashFiles: true,
         hashPages: false,
         hashKoreader: false,
@@ -524,6 +551,18 @@ export default Vue.extend({
     seriesCover(): any[] {
       return Object.keys(SeriesCoverDto).map(x => ({
         text: this.$t(`enums.series_cover.${x}`),
+        value: x,
+      }))
+    },
+    bookSortFields(): any[] {
+      return Object.keys(BookSortFieldDto).map(x => ({
+        text: this.$t(`enums.book_sort_field.${x}`),
+        value: x,
+      }))
+    },
+    bookSortOrders(): any[] {
+      return Object.keys(BookSortOrderDto).map(x => ({
+        text: this.$t(`enums.book_sort_order.${x}`),
         value: x,
       }))
     },
@@ -663,6 +702,8 @@ export default Vue.extend({
       this.form.convertToCbz = library ? library.convertToCbz : false
       this.form.emptyTrashAfterScan = library ? library.emptyTrashAfterScan : false
       this.form.seriesCover = library ? library.seriesCover : SeriesCoverDto.FIRST
+      this.form.defaultBookSortField = library ? library.defaultBookSortField : BookSortFieldDto.NUMBER
+      this.form.defaultBookSortOrder = library ? library.defaultBookSortOrder : BookSortOrderDto.ASC
       this.form.hashFiles = library ? library.hashFiles : true
       this.form.hashPages = library ? library.hashPages : false
       this.form.hashKoreader = library ? library.hashKoreader : false
@@ -699,6 +740,8 @@ export default Vue.extend({
           convertToCbz: this.form.convertToCbz,
           emptyTrashAfterScan: this.form.emptyTrashAfterScan,
           seriesCover: this.form.seriesCover,
+          defaultBookSortField: this.form.defaultBookSortField,
+          defaultBookSortOrder: this.form.defaultBookSortOrder,
           hashFiles: this.form.hashFiles,
           hashPages: this.form.hashPages,
           hashKoreader: this.form.hashKoreader,

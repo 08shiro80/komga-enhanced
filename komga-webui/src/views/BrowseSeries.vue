@@ -518,6 +518,7 @@ import PageSizeSelect from '@/components/PageSizeSelect.vue'
 import {parseQuerySort} from '@/functions/query-params'
 import {seriesFileUrl, seriesThumbnailUrl} from '@/functions/urls'
 import {MediaProfile, ReadStatus} from '@/types/enum-books'
+import {BookSortFieldDto, BookSortOrderDto} from '@/types/enum-libraries'
 import {
   BOOK_ADDED,
   BOOK_CHANGED,
@@ -591,6 +592,16 @@ import {
 } from '@/types/filter'
 
 const tags = require('language-tags')
+
+const bookSortFieldToKey: Record<BookSortFieldDto, string> = {
+  [BookSortFieldDto.NUMBER]: 'metadata.numberSort',
+  [BookSortFieldDto.DATE_ADDED]: 'createdDate',
+  [BookSortFieldDto.DATE_UPDATED]: 'lastModifiedDate',
+  [BookSortFieldDto.RELEASE_DATE]: 'metadata.releaseDate',
+  [BookSortFieldDto.FILE_SIZE]: 'fileSize',
+  [BookSortFieldDto.FILE_NAME]: 'name',
+  [BookSortFieldDto.PAGE_COUNT]: 'media.pagesCount',
+}
 
 export default Vue.extend({
   name: 'BrowseSeries',
@@ -785,7 +796,14 @@ export default Vue.extend({
       return {color: undefined, text: undefined}
     },
     sortOrFilterActive(): boolean {
-      return sortOrFilterActive(this.sortActive, this.sortDefault, this.filters)
+      const library = this.$store.getters.getLibraryById(this.series?.libraryId)
+      const effectiveDefault: SortActive = library?.defaultBookSortField
+        ? {
+            key: bookSortFieldToKey[library.defaultBookSortField as BookSortFieldDto] || 'metadata.numberSort',
+            order: library.defaultBookSortOrder === BookSortOrderDto.DESC ? 'desc' : 'asc',
+          }
+        : this.sortDefault
+      return sortOrFilterActive(this.sortActive, effectiveDefault, this.filters)
     },
     authorsByRole(): any {
       return groupAuthorsByRole(this.series.booksMetadata.authors)
@@ -885,9 +903,17 @@ export default Vue.extend({
       for (const prop in this.filters) {
         this.$set(this.filters, prop, [])
       }
-      this.sortActive = this.sortDefault
       if (this.series.libraryId) {
-        this.$store.commit('setLibrarySortSeriesBooks', {id: this.series.libraryId, sort: this.sortActive})
+        this.$store.commit('setLibrarySortSeriesBooks', {id: this.series.libraryId, sort: null})
+      }
+      const library = this.$store.getters.getLibraryById(this.series.libraryId)
+      if (library?.defaultBookSortField) {
+        this.sortActive = {
+          key: bookSortFieldToKey[library.defaultBookSortField as BookSortFieldDto] || 'metadata.numberSort',
+          order: library.defaultBookSortOrder === BookSortOrderDto.DESC ? 'desc' : 'asc',
+        }
+      } else {
+        this.sortActive = this.sortDefault
       }
       this.updateRouteAndReload()
     },
@@ -1019,10 +1045,19 @@ export default Vue.extend({
       }
 
       const r = route || this.$route
+
       if (!r.query.sort) {
         const storedSort = this.$store.getters.getLibrarySortSeriesBooks(this.series.libraryId)
         if (storedSort) {
           this.sortActive = storedSort
+        } else {
+          const library = this.$store.getters.getLibraryById(this.series.libraryId)
+          if (library?.defaultBookSortField) {
+            this.sortActive = {
+              key: bookSortFieldToKey[library.defaultBookSortField as BookSortFieldDto] || 'metadata.numberSort',
+              order: library.defaultBookSortOrder === BookSortOrderDto.DESC ? 'desc' : 'asc',
+            }
+          }
         }
       }
 

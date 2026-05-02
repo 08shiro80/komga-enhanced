@@ -501,6 +501,7 @@
       "label_scan_directory_exclusions": "Directory exclusions",
       "label_scan_types": "Scan for these file types",
       "label_scanner": "Scanner",
+      "label_default_book_sort": "Default book sort",
       "label_series_cover": "Series cover",
       "tab_general": "General",
       "tab_metadata": "Metadata",
@@ -756,6 +757,19 @@
       "EVERY_6H": "Every 6 hours",
       "HOURLY": "Hourly",
       "WEEKLY": "Weekly"
+    },
+    "book_sort_field": {
+      "DATE_ADDED": "Date added",
+      "DATE_UPDATED": "Date updated",
+      "FILE_NAME": "Filename",
+      "FILE_SIZE": "File size",
+      "NUMBER": "Number",
+      "PAGE_COUNT": "Page count",
+      "RELEASE_DATE": "Release date"
+    },
+    "book_sort_order": {
+      "ASC": "Ascending",
+      "DESC": "Descending"
     },
     "series_cover": {
       "FIRST": "First",

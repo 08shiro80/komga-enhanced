@@ -35,6 +35,8 @@ data class Library(
   val hashPages: Boolean = false,
   val hashKoreader: Boolean = false,
   val analyzeDimensions: Boolean = true,
+  val defaultBookSortField: BookSortField = BookSortField.NUMBER,
+  val defaultBookSortOrder: BookSortOrder = BookSortOrder.ASC,
   val oneshotsDirectory: String? = null,
   val downloadFolder: String? = null,
   val unavailableDate: LocalDateTime? = null,
@@ -42,6 +44,21 @@ data class Library(
   override val createdDate: LocalDateTime = LocalDateTime.now(),
   override val lastModifiedDate: LocalDateTime = createdDate,
 ) : Auditable {
+  enum class BookSortField {
+    NUMBER,
+    DATE_ADDED,
+    DATE_UPDATED,
+    RELEASE_DATE,
+    FILE_SIZE,
+    FILE_NAME,
+    PAGE_COUNT,
+  }
+
+  enum class BookSortOrder {
+    ASC,
+    DESC,
+  }
+
   enum class SeriesCover {
     FIRST,
     FIRST_UNREAD_OR_FIRST,

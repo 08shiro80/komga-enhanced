@@ -111,6 +111,8 @@ class LibraryDao(
       .set(l.HASH_PAGES, library.hashPages)
       .set(l.HASH_KOREADER, library.hashKoreader)
       .set(l.ANALYZE_DIMENSIONS, library.analyzeDimensions)
+      .set(l.DEFAULT_BOOKS_SORT_FIELD, library.defaultBookSortField.toString())
+      .set(l.DEFAULT_BOOKS_SORT_ORDER, library.defaultBookSortOrder.toString())
       .set(l.ONESHOTS_DIRECTORY, library.oneshotsDirectory)
       .set(l.DOWNLOAD_FOLDER, library.downloadFolder)
       .set(l.UNAVAILABLE_DATE, library.unavailableDate)
@@ -150,6 +152,8 @@ class LibraryDao(
       .set(l.HASH_PAGES, library.hashPages)
       .set(l.HASH_KOREADER, library.hashKoreader)
       .set(l.ANALYZE_DIMENSIONS, library.analyzeDimensions)
+      .set(l.DEFAULT_BOOKS_SORT_FIELD, library.defaultBookSortField.toString())
+      .set(l.DEFAULT_BOOKS_SORT_ORDER, library.defaultBookSortOrder.toString())
       .set(l.ONESHOTS_DIRECTORY, library.oneshotsDirectory)
       .set(l.DOWNLOAD_FOLDER, library.downloadFolder)
       .set(l.UNAVAILABLE_DATE, library.unavailableDate)
@@ -208,6 +212,8 @@ class LibraryDao(
       hashPages = hashPages,
       hashKoreader = hashKoreader,
       analyzeDimensions = analyzeDimensions,
+      defaultBookSortField = Library.BookSortField.valueOf(defaultBooksSortField),
+      defaultBookSortOrder = Library.BookSortOrder.valueOf(defaultBooksSortOrder),
       oneshotsDirectory = oneshotsDirectory,
       downloadFolder = downloadFolder,
       unavailableDate = unavailableDate,

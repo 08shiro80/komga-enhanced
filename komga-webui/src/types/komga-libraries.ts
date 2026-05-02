@@ -1,4 +1,4 @@
-import {ScanIntervalDto, SeriesCoverDto} from '@/types/enum-libraries'
+import {BookSortFieldDto, BookSortOrderDto, ScanIntervalDto, SeriesCoverDto} from '@/types/enum-libraries'
 
 export interface LibraryDto {
   id: string,
@@ -30,6 +30,8 @@ export interface LibraryDto {
   hashPages: boolean,
   hashKoreader: boolean,
   analyzeDimensions: boolean,
+  defaultBookSortField: BookSortFieldDto,
+  defaultBookSortOrder: BookSortOrderDto,
   oneshotsDirectory: string,
   unavailable: boolean,
 
@@ -67,6 +69,8 @@ export interface LibraryCreationDto {
   hashPages: boolean,
   hashKoreader: boolean,
   analyzeDimensions: boolean,
+  defaultBookSortField: BookSortFieldDto,
+  defaultBookSortOrder: BookSortOrderDto,
   oneshotsDirectory: string,
 }
 
@@ -99,5 +103,7 @@ export interface LibraryUpdateDto {
   hashPages: boolean,
   hashKoreader: boolean,
   analyzeDimensions: boolean,
+  defaultBookSortField: BookSortFieldDto,
+  defaultBookSortOrder: BookSortOrderDto,
   oneshotsDirectory: string,
 }

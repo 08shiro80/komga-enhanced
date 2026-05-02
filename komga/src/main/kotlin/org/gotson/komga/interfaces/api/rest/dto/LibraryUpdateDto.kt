@@ -45,6 +45,8 @@ class LibraryUpdateDto {
   val hashPages: Boolean? = null
   val hashKoreader: Boolean? = null
   val analyzeDimensions: Boolean? = null
+  val defaultBookSortField: BookSortFieldDto? = null
+  val defaultBookSortOrder: BookSortOrderDto? = null
   var oneshotsDirectory: String?
     by Delegates.observable(null) { prop, _, _ ->
       isSet[prop.name] = true

@@ -120,6 +120,8 @@ class LibraryController(
             hashPages = library.hashPages,
             hashKoreader = library.hashKoreader,
             analyzeDimensions = library.analyzeDimensions,
+            defaultBookSortField = library.defaultBookSortField.toDomain(),
+            defaultBookSortOrder = library.defaultBookSortOrder.toDomain(),
             oneshotsDirectory = library.oneshotsDirectory?.ifBlank { null },
           ),
         ).toDto(includeRoot = principal.user.isAdmin)
@@ -193,6 +195,8 @@ class LibraryController(
             hashPages = hashPages ?: existing.hashPages,
             hashKoreader = hashKoreader ?: existing.hashKoreader,
             analyzeDimensions = analyzeDimensions ?: existing.analyzeDimensions,
+            defaultBookSortField = defaultBookSortField?.toDomain() ?: existing.defaultBookSortField,
+            defaultBookSortOrder = defaultBookSortOrder?.toDomain() ?: existing.defaultBookSortOrder,
             oneshotsDirectory = if (isSet("oneshotsDirectory")) oneshotsDirectory?.ifBlank { null } else existing.oneshotsDirectory,
           )
         }

@@ -6,6 +6,32 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.4.2] - 2026-05-02
+
+### New Features
+- **Per-library default book sort** — Each library can now define a default sort field and direction for books within a series. Configured in Library Settings → Options → "Default book sort" (field + direction). The server-side default applies whenever a series is opened with no active URL sort parameter and no device-local sort preference stored. If the user explicitly changes the sort for a library, that preference is remembered in localStorage and takes priority over the library default until the user resets it. Clicking "Reset" clears the stored preference and reverts to the library default. The sort indicator icon is only highlighted when the active sort differs from the library default — opening a series with the library default applied does not trigger the orange indicator.
+
+| Modified/New Files | Purpose |
+|-------------------|---------|
+| `db/migration/fork/sqlite/V20260502000000__library_default_book_sort.sql` | Adds `DEFAULT_BOOKS_SORT_FIELD` / `DEFAULT_BOOKS_SORT_ORDER` columns to `LIBRARY` table |
+| `domain/model/Library.kt` | `BookSortField` and `BookSortOrder` enums + two new fields |
+| `interfaces/api/rest/dto/BookSortFieldDto.kt` | New — DTO enum + `toDomain()`/`toDto()` |
+| `interfaces/api/rest/dto/BookSortOrderDto.kt` | New — DTO enum + `toDomain()`/`toDto()` |
+| `interfaces/api/rest/dto/LibraryDto.kt` | New fields in API response |
+| `interfaces/api/rest/dto/LibraryCreationDto.kt` | New fields with defaults (`NUMBER`/`ASC`) |
+| `interfaces/api/rest/dto/LibraryUpdateDto.kt` | New nullable fields for PATCH |
+| `interfaces/api/rest/LibraryController.kt` | Maps new fields in `addLibrary` + `updateLibraryById` |
+| `infrastructure/jooq/main/LibraryDao.kt` | Persists and reads new DB columns |
+| `komga-webui/src/types/enum-libraries.ts` | `BookSortFieldDto` + `BookSortOrderDto` enums |
+| `komga-webui/src/types/komga-libraries.ts` | New fields in `LibraryDto`, `LibraryCreationDto`, `LibraryUpdateDto` |
+| `komga-webui/src/locales/en.json` | i18n for `book_sort_field.*`, `book_sort_order.*`, dialog label |
+| `komga-webui/src/components/dialogs/LibraryEditDialog.vue` | Two dropdowns in Options tab; form reset/submit wired |
+| `komga-webui/src/views/BrowseSeries.vue` | Library default applied in `loadSeries`; `resetSortAndFilters` clears stored pref; `sortOrFilterActive` compares against library default |
+
+> **Note:** Run `./gradlew jooq-codegen-primary` after applying the migration to regenerate the jOOQ DSL before compiling.
+
+---
+
 ## [0.1.4.1] - 2026-04-26 — Upstream merge: 1.24.4
 
 ### Upstream Fixes (from Komga 1.24.4)

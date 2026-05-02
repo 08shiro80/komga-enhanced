@@ -1,3 +1,18 @@
+export enum BookSortFieldDto {
+  NUMBER = 'NUMBER',
+  DATE_ADDED = 'DATE_ADDED',
+  DATE_UPDATED = 'DATE_UPDATED',
+  RELEASE_DATE = 'RELEASE_DATE',
+  FILE_SIZE = 'FILE_SIZE',
+  FILE_NAME = 'FILE_NAME',
+  PAGE_COUNT = 'PAGE_COUNT',
+}
+
+export enum BookSortOrderDto {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
 export enum SeriesCoverDto {
   FIRST = 'FIRST',
   FIRST_UNREAD_OR_FIRST = 'FIRST_UNREAD_OR_FIRST',

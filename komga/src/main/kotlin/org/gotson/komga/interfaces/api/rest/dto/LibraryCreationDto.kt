@@ -31,5 +31,7 @@ data class LibraryCreationDto(
   val hashPages: Boolean = false,
   val hashKoreader: Boolean = false,
   val analyzeDimensions: Boolean = true,
+  val defaultBookSortField: BookSortFieldDto = BookSortFieldDto.NUMBER,
+  val defaultBookSortOrder: BookSortOrderDto = BookSortOrderDto.ASC,
   val oneshotsDirectory: String? = null,
 )
