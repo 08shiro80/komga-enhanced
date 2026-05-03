@@ -1,8 +1,75 @@
 # Komga Enhanced
 
+[![Docker Pulls](https://img.shields.io/docker/pulls/08shiro80/komga)](https://hub.docker.com/r/08shiro80/komga)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-21+-blue)](https://adoptium.net/)
+[![Based on Komga](https://img.shields.io/badge/Based%20on-Komga-blueviolet)](https://github.com/gotson/komga)
+
 **Komga Enhanced** - A powerful manga media server with integrated manga downloading, automatic chapter tracking, and Tachiyomi/Mihon backup import.
 
 > **Built on [Komga](https://github.com/gotson/komga)** - Extends the excellent Komga media server with manga downloading and automation features.
+
+---
+
+## Contents
+
+- [Quick Start](#quick-start)
+- [Why This Fork?](#why-this-fork)
+- [Screenshots](#screenshots)
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [API](#api)
+- [Switching Between Komga Versions](#switching-between-official-komga-and-this-fork)
+- [Comparison](#comparison-with-original-komga)
+- [Documentation](#documentation)
+- [Tech Stack](#tech-stack)
+- [Contributing](#contributing)
+- [Credits](#credits)
+
+---
+
+## Quick Start
+
+| Image | Description |
+|-------|-------------|
+| `08shiro80/komga:latest` | Stable release |
+| `08shiro80/komga-private:latest` | Testing branch — may contain unstable or experimental changes |
+
+**Docker:**
+
+```bash
+docker run -d \
+  --name komga \
+  --network bridge \
+  -p 25600:25600 \
+  -v /path/to/config:/config \
+  -v /path/to/manga:/manga \
+  08shiro80/komga:latest
+```
+
+**Docker Compose:**
+
+```yaml
+version: "3.9"
+services:
+  komga:
+    image: 08shiro80/komga:latest
+    container_name: komga
+    network_mode: bridge
+    ports:
+      - "25600:25600"
+    volumes:
+      - ./config:/config
+      - /path/to/manga:/manga
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+Open `http://localhost:25600`, create an admin account, and add a library. See [Installation](#installation) for JAR, build-from-source, and gallery-dl options.
 
 ---
 
@@ -64,7 +131,7 @@ This fork transforms Komga from a pure media server into a **complete manga mana
 
 ### Download System
 
-Download manga from MangaDex and other manga/image sites via [gallery-dl](https://github.com/mikf/gallery-dl):
+Download manga from MangaDex and other manga/image sites via [gallery-dl-komga](https://github.com/08shiro80/gallery-dl-komga) (a fork of [gallery-dl](https://github.com/mikf/gallery-dl) with Komga-specific enhancements):
 
 - **Queue-based downloads** with priority support
 - **Real-time progress** via Server-Sent Events (SSE)
@@ -75,7 +142,7 @@ Download manga from MangaDex and other manga/image sites via [gallery-dl](https:
 - **Rate limiting** - respects site-specific API limits
 - **Multi-language support** - 36 languages, shared across all plugins (one setting)
 - **Automatic publisher detection** - derives publisher from source site (MangaDex, Mangahere, etc.)
-- **Custom gallery-dl path** - point to a local gallery-dl checkout for latest extractors
+- **Custom gallery-dl path** - point to a local gallery-dl-komga checkout for latest extractors
 
 Any manga/image URL supported by gallery-dl works — not just MangaDex. Simply paste the URL in the WebUI to start a download.
 
@@ -257,54 +324,18 @@ The fork stores its database migrations in a separate history table (`flyway_for
 ### Requirements
 
 - Java 21+
-- [gallery-dl](https://github.com/mikf/gallery-dl) (`pip install gallery-dl`)
+- [gallery-dl-komga](https://github.com/08shiro80/gallery-dl-komga) (`pip install https://github.com/08shiro80/gallery-dl-komga/archive/refs/heads/master.tar.gz`)
 
-### Docker (Recommended)
+### Docker
 
-| Image | Description |
-|-------|-------------|
-| `08shiro80/komga:latest` | Stable release |
-| `08shiro80/komga-private:latest` | Testing branch — may contain unstable or experimental changes |
+See [Quick Start](#quick-start) for Docker and Docker Compose commands.
 
-```bash
-docker pull 08shiro80/komga:latest
+### Updating gallery-dl-komga in Docker
 
-docker run -d \
-  --name komga \
-  --network bridge \
-  -p 25600:25600 \
-  -v /path/to/config:/config \
-  -v /path/to/manga:/manga \
-  08shiro80/komga:latest
-```
-
-### Docker Compose
-
-```yaml
-version: "3.9"
-services:
-  komga:
-    image: 08shiro80/komga:latest
-    container_name: komga
-    network_mode: bridge
-    ports:
-      - "25600:25600"
-    volumes:
-      - ./config:/config
-      - /path/to/manga:/manga
-    restart: unless-stopped
-```
+gallery-dl-komga is installed via pip inside the Docker image. To update:
 
 ```bash
-docker compose up -d
-```
-
-### Updating gallery-dl in Docker
-
-gallery-dl is installed via pip inside the Docker image. To update:
-
-```bash
-docker exec -u 0 komga pip3 install --break-system-packages -U gallery-dl
+docker exec -u 0 komga pip3 install --break-system-packages -U https://github.com/08shiro80/gallery-dl-komga/archive/refs/heads/master.tar.gz
 ```
 
 ### JAR
@@ -349,7 +380,7 @@ Create `~/.config/gallery-dl/config.json`:
 }
 ```
 
-To use a local gallery-dl checkout (e.g. for latest extractors), set `gallery_dl_path` in the plugin config to the directory containing the `gallery_dl` package. This sets `PYTHONPATH` so `python -m gallery_dl` loads from your local source.
+To use a local gallery-dl-komga checkout (e.g. for latest extractors), set `gallery_dl_path` in the plugin config to the directory containing the `gallery_dl` package. This sets `PYTHONPATH` so `python -m gallery_dl` loads from your local source.
 
 ### Follow List Check Interval
 
@@ -422,7 +453,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ## Credits
 
 - [Komga](https://github.com/gotson/komga) by gotson - The excellent base media server
-- [gallery-dl](https://github.com/mikf/gallery-dl) by mikf - Download engine
+- [gallery-dl](https://github.com/mikf/gallery-dl) by mikf - Download engine (base)
+- [gallery-dl-komga](https://github.com/08shiro80/gallery-dl-komga) - Komga-enhanced fork with genre/tag splitting and extended metadata
 - [MangaDex](https://mangadex.org) - Primary manga source and API
 - [AniList](https://anilist.co) - Metadata source
 - [Kitsu](https://kitsu.app) - Metadata source

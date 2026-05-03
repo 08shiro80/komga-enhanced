@@ -108,6 +108,11 @@ class GalleryDlProcess {
               "compression" to "store",
               "keep-files" to false,
             ),
+            mapOf(
+              "name" to "komga",
+              "extension" to "cbz",
+              "series-json" to false,
+            ),
           ),
       )
 

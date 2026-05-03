@@ -269,6 +269,10 @@
               <v-list-item-title>Plugins</v-list-item-title>
             </v-list-item>
 
+            <v-list-item :to="{name: 'settings-fixes'}">
+              <v-list-item-title>Fixes</v-list-item-title>
+            </v-list-item>
+
             <v-list-item :to="{name: 'metrics'}">
               <v-list-item-title>{{ $t('metrics.title') }}</v-list-item-title>
             </v-list-item>

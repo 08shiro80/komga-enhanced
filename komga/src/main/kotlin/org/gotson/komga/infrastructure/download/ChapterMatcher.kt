@@ -23,12 +23,35 @@ class ChapterMatcher {
   }
 
   fun extractChapterId(cbzPath: Path): String? {
-    val filename = cbzPath.fileName.toString()
-    return cbzUuidRegex.find(filename)?.groupValues?.get(1)
+    val fromFilename = cbzUuidRegex.find(cbzPath.fileName.toString())?.groupValues?.get(1)
+    if (fromFilename != null) return fromFilename
+    return try {
+      java.util.zip.ZipFile(cbzPath.toFile()).use { zip ->
+        zip.comment?.let { zipCommentUuidRegex.find(it)?.groupValues?.get(1) }
+          ?: run {
+            val entry = zip.getEntry("ComicInfo.xml") ?: return@use null
+            val xml =
+              zip
+                .getInputStream(entry)
+                .use { it.readBytes() }
+                .toString(Charsets.UTF_8)
+            comicInfoWebRegex
+              .find(xml)
+              ?.groupValues
+              ?.get(1)
+              ?.substringAfterLast("/chapter/", "")
+              ?.takeIf { it.isNotBlank() }
+          }
+      }
+    } catch (e: Exception) {
+      logger.debug(e) { "Failed to read chapter ID from ${cbzPath.fileName}" }
+      null
+    }
   }
 
   fun extractChapterNumberFromFilename(filename: String): String? {
-    val name = filename.substringBeforeLast('.').lowercase()
+    var name = filename.substringBeforeLast('.').lowercase()
+    if (volumePrefixRegex.matches(name)) name = name.substringAfter(" ")
     val match =
       chapterNumCRegex.find(name)
         ?: chapterNumChRegex.find(name)
@@ -43,9 +66,10 @@ class ChapterMatcher {
   }
 
   fun extractChapterNumFromFilename(nameLower: String): String? {
-    val cMatch = chapterNumCRegex.find(nameLower)
+    val name = if (volumePrefixRegex.matches(nameLower)) nameLower.substringAfter(" ") else nameLower
+    val cMatch = chapterNumCRegex.find(name)
     if (cMatch != null) return cMatch.groupValues[1]
-    val chMatch = chapterNumChRegex.find(nameLower)
+    val chMatch = chapterNumChRegex.find(name)
     if (chMatch != null) return chMatch.groupValues[1]
     return null
   }

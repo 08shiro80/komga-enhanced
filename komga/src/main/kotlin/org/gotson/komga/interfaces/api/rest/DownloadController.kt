@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
@@ -286,6 +287,7 @@ class DownloadController(
   @Operation(summary = "Repair missing ComicInfo.xml and zip comments in MangaDex CBZ files", tags = [TagNames.DOWNLOADS])
   fun repairComicInfo(
     @PathVariable libraryId: String,
+    @RequestParam(defaultValue = "false") force: Boolean,
   ): ResponseEntity<Map<String, Any>> {
     val library =
       libraryRepository.findByIdOrNull(libraryId)
@@ -325,7 +327,7 @@ class DownloadController(
     val errors = mutableListOf<String>()
 
     for ((mangaDexId, dirs) in mangaDexDirs) {
-      val result = galleryDlWrapper.repairMissingComicInfo(mangaDexId, dirs)
+      val result = galleryDlWrapper.repairMissingComicInfo(mangaDexId, dirs, forceReinject = force)
       totalRepaired += result.repaired
       totalSkipped += result.skipped
       if (result.error != null) errors.add("$mangaDexId: ${result.error}")

@@ -229,16 +229,18 @@ class MangaDexApiClient(
           else -> null
         }
 
-      val tags = attributes["tags"] as? List<*> ?: emptyList<Map<String, Any>>()
+      val rawTags = attributes["tags"] as? List<*> ?: emptyList<Map<String, Any>>()
       val genres = mutableListOf<String>()
+      val contentTags = mutableListOf<String>()
 
-      tags.forEach { tag ->
+      rawTags.forEach { tag ->
         if (tag is Map<*, *>) {
           val tagAttributes = tag["attributes"] as? Map<*, *>
           val tagName = tagAttributes?.get("name") as? Map<*, *>
           val englishTagName = tagName?.get("en") as? String
+          val group = tagAttributes?.get("group") as? String
           if (englishTagName != null) {
-            genres.add(englishTagName)
+            if (group == "genre") genres.add(englishTagName) else contentTags.add(englishTagName)
           }
         }
       }
@@ -269,6 +271,7 @@ class MangaDexApiClient(
         status = status,
         publicationDemographic = publicationDemographic,
         genres = genres,
+        tags = contentTags,
         coverFilename = coverFilename,
         mangaDexId = mangaId,
       )

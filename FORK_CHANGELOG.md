@@ -6,6 +6,59 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.4.3] - 2026-05-03
+
+### New: gallery-dl-komga fork + komga postprocessor
+
+**gallery-dl fork:** All Dockerfiles and documentation now reference `https://github.com/08shiro80/gallery-dl-komga` (a Komga-specific fork of gallery-dl) instead of upstream PyPI `gallery-dl`. The fork adds:
+- `mangadex.py`: tags split by MangaDex API group (`genre` → genres, rest → tags); `manga_alt` field alongside `manga_titles`
+- `hentai2read.py`: extended metadata (`manga_alt`, `genres`, `tags`, `description`, `author`, `artist`, `status`, `year`)
+- New `komga` postprocessor: automatically injects ComicInfo.xml into CBZ archives and writes series.json during the gallery-dl download process — no additional API calls required
+
+**komga postprocessor integration:**
+- `GalleryDlProcess.kt` adds the `komga` postprocessor (after `zip`) to the gallery-dl config; series.json generation is disabled (`series-json: false`) since `GalleryDlWrapper.kt` creates a richer version
+- `GalleryDlWrapper.kt` skips ComicInfo.xml injection if the gallery-dl postprocessor already injected it (detected via `hasComicInfoXml()`)
+
+| Modified/New File | Change |
+|------------------|--------|
+| `infrastructure/download/GalleryDlProcess.kt` | `komga` postprocessor added to config after `zip` |
+| `infrastructure/download/GalleryDlWrapper.kt` | Skip ComicInfo injection if already present |
+| `komga/docker/Dockerfile.local` | Uses `gallery-dl-komga` fork tarball instead of PyPI |
+| `komga/docker/Dockerfile.tpl` | Uses `gallery-dl-komga` fork tarball instead of PyPI |
+| `README.md` | Updated installation/update instructions for `gallery-dl-komga` |
+
+---
+
+## [0.1.4.3] - 2026-05-03
+
+### Fix: Genre/tag split in ComicInfo.xml and series.json
+
+**Problem:** All MangaDex tags (genre, theme, content, format) were written to `<Genre>` in ComicInfo.xml without distinction. The `<Tags>` field was never populated, causing content-specific tags to appear as series genres in Komga instead of book tags. The `description` key in `series.json` was also never read by MylarMetadata (which expects `description_text`).
+
+**Fix:**
+- MangaDex tags are now split by API group: `group=genre` → `<Genre>`, all others (`theme`, `content`, `format`) → `<Tags>`
+- `ComicInfoGenerator` now writes a `<Tags>` element
+- `series.json` uses `description_text` key and writes a separate `tags` list
+- `MangaInfo` gains a `tags: List<String>` field
+
+### New: Settings → Fixes page
+
+A new **Fixes** page under Settings provides GUI-triggered one-time maintenance actions. Fixes are added as versioned cards and removed once no longer needed.
+
+**First fix available (since 0.1.4.3):** Re-inject ComicInfo.xml — corrects genre/tag split in existing CBZ files. Select a library, enable Force, and run.
+
+| Modified/New File | Change |
+|------------------|--------|
+| `infrastructure/download/MangaDexApiClient.kt` | Tags split by `group`: `genre`→genres, rest→tags |
+| `infrastructure/download/GalleryDlWrapper.kt` | `MangaInfo.tags` field; `extractMetadataFields` reads `genres`+`tags`; `createSeriesJson` writes `description_text`+`tags`; `repairMissingComicInfo` gains `forceReinject` parameter |
+| `infrastructure/download/ComicInfoGenerator.kt` | `<Tags>` element from `mangaInfo.tags` |
+| `interfaces/api/rest/DownloadController.kt` | `?force=true` parameter for `repair-comicinfo` endpoint |
+| `komga-webui/src/views/SettingsFixes.vue` | New — Fixes page with Re-inject ComicInfo fix card |
+| `komga-webui/src/router.ts` | Route `/settings/fixes` |
+| `komga-webui/src/views/HomeView.vue` | "Fixes" navigation item under Settings |
+
+---
+
 ## [0.1.4.2] - 2026-05-02
 
 ### New Features

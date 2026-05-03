@@ -24,6 +24,7 @@ class ComicInfoGenerator {
     val author = mangaInfo.author?.escapeXml() ?: ""
     val description = mangaInfo.description?.escapeXml() ?: ""
     val genres = mangaInfo.genres.joinToString(", ") { it.escapeXml() }
+    val tags = mangaInfo.tags.joinToString(", ") { it.escapeXml() }
     val chapterTitle = chapterInfo?.chapterTitle?.escapeXml() ?: ""
     val chapterNumber = chapterInfo?.chapterNumber
     val volume = chapterInfo?.volume
@@ -58,6 +59,7 @@ class ComicInfoGenerator {
   <Translator>$scanlationGroup</Translator>
   <Publisher>${mangaInfo.publisher.escapeXml()}</Publisher>
   ${if (genres.isNotBlank()) "<Genre>$genres</Genre>" else ""}
+  ${if (tags.isNotBlank()) "<Tags>$tags</Tags>" else ""}
   <Web>${(chapterUrl ?: mangaInfo.sourceUrl ?: "").escapeXml()}</Web>
   ${if (pageCount > 0) "<PageCount>$pageCount</PageCount>" else ""}
   <LanguageISO>$language</LanguageISO>

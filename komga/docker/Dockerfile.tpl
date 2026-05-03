@@ -18,7 +18,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && \
     locale-gen en_US.UTF-8
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --break-system-packages --ignore-installed pip setuptools wheel gallery-dl
+    pip3 install --break-system-packages --ignore-installed pip setuptools wheel && \
+    pip3 install --break-system-packages https://github.com/08shiro80/gallery-dl-komga/archive/refs/heads/master.tar.gz
 RUN KEPUBIFY_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "64bit" || echo "$TARGETARCH") && \
     curl -sL --retry 3 \
       "https://github.com/pgaskin/kepubify/releases/latest/download/kepubify-linux-${KEPUBIFY_ARCH}" \

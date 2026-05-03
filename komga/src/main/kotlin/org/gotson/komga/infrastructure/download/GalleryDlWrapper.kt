@@ -846,7 +846,11 @@ class GalleryDlWrapper(
                       publishDate = chapter.publishDate,
                       language = chapter.language,
                     )
-                  addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+                  if (!comicInfoGenerator.hasComicInfoXml(targetCbz)) {
+                    addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
+                  } else {
+                    logger.debug { "ComicInfo.xml already present from gallery-dl postprocessor: ${targetCbz.name}" }
+                  }
                   if (komgaSeriesId != null && !chapterUrlRepository.existsByUrl(chapter.chapterUrl)) {
                     val chapterNumVal =
                       chapter.chapterNumber
@@ -1118,6 +1122,7 @@ class GalleryDlWrapper(
   fun repairMissingComicInfo(
     mangaDexId: String,
     directories: List<File>,
+    forceReinject: Boolean = false,
   ): RepairResult {
     val mangaInfo =
       try {
@@ -1134,7 +1139,9 @@ class GalleryDlWrapper(
       }
 
     val chapterMap = mutableMapOf<String, MutableList<ChapterDownloadInfo>>()
+    val chapterUrlMap = mutableMapOf<String, ChapterDownloadInfo>()
     for (ch in allChapters) {
+      chapterUrlMap[ch.chapterUrl] = ch
       val num = ch.chapterNumber ?: continue
       val padded = chapterMatcher.padChapterNumber(num)
       val plain =
@@ -1160,14 +1167,15 @@ class GalleryDlWrapper(
 
       for (cbzFile in cbzFiles) {
         try {
-          val hasComment =
-            java.util.zip.ZipFile(cbzFile).use { zf ->
-              !zf.comment.isNullOrBlank()
+          if (!forceReinject) {
+            val hasComment =
+              java.util.zip.ZipFile(cbzFile).use { zf ->
+                !zf.comment.isNullOrBlank()
+              }
+            if (hasComment) {
+              skipped++
+              continue
             }
-
-          if (hasComment) {
-            skipped++
-            continue
           }
 
           val chapterNum =
@@ -1176,12 +1184,18 @@ class GalleryDlWrapper(
             chapterMatcher.extractScanlationGroup(cbzFile.nameWithoutExtension)
 
           val candidates = if (chapterNum != null) chapterMap[chapterNum] else null
-          val chapter =
+          val chapterByNum =
             if (candidates != null && fileGroup != null) {
               candidates.find { it.scanlationGroup?.equals(fileGroup, ignoreCase = true) == true }
                 ?: candidates.firstOrNull()
             } else {
               candidates?.firstOrNull()
+            }
+
+          val chapter =
+            chapterByNum ?: run {
+              val chapterId = chapterMatcher.extractChapterId(cbzFile.toPath())
+              if (chapterId != null) chapterUrlMap["https://mangadex.org/chapter/$chapterId"] else null
             }
 
           if (chapter != null) {
@@ -1288,12 +1302,15 @@ class GalleryDlWrapper(
               mangaInfo.mangaDexId?.let { this["comicid"] = it }
               mangaInfo.coverFilename?.let { this["cover_filename"] = it }
               mangaInfo.author?.let { this["author"] = it }
-              mangaInfo.description?.let { this["description"] = it }
+              mangaInfo.description?.let { this["description_text"] = it }
               mangaInfo.year?.let { this["year"] = it }
               mangaInfo.status?.let { this["status"] = it }
               mangaInfo.publicationDemographic?.let { this["publication_demographic"] = it }
               if (mangaInfo.genres.isNotEmpty()) {
                 this["genres"] = mangaInfo.genres
+              }
+              if (mangaInfo.tags.isNotEmpty()) {
+                this["tags"] = mangaInfo.tags
               }
             },
         )
@@ -1374,6 +1391,8 @@ class GalleryDlWrapper(
     var scanlationGroup: String? = null
     val alternativeTitlesSet = mutableSetOf<String>()
     val alternativeTitlesWithLangMap = mutableMapOf<String, String>()
+    val genresSet = mutableSetOf<String>()
+    val tagsSet = mutableSetOf<String>()
     var totalChapters = 0
     var category: String? = null
     var description: String? = null
@@ -1401,6 +1420,8 @@ class GalleryDlWrapper(
               },
               onAuthor = { if (author == null) author = it },
               onGroup = { if (scanlationGroup == null) scanlationGroup = it },
+              onGenres = { genresSet.addAll(it) },
+              onTags = { tagsSet.addAll(it) },
             )
             if (category == null) category = metadata["category"] as? String
             if (title == null) {
@@ -1424,6 +1445,8 @@ class GalleryDlWrapper(
                 },
                 onAuthor = { if (author == null) author = it },
                 onGroup = { if (scanlationGroup == null) scanlationGroup = it },
+                onGenres = { genresSet.addAll(it) },
+                onTags = { tagsSet.addAll(it) },
               )
               if (category == null) category = metadata["category"] as? String
               if (title == null) {
@@ -1447,6 +1470,8 @@ class GalleryDlWrapper(
               },
               onAuthor = { if (author == null) author = it },
               onGroup = { if (scanlationGroup == null) scanlationGroup = it },
+              onGenres = { genresSet.addAll(it) },
+              onTags = { tagsSet.addAll(it) },
             )
           }
         }
@@ -1465,6 +1490,8 @@ class GalleryDlWrapper(
       alternativeTitles = alternativeTitlesSet.toList(),
       alternativeTitlesWithLanguage = alternativeTitlesWithLangMap,
       scanlationGroup = scanlationGroup,
+      genres = genresSet.toList(),
+      tags = tagsSet.toList(),
     )
   }
 
@@ -1475,6 +1502,8 @@ class GalleryDlWrapper(
     onAltTitles: (String, String) -> Unit,
     onAuthor: (String) -> Unit,
     onGroup: (String) -> Unit,
+    onGenres: (List<String>) -> Unit,
+    onTags: (List<String>) -> Unit,
   ) {
     val mangaTitle = metadata["manga"] as? String
     val lang = metadata["lang"] as? String
@@ -1507,6 +1536,20 @@ class GalleryDlWrapper(
     val groups = metadata["group"] as? List<*>
     val firstGroup = groups?.firstOrNull() as? String
     if (firstGroup != null) onGroup(firstGroup)
+
+    @Suppress("UNCHECKED_CAST")
+    val genres = metadata["genres"] as? List<*>
+    if (genres != null) {
+      val stringGenres = genres.filterIsInstance<String>()
+      if (stringGenres.isNotEmpty()) onGenres(stringGenres)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    val tags = metadata["tags"] as? List<*>
+    if (tags != null) {
+      val stringTags = tags.filterIsInstance<String>()
+      if (stringTags.isNotEmpty()) onTags(stringTags)
+    }
   }
 
   private fun detectLanguageFromTitle(title: String): String {
@@ -1593,6 +1636,7 @@ data class MangaInfo(
   val status: String? = null,
   val publicationDemographic: String? = null,
   val genres: List<String> = emptyList(),
+  val tags: List<String> = emptyList(),
   val coverFilename: String? = null,
   val mangaDexId: String? = null,
   val sourceUrl: String? = null,

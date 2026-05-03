@@ -64,3 +64,5 @@ secret/
 ##Ignore
 gradle-tasks.txt
 /scripts/
+.dockerignore
+komga/docker/Dockerfile.local

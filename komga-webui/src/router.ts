@@ -123,6 +123,12 @@ const router = new Router({
           component: () => import(/* webpackChunkName: "settings-plugins" */ './views/PluginManager.vue'),
         },
         {
+          path: '/settings/fixes',
+          name: 'settings-fixes',
+          beforeEnter: adminGuard,
+          component: () => import(/* webpackChunkName: "settings-fixes" */ './views/SettingsFixes.vue'),
+        },
+        {
           path: '/settings/metrics',
           name: 'metrics',
           beforeEnter: adminGuard,
