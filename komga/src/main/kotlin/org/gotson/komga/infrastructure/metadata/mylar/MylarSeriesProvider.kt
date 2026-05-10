@@ -76,6 +76,7 @@ class MylarSeriesProvider(
                 host.contains("mangadex.org") -> "MangaDex"
                 host.contains("kitsu") -> "Kitsu"
                 host.contains("myanimelist.net") -> "MyAnimeList"
+                host.contains("metron.cloud") -> "Metron"
                 else -> host
               }
             } ?: "Source"

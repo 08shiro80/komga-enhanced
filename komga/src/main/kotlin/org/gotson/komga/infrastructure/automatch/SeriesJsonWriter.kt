@@ -33,6 +33,7 @@ class SeriesJsonWriter(
       "anilist" -> "https://anilist.co/manga/$ext"
       "mangadex" -> "https://mangadex.org/title/$ext"
       "kitsu" -> "https://kitsu.app/manga/$ext"
+      "metron" -> "https://metron.cloud/series/$ext/"
       else -> defaultWebUrl(ext)
     }
   }

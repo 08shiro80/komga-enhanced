@@ -3,6 +3,7 @@ package org.gotson.komga.application.startup
 import org.gotson.komga.domain.model.Plugin
 import org.gotson.komga.domain.model.PluginType
 import org.gotson.komga.domain.persistence.PluginRepository
+import org.gotson.komga.infrastructure.scrobbler.PluginVersions
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
@@ -115,14 +116,48 @@ class PluginInitializer(
           dependencies = null,
         ),
         Plugin(
-          id = "scrobbler",
-          name = "Scrobbler (AniList / MyAnimeList)",
-          version = "1.0.0",
+          id = "metron-metadata",
+          name = "Metron Metadata Provider",
+          version = PluginVersions.METRON_METADATA,
+          author = "Komga Team",
+          description = "Fetches comic series metadata from Metron (metron.cloud) API. Requires a free Metron account for API authentication. Configures series metadata including title, publisher, description, genres, and cover art.",
+          enabled = false,
+          pluginType = PluginType.METADATA,
+          entryPoint = "org.gotson.komga.infrastructure.metadata.metron.MetronMetadataPlugin",
+          sourceUrl = "https://metron.cloud",
+          installedDate = LocalDateTime.now(),
+          lastUpdated = LocalDateTime.now(),
+          configSchema =
+            """
+            {
+              "type": "object",
+              "properties": {
+                "metron_username": {
+                  "type": "string",
+                  "title": "Metron Username",
+                  "description": "Your Metron account username (metron.cloud)"
+                },
+                "metron_password": {
+                  "type": "string",
+                  "title": "Metron Password",
+                  "format": "password",
+                  "description": "Your Metron account password"
+                }
+              },
+              "required": ["metron_username", "metron_password"]
+            }
+            """.trimIndent(),
+          dependencies = null,
+        ),
+        Plugin(
+          id = "manga-scrobbler",
+          name = "Manga Scrobbler (AniList / MyAnimeList)",
+          version = PluginVersions.MANGA_SCROBBLER,
           author = "Komga Team",
           description = "Syncs read progress to AniList and/or MyAnimeList when a book is marked completed. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net) or via manual JSON mappings.",
           enabled = false,
           pluginType = PluginType.NOTIFIER,
-          entryPoint = "org.gotson.komga.infrastructure.scrobbler.ScrobblerPlugin",
+          entryPoint = "org.gotson.komga.infrastructure.scrobbler.MangaScrobblerPlugin",
           sourceUrl = null,
           installedDate = LocalDateTime.now(),
           lastUpdated = LocalDateTime.now(),
@@ -168,6 +203,58 @@ class PluginInitializer(
                 }
               },
               "required": []
+            }
+            """.trimIndent(),
+          dependencies = null,
+        ),
+        Plugin(
+          id = "comic-scrobbler",
+          name = "Comic Scrobbler (Metron)",
+          version = PluginVersions.COMIC_SCROBBLER,
+          author = "Komga Team",
+          description = "Syncs comic read progress to Metron (metron.cloud) when a book is marked completed. Resolves issue IDs from series links (metron.cloud/issue/... or metron.cloud/series/... from Metron Metadata Provider), auto-search by series name, or via manual JSON mappings.",
+          enabled = false,
+          pluginType = PluginType.NOTIFIER,
+          entryPoint = "org.gotson.komga.infrastructure.comicscrobbler.ComicScrobblerPlugin",
+          sourceUrl = "https://metron.cloud",
+          installedDate = LocalDateTime.now(),
+          lastUpdated = LocalDateTime.now(),
+          configSchema =
+            """
+            {
+              "type": "object",
+              "properties": {
+                "metron_username": {
+                  "type": "string",
+                  "title": "Metron Username",
+                  "description": "Your Metron account username (metron.cloud)"
+                },
+                "metron_password": {
+                  "type": "string",
+                  "title": "Metron Password",
+                  "format": "password",
+                  "description": "Your Metron account password"
+                },
+
+                "auto_detect_links": {
+                  "type": "string",
+                  "title": "Auto-detect issue IDs from series links",
+                  "default": "true",
+                  "enum": ["false", "true"],
+                  "description": "If true, extract issue/series IDs from metron.cloud URLs in SeriesMetadata.links."
+                },
+                "mappings": {
+                  "type": "string",
+                  "title": "Manual issue mappings (JSON)",
+                  "description": "Fallback when auto-detect/search fails. Example: {\"Amazing Spider-Man\":{\"metron_issue_id\":12345}}"
+                },
+                "sync_user_id": {
+                  "type": "string",
+                  "title": "Restrict to user ID",
+                  "description": "Optional. Only syncs reads from this Komga user."
+                }
+              },
+              "required": ["metron_username", "metron_password"]
             }
             """.trimIndent(),
           dependencies = null,
