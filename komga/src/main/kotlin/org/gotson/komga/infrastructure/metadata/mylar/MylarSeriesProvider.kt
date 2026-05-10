@@ -63,12 +63,32 @@ class MylarSeriesProvider(
           }
         }
 
-      val links =
-        if (metadata.comicid.isNotBlank()) {
+      // Prefer an explicit web_url (provider-aware; written by PluginController.writeSeriesJson)
+      // and fall back to the legacy MangaDex assumption only when comicid is a MangaDex UUID.
+      // This is what makes scrobbler auto-detection work without a manual link + linksLock.
+      val links: List<WebLink>? = run {
+        val webUrl = metadata.webUrl?.takeIf { it.isNotBlank() }
+        if (webUrl != null) {
+          val label =
+            runCatching { URI(webUrl).host }.getOrNull()?.let { host ->
+              when {
+                host.contains("anilist.co") -> "AniList"
+                host.contains("mangadex.org") -> "MangaDex"
+                host.contains("kitsu") -> "Kitsu"
+                host.contains("myanimelist.net") -> "MyAnimeList"
+                else -> host
+              }
+            } ?: "Source"
+          listOf(WebLink(label, URI(webUrl)))
+        } else if (metadata.comicid.isNotBlank() &&
+          Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE)
+            .matches(metadata.comicid)
+        ) {
           listOf(WebLink("MangaDex", URI("https://mangadex.org/title/${metadata.comicid}")))
         } else {
           null
         }
+      }
 
       return SeriesMetadataPatch(
         title = title,

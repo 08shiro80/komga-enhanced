@@ -308,14 +308,36 @@ class PluginController(
     request.status?.let {
       metadata["status"] =
         when (it.lowercase()) {
-          "ongoing" -> "Continuing"
-          "completed" -> "Ended"
-          "hiatus" -> "Hiatus"
-          "cancelled" -> "Cancelled"
+          // Mylar / generic
+          "ongoing", "continuing" -> "Continuing"
+          "completed", "ended", "finished" -> "Ended"
+          "hiatus", "paused" -> "Hiatus"
+          "cancelled", "canceled", "dropped" -> "Cancelled"
+          // AniList GraphQL enum (uppercase) → already lowercased above
+          "releasing", "current" -> "Continuing"
+          "not_yet_released" -> "Continuing"
           else -> it
         }
     }
     request.externalId?.let { metadata["comicid"] = it }
+    // Provider-aware web_url so MylarSeriesProvider can produce a correct WebLink
+    // (instead of always treating comicid as a MangaDex UUID). This is what makes
+    // scrobbler auto-detection work without a manual link + linksLock per series.
+    val providerWebUrl: String? = run {
+      val ext = request.externalId?.takeIf { it.isNotBlank() } ?: return@run null
+      val explicit = request.provider?.lowercase()
+      when {
+        explicit == "anilist" -> "https://anilist.co/manga/$ext"
+        explicit == "mangadex" -> "https://mangadex.org/title/$ext"
+        explicit == "kitsu" -> "https://kitsu.app/manga/$ext"
+        // Heuristic when caller didn't send a provider: UUID → MangaDex, all-digits → AniList.
+        Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matches(ext) ->
+          "https://mangadex.org/title/$ext"
+        ext.all { it.isDigit() } -> "https://anilist.co/manga/$ext"
+        else -> null
+      }
+    }
+    providerWebUrl?.let { metadata["web_url"] = it }
     if (request.genres?.isNotEmpty() == true) metadata["genres"] = request.genres
     if (request.tags?.isNotEmpty() == true) metadata["tags"] = request.tags
     if (alternateTitles.isNotEmpty()) metadata["alternate_titles"] = alternateTitles
@@ -447,6 +469,13 @@ data class PluginApplyMetadataRequest(
   val tags: List<String>? = null,
   val authors: List<PluginApplyAuthor>? = null,
   val alternativeTitles: Map<String, String>? = null,
+  /**
+   * Originating metadata provider (e.g. "anilist", "mangadex", "kitsu"). Optional —
+   * when present, used to write a provider-specific web_url into series.json so
+   * MylarSeriesProvider produces a WebLink to the correct site (which the
+   * scrobbler then auto-detects as a tracker ID).
+   */
+  val provider: String? = null,
 )
 
 fun Plugin.toDto() =

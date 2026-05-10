@@ -1059,6 +1059,7 @@ export default Vue.extend({
               this.series.id,
               metadata,
               result.externalId,
+              this.metadataSearch.selectedPlugin,
             )
           } catch (err) {
             this.$eventHub.$emit(ERROR, {message: `series.json failed: ${err.message}`} as ErrorEvent)

@@ -110,8 +110,15 @@ export default class KomgaPluginsService {
     }
   }
 
-  async applyMetadataToSeries(seriesId: string, metadata: MetadataDetails, externalId?: string): Promise<void> {
+  async applyMetadataToSeries(seriesId: string, metadata: MetadataDetails, externalId?: string, pluginId?: string): Promise<void> {
     try {
+      // Map plugin id ("anilist-metadata", "mangadex-metadata", "kitsu-metadata")
+      // to a normalized provider tag the backend uses to write a provider-aware
+      // web_url into series.json (so MylarSeriesProvider produces the right WebLink
+      // and the scrobbler can auto-detect the tracker).
+      const provider = pluginId
+        ? pluginId.replace(/-metadata$/, '').toLowerCase()
+        : undefined
       await this.http.post(`/api/v1/plugins/apply-metadata/${seriesId}`, {
         title: metadata.title,
         summary: metadata.summary,
@@ -124,6 +131,7 @@ export default class KomgaPluginsService {
         tags: metadata.tags,
         authors: metadata.authors,
         alternativeTitles: metadata.alternativeTitles,
+        provider: provider,
       })
     } catch (e) {
       let msg = 'An error occurred while applying metadata'
