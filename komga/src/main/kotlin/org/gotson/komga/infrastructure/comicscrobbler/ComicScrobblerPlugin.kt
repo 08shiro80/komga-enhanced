@@ -188,7 +188,7 @@ class ComicScrobblerPlugin(
     return try {
       val encodedNumber = URLEncoder.encode(issueNumber.toString(), "UTF-8")
       val issueResponse = metronClient.get()
-        .uri("/api/issues/?series_id=$seriesId&number=$encodedNumber")
+        .uri("/api/issue/?series_id=$seriesId&number=$encodedNumber")
         .header("Authorization", basicAuth(username, password))
         .retrieve()
         .body(String::class.java)

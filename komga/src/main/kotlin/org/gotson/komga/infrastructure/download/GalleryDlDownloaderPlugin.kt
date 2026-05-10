@@ -41,7 +41,7 @@ class GalleryDlDownloaderPlugin(
       id = "gallery-dl-downloader",
       name = "gallery-dl Downloader",
       version = "1.0.0",
-      author = "Komga Team",
+      author = "Jack O'Hagan",
       description =
         "Downloads manga from 1000+ websites using gallery-dl. " +
           "Supports MangaDex, MangaPlus, and many more sites. " +

@@ -40,6 +40,7 @@ class MangaScrobblerPlugin(
 
   private val anilistClient = RestClient.create("https://graphql.anilist.co")
   private val malClient = RestClient.create("https://api.myanimelist.net")
+  private val kitsuClient = RestClient.create("https://kitsu.app/api/edge")
 
   // Fire-and-forget so we don't block the read-progress save path.
   private val executor = Executors.newSingleThreadExecutor { r ->
@@ -52,6 +53,7 @@ class MangaScrobblerPlugin(
 
   private val anilistIdRegex = Regex("""anilist\.co/manga/(\d+)""", RegexOption.IGNORE_CASE)
   private val malIdRegex = Regex("""myanimelist\.net/manga/(\d+)""", RegexOption.IGNORE_CASE)
+  private val kitsuIdRegex = Regex("""kitsu\.app/manga/(\d+)""", RegexOption.IGNORE_CASE)
 
   @EventListener(ApplicationReadyEvent::class)
   fun init() {
@@ -146,12 +148,21 @@ class MangaScrobblerPlugin(
       }
     }
 
+    if (tracker in listOf("kitsu", "both_kitsu", "all") && ids.kitsuId != null) {
+      val token = config["kitsu_token"]
+      if (token.isNullOrBlank()) {
+        log(LogLevel.WARN, "Kitsu token not configured")
+      } else if (updateKitsu(ids.kitsuId, chapterNumber, token, seriesMeta.title)) {
+        anySuccess = true
+      }
+    }
+
     if (anySuccess) {
       lastSynced[book.seriesId] = max(previous, chapterNumber)
     }
   }
 
-  private data class TrackerIds(val anilistId: Int?, val malId: Int?)
+  private data class TrackerIds(val anilistId: Int?, val malId: Int?, val kitsuId: Int?)
 
   private fun resolveTrackerIds(
     seriesTitle: String,
@@ -161,12 +172,14 @@ class MangaScrobblerPlugin(
     // 1. Auto-detect from SeriesMetadata.links if enabled
     var anilistId: Int? = null
     var malId: Int? = null
+    var kitsuId: Int? = null
 
     if ((config["auto_detect_links"] ?: "true").toBoolean()) {
       for (link in links) {
         val url = link.url.toString()
         if (anilistId == null) anilistIdRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()?.let { anilistId = it }
         if (malId == null) malIdRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()?.let { malId = it }
+        if (kitsuId == null) kitsuIdRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()?.let { kitsuId = it }
       }
     }
 
@@ -180,13 +193,14 @@ class MangaScrobblerPlugin(
         match?.value?.let { node ->
           node.get("anilist_id")?.asInt(0)?.takeIf { it > 0 }?.let { anilistId = it }
           node.get("mal_id")?.asInt(0)?.takeIf { it > 0 }?.let { malId = it }
+          node.get("kitsu_id")?.asInt(0)?.takeIf { it > 0 }?.let { kitsuId = it }
         }
       } catch (e: Exception) {
         log(LogLevel.ERROR, "Invalid 'mappings' JSON: ${e.message}")
       }
     }
 
-    return TrackerIds(anilistId, malId)
+    return TrackerIds(anilistId, malId, kitsuId)
   }
 
   private fun updateAnilist(mediaId: Int, progress: Int, token: String, title: String): Boolean {
@@ -244,6 +258,74 @@ class MangaScrobblerPlugin(
       true
     } catch (e: RestClientException) {
       log(LogLevel.ERROR, "MAL request failed for '$title' (id=$mediaId): ${e.message}", e)
+      false
+    }
+  }
+
+  private fun updateKitsu(mediaId: Int, progress: Int, token: String, title: String): Boolean {
+    return try {
+      // Find the user's library entry for this manga
+      val searchResponse = kitsuClient.get()
+        .uri("/library-entries?filter[mangaId]=$mediaId&page[limit]=1")
+        .header("Authorization", "Bearer $token")
+        .header("Accept", "application/vnd.api+json")
+        .retrieve()
+        .body(String::class.java)
+
+      val searchJson = searchResponse?.let { objectMapper.readTree(it) }
+      val data = searchJson?.get("data")
+      val entryId = data?.firstOrNull()?.get("id")?.asText()
+
+      if (entryId != null) {
+        // Update existing entry
+        val patchBody = mapOf(
+          "data" to mapOf(
+            "id" to entryId,
+            "type" to "libraryEntries",
+            "attributes" to mapOf("progress" to progress)
+          )
+        )
+        kitsuClient.patch()
+          .uri("/library-entries/$entryId")
+          .header("Authorization", "Bearer $token")
+          .contentType(MediaType("application/vnd.api+json"))
+          .body(patchBody)
+          .retrieve()
+          .body(String::class.java)
+
+        log(LogLevel.INFO, "Kitsu: '$title' → chapter $progress")
+      } else {
+        // Create new entry
+        val postBody = mapOf(
+          "data" to mapOf(
+            "type" to "libraryEntries",
+            "attributes" to mapOf(
+              "progress" to progress,
+              "status" to "current"
+            ),
+            "relationships" to mapOf(
+              "manga" to mapOf(
+                "data" to mapOf(
+                  "id" to mediaId.toString(),
+                  "type" to "manga"
+                )
+              )
+            )
+          )
+        )
+        kitsuClient.post()
+          .uri("/library-entries")
+          .header("Authorization", "Bearer $token")
+          .contentType(MediaType("application/vnd.api+json"))
+          .body(postBody)
+          .retrieve()
+          .body(String::class.java)
+
+        log(LogLevel.INFO, "Kitsu: '$title' → chapter $progress (created)")
+      }
+      true
+    } catch (e: RestClientException) {
+      log(LogLevel.ERROR, "Kitsu request failed for '$title' (id=$mediaId): ${e.message}", e)
       false
     }
   }
