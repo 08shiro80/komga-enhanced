@@ -15,10 +15,15 @@ Local fork of [komga](https://github.com/gotson/komga), tagged
 | `anilist-metadata` | METADATA | `komga/src/main/kotlin/org/gotson/komga/infrastructure/metadata/anilist/AniListMetadataPlugin.kt` |
 | `mangadex-metadata` | METADATA | `komga/src/main/kotlin/org/gotson/komga/infrastructure/metadata/mangadex/MangaDexMetadataPlugin.kt` |
 | `kitsu-metadata` | METADATA | `komga/src/main/kotlin/org/gotson/komga/infrastructure/metadata/kitsu/KitsuMetadataPlugin.kt` |
+| `auto-metadata` | METADATA (virtual) | `komga/src/main/kotlin/org/gotson/komga/infrastructure/automatch/` |
 | `scrobbler` | NOTIFIER | `komga/src/main/kotlin/org/gotson/komga/infrastructure/scrobbler/ScrobblerPlugin.kt` |
 
 Plus the supporting Mylar `series.json` reader (used as the apply path —
 see below).
+
+`auto-metadata` is a "virtual" plugin: it has a row in the plugin DB so it
+shows up in the config UI, but it isn't an `OnlineMetadataProvider` itself
+— it orchestrates the other three. See **Auto-match (Komf-style)** below.
 
 ## Build & deploy
 
@@ -39,6 +44,74 @@ docker compose up -d --force-recreate
 A clean rebuild takes ~5 min. The Spring Boot fat-jar inside the container
 lives at `/app/application.jar`; if its mtime predates your build, the
 container is still on the old image — recreate.
+
+## Auto-match (Komf-style)
+
+A built-in equivalent to running [Komf](https://github.com/Snd-R/komf) as a
+sidecar: when a series is added (or when explicitly triggered), the system
+walks a configured priority list of metadata providers, picks the best
+candidate by normalized-title similarity, and writes a `series.json` that
+the existing Mylar pipeline reads back.
+
+```
+DomainEvent.SeriesAdded                POST /api/v1/automatch/series/{id}
+        │                                       │
+        ▼                                       │
+AutoMetadataEventListener                       │
+        │ (only if 'auto-metadata' enabled)     │
+        ▼                                       │
+Task.AutoMatchSeriesMetadata ──── TaskHandler ──┘
+                                       │
+                                       ▼
+                          AutoMetadataApplier.apply()
+                                       │
+                ┌──────────────────────┼──────────────────────┐
+                ▼                      ▼                      ▼
+        AutoMetadataMatcher    SeriesJsonWriter       refreshSeriesMetadata
+        (search + score)      (atomic series.json)    (HIGH_PRIORITY)
+                                       │
+                                       ▼
+                                  rescan picks it up
+                                  via MylarSeriesProvider
+```
+
+Key knobs (configured on the virtual `auto-metadata` plugin):
+- `enabled` — gates the SeriesAdded listener. Default `false` (opt-in).
+- `provider_priority` — CSV; default `anilist,mangadex,kitsu`. First provider
+  whose top result clears the threshold wins; we don't aggregate across
+  providers.
+- `min_score` — token-set Jaccard + containment, default `0.85`. `1.0` means
+  normalized titles are exactly equal. Lower it if your series names contain
+  noise the normalizer can't strip.
+
+Endpoints:
+- `POST /api/v1/automatch/series/{id}` — sync, returns `ApplyOutcome`
+- `POST /api/v1/automatch/series/{id}/queue?force=true` — async
+- `POST /api/v1/automatch/libraries/{id}?force=true` — bulk async
+
+The applier is **idempotent**: it skips series that already have any link
+in `SeriesMetadata.links` unless `force=true`. This means a freshly imported
+series gets matched once on first scan, and subsequent refreshes/scans
+don't re-search.
+
+**Title normalization** lives in `TitleNormalizer.kt`. The relevant rule is
+that bracket-and-paren content is stripped iteratively (3 passes), and
+common volume/chapter markers (`Vol. 1`, `v01`, `Ch 5`) are removed before
+tokenization. Stopwords (`the`, `a`, `en`, `english`, `raw`, ...) are
+dropped from the token set so a folder like `Atsumaru (EN) - Lookism`
+still matches `Lookism` cleanly.
+
+**Rate limits.** AniList allows 90 req/min; the single-threaded task
+processor naturally paces below that for libraries up to a few hundred
+series. For larger backfills, throttle by issuing the bulk endpoint per
+library rather than all at once, or extend `AutoMetadataMatcher` with an
+explicit `RateLimiter` (none today).
+
+**Why this is integrated, not a Komf sidecar.** Komf needs a webhook back
+to Komga to apply matches, and Komga's apply path is the same one used
+here (write `series.json`, refresh). Doing it in-process avoids the extra
+HTTP hop and lets us share `SeriesJsonWriter` with the manual UI flow so
+both produce identical output.
 
 ## Architecture pitfall: the scrobbler ↔ AniList plugin handshake
 
