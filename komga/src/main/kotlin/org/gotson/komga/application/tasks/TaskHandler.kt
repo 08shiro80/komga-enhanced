@@ -17,6 +17,7 @@ import org.gotson.komga.domain.service.LocalArtworkLifecycle
 import org.gotson.komga.domain.service.PageHashLifecycle
 import org.gotson.komga.domain.service.SeriesLifecycle
 import org.gotson.komga.domain.service.SeriesMetadataLifecycle
+import org.gotson.komga.infrastructure.automatch.AutoMetadataApplier
 import org.gotson.komga.infrastructure.search.SearchIndexLifecycle
 import org.gotson.komga.interfaces.scheduler.METER_TASKS_EXECUTION
 import org.gotson.komga.interfaces.scheduler.METER_TASKS_FAILURE
@@ -45,6 +46,7 @@ class TaskHandler(
   private val searchIndexLifecycle: SearchIndexLifecycle,
   private val pageHashLifecycle: PageHashLifecycle,
   private val chapterChecker: ChapterChecker,
+  private val autoMetadataApplier: AutoMetadataApplier,
   private val meterRegistry: MeterRegistry,
 ) {
   fun handleTask(task: Task) {
@@ -111,6 +113,11 @@ class TaskHandler(
           is Task.AggregateSeriesMetadata ->
             seriesRepository.findByIdOrNull(task.seriesId)?.let { series ->
               seriesMetadataLifecycle.aggregateMetadata(series)
+            } ?: logger.warn { "Cannot execute task $task: Series does not exist" }
+
+          is Task.AutoMatchSeriesMetadata ->
+            seriesRepository.findByIdOrNull(task.seriesId)?.let { series ->
+              autoMetadataApplier.apply(series, force = task.force)
             } ?: logger.warn { "Cannot execute task $task: Series does not exist" }
 
           is Task.RefreshBookLocalArtwork ->

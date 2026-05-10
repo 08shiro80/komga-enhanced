@@ -206,6 +206,14 @@ class TaskEmitter(
     submitTask(Task.AggregateSeriesMetadata(seriesId, priority))
   }
 
+  fun autoMatchSeriesMetadata(
+    seriesId: String,
+    force: Boolean = false,
+    priority: Int = DEFAULT_PRIORITY,
+  ) {
+    submitTask(Task.AutoMatchSeriesMetadata(seriesId, force, priority))
+  }
+
   fun refreshBookLocalArtwork(
     book: Book,
     priority: Int = DEFAULT_PRIORITY,

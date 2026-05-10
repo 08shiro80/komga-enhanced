@@ -115,6 +115,106 @@ class PluginInitializer(
           dependencies = null,
         ),
         Plugin(
+          id = "scrobbler",
+          name = "Scrobbler (AniList / MyAnimeList)",
+          version = "1.0.0",
+          author = "Komga Team",
+          description = "Syncs read progress to AniList and/or MyAnimeList when a book is marked completed. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net) or via manual JSON mappings.",
+          enabled = false,
+          pluginType = PluginType.NOTIFIER,
+          entryPoint = "org.gotson.komga.infrastructure.scrobbler.ScrobblerPlugin",
+          sourceUrl = null,
+          installedDate = LocalDateTime.now(),
+          lastUpdated = LocalDateTime.now(),
+          configSchema =
+            """
+            {
+              "type": "object",
+              "properties": {
+                "tracker": {
+                  "type": "string",
+                  "title": "Trackers to update",
+                  "default": "anilist",
+                  "enum": ["anilist", "both", "mal"]
+                },
+                "anilist_token": {
+                  "type": "string",
+                  "title": "AniList Access Token",
+                  "format": "password",
+                  "description": "Personal access token from anilist.co/api/v2/oauth/pin (Implicit Grant flow)."
+                },
+                "mal_access_token": {
+                  "type": "string",
+                  "title": "MyAnimeList Access Token",
+                  "format": "password",
+                  "description": "OAuth2 access token. NOTE: MAL tokens expire after ~1 month — refresh handling is not implemented in v1."
+                },
+                "auto_detect_links": {
+                  "type": "string",
+                  "title": "Auto-detect tracker IDs from series links",
+                  "default": "true",
+                  "enum": ["false", "true"],
+                  "description": "If true, extract IDs from anilist.co / myanimelist.net URLs in SeriesMetadata.links."
+                },
+                "mappings": {
+                  "type": "string",
+                  "title": "Manual series mappings (JSON)",
+                  "description": "Override auto-detection. Example: {\"Berserk\":{\"anilist_id\":30002,\"mal_id\":2}}"
+                },
+                "sync_user_id": {
+                  "type": "string",
+                  "title": "Restrict to user ID",
+                  "description": "Optional. If set, only progress changes from this Komga user ID are synced."
+                }
+              },
+              "required": []
+            }
+            """.trimIndent(),
+          dependencies = null,
+        ),
+        Plugin(
+          id = "auto-metadata",
+          name = "Auto Metadata Match",
+          version = "1.0.0",
+          author = "Komga Team",
+          description = "Automatically match new series against the configured metadata providers (AniList, MangaDex, Kitsu) on scan/import. Komf-style: walks a priority list, scores candidates by normalized-title similarity, and applies the first match above the score threshold. Existing series can be bulk-matched via POST /api/v1/automatch/libraries/{id}.",
+          enabled = true,
+          pluginType = PluginType.METADATA,
+          entryPoint = "org.gotson.komga.infrastructure.automatch.AutoMetadataApplier",
+          sourceUrl = null,
+          installedDate = LocalDateTime.now(),
+          lastUpdated = LocalDateTime.now(),
+          configSchema =
+            """
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "string",
+                  "title": "Auto-match new series",
+                  "default": "false",
+                  "enum": ["false", "true"],
+                  "description": "If true, queue a background auto-match task whenever a new series is added (initial scan or import). Existing series are not touched unless you call the bulk endpoint."
+                },
+                "provider_priority": {
+                  "type": "string",
+                  "title": "Provider priority (CSV)",
+                  "default": "anilist,mangadex,kitsu",
+                  "description": "Comma-separated provider tags to try in order. The first provider whose top result scores above min_score wins. Disabled plugins are skipped."
+                },
+                "min_score": {
+                  "type": "string",
+                  "title": "Minimum match score (0.0-1.0)",
+                  "default": "0.85",
+                  "description": "Token-set Jaccard score. 1.0 = normalized titles are exactly equal. 0.85 is a good default; lower if your titles include extra noise that the normalizer cannot strip; raise if you see false positives."
+                }
+              },
+              "required": []
+            }
+            """.trimIndent(),
+          dependencies = null,
+        ),
+        Plugin(
           id = "mangadex-subscription",
           name = "MangaDex Subscription Sync",
           version = "1.0.0",

@@ -138,6 +138,16 @@ sealed class Task(
     override fun toString(): String = "AggregateSeriesMetadata(seriesId='$seriesId', priority='$priority')"
   }
 
+  class AutoMatchSeriesMetadata(
+    val seriesId: String,
+    val force: Boolean = false,
+    priority: Int = DEFAULT_PRIORITY,
+  ) : Task(priority, seriesId) {
+    override val uniqueId = "AUTO_MATCH_SERIES_METADATA_${seriesId}_FORCE_$force"
+
+    override fun toString(): String = "AutoMatchSeriesMetadata(seriesId='$seriesId', force=$force, priority='$priority')"
+  }
+
   class RefreshBookLocalArtwork(
     val bookId: String,
     priority: Int = DEFAULT_PRIORITY,
