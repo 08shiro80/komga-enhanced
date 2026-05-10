@@ -34,12 +34,21 @@ class AutoMetadataApplier(
   private val taskEmitter: TaskEmitter,
 ) {
   /**
-   * @param force if false (default), skip series that already have at least one
-   *   link in `SeriesMetadata.links` (assumes earlier auto-match or manual edit).
+   * @param force if false (default), respect both the global "auto-metadata enabled"
+   *   toggle and the "skip if already linked" rule. force=true bypasses both gates,
+   *   so an admin can force-rematch a single series even when the global feature
+   *   is off.
    * @param triggerRefresh if true, queue a `RefreshSeriesMetadata` so the
-   *   freshly written series.json is read back and merged into the DB.
+   *   freshly written series.json is read back and merged into the DB. Set
+   *   false when calling from inside an existing refresh handler — the
+   *   in-flight refresh will already pick up the new series.json from disk.
    */
   fun apply(series: Series, force: Boolean = false, triggerRefresh: Boolean = true): ApplyOutcome {
+    if (!force && !matcher.isEnabled()) {
+      logger.debug { "Auto-match: feature disabled, skipping series='${series.name}'" }
+      return ApplyOutcome(matched = false, skippedReason = "disabled")
+    }
+
     val meta = seriesMetadataRepository.findById(series.id)
 
     if (!force && meta.links.isNotEmpty()) {

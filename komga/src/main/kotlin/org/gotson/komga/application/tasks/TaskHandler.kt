@@ -106,6 +106,18 @@ class TaskHandler(
 
           is Task.RefreshSeriesMetadata ->
             seriesRepository.findByIdOrNull(task.seriesId)?.let { series ->
+              // If auto-match is enabled and the series has no link yet, try to
+              // resolve a tracker before the lifecycle refresh runs. The applier
+              // writes a fresh series.json, which the in-flight refresh below
+              // will then read via MylarSeriesProvider — no second queued
+              // refresh needed (triggerRefresh=false). Self-gates on
+              // matcher.isEnabled() and on existing links, so no overhead for
+              // already-matched series or when the feature is off.
+              try {
+                autoMetadataApplier.apply(series, force = false, triggerRefresh = false)
+              } catch (e: Exception) {
+                logger.warn(e) { "Auto-match failed during refresh for series='${series.name}', continuing with normal refresh" }
+              }
               seriesMetadataLifecycle.refreshMetadata(series)
               taskEmitter.aggregateSeriesMetadata(series.id, priority = task.priority)
             } ?: logger.warn { "Cannot execute task $task: Series does not exist" }
