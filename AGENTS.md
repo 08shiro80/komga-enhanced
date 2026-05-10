@@ -94,6 +94,20 @@ in `SeriesMetadata.links` unless `force=true`. This means a freshly imported
 series gets matched once on first scan, and subsequent refreshes/scans
 don't re-search.
 
+**Triggers** (in addition to the dedicated `/automatch/...` endpoints):
+- `DomainEvent.SeriesAdded` → `AutoMetadataEventListener` queues a
+  `Task.AutoMatchSeriesMetadata` (gated on the `enabled` config).
+- `Task.RefreshSeriesMetadata` (the existing refresh path — UI's "Refresh
+  Metadata" button, post-scan refresh, manual `POST .../metadata/refresh`)
+  → calls `autoMetadataApplier.apply(force=false, triggerRefresh=false)`
+  before the lifecycle refresh runs. Self-gates on `enabled` + already-
+  linked, so already-matched series take one DB read and skip. The applier
+  writes a fresh `series.json`; the in-flight refresh then reads it via
+  `MylarSeriesProvider`. No second queued refresh.
+
+Net effect: an unmatched series clicked through the existing UI Refresh
+button gets a full match + tracker link populated in one round trip.
+
 **Title normalization** lives in `TitleNormalizer.kt`. The relevant rule is
 that bracket-and-paren content is stripped iteratively (3 passes), and
 common volume/chapter markers (`Vol. 1`, `v01`, `Ch 5`) are removed before
