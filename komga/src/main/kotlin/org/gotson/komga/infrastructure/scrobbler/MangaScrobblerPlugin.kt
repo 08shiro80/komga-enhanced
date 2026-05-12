@@ -30,6 +30,8 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlin.math.max
+import java.net.http.HttpClient
+import org.springframework.http.client.JdkClientHttpRequestFactory
 
 private val logger = KotlinLogging.logger {}
 
@@ -47,10 +49,13 @@ class MangaScrobblerPlugin(
 ) {
   private val pluginId = "manga-scrobbler"
 
-  private val anilistClient = RestClient.create("https://graphql.anilist.co")
-  private val malClient = RestClient.create("https://api.myanimelist.net")
-  private val kitsuClient = RestClient.create("https://kitsu.app/api/edge")
-  private val mangadexClient = RestClient.create("https://api.mangadex.org")
+  private val timeoutClient = JdkClientHttpRequestFactory().apply {
+    setReadTimeout(Duration.ofSeconds(30))
+  }
+  private val anilistClient = RestClient.builder().baseUrl("https://graphql.anilist.co").requestFactory(timeoutClient).build()
+  private val malClient = RestClient.builder().baseUrl("https://api.myanimelist.net").requestFactory(timeoutClient).build()
+  private val kitsuClient = RestClient.builder().baseUrl("https://kitsu.app/api/edge").requestFactory(timeoutClient).build()
+  private val mangadexClient = RestClient.builder().baseUrl("https://api.mangadex.org").requestFactory(timeoutClient).build()
 
   // Fire-and-forget so we don't block the read-progress save path.
   private val executor = Executors.newSingleThreadExecutor { r ->
@@ -63,7 +68,7 @@ class MangaScrobblerPlugin(
 
   // In-memory token cache with expiry (avoids unnecessary refresh calls)
   private val refreshClients by lazy {
-    RestClient.create()
+    RestClient.builder().requestFactory(timeoutClient).build()
   }
   private var malAccessToken: String? = null
   private var malTokenExpiry: Instant? = null
@@ -109,9 +114,11 @@ class MangaScrobblerPlugin(
     val progress = event.progress
     if (!progress.completed) return
 
+    logger.info { "MangaScrobbler: dispatching handle for book ${progress.bookId}" }
     executor.submit {
       try {
         handle(progress.bookId, progress.userId)
+        logger.info { "MangaScrobbler: handle completed for book ${progress.bookId}" }
       } catch (e: Exception) {
         logger.error(e) { "Scrobbler failed for book ${progress.bookId}" }
         log(LogLevel.ERROR, "Unexpected error for book ${progress.bookId}: ${e.message}", e)
@@ -380,7 +387,7 @@ class MangaScrobblerPlugin(
   private fun updateMangaDex(mangaId: String, progress: Int, config: Map<String, String?>, title: String): Boolean {
     val token = getValidMangaDexToken(config) ?: return false
     return try {
-      mangadexClient.patch()
+      mangadexClient.post()
         .uri("/manga/$mangaId/read")
         .header("Authorization", "Bearer $token")
         .contentType(MediaType.APPLICATION_JSON)
@@ -398,7 +405,7 @@ class MangaScrobblerPlugin(
         val retryToken = getValidMangaDexToken(config)
         if (retryToken != null) {
           try {
-            mangadexClient.patch()
+            mangadexClient.post()
               .uri("/manga/$mangaId/read")
               .header("Authorization", "Bearer $retryToken")
               .contentType(MediaType.APPLICATION_JSON)

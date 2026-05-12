@@ -12,9 +12,11 @@ import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.infrastructure.metadata.SeriesMetadataProvider
 import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import java.net.URI
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 private val logger = KotlinLogging.logger {}
@@ -26,10 +28,13 @@ class TrackerLinkEnricher(
   private val pluginRepository: PluginRepository,
   private val objectMapper: ObjectMapper,
 ) : SeriesMetadataProvider {
-  private val anilistClient = RestClient.create("https://graphql.anilist.co")
-  private val malClient = RestClient.create("https://api.myanimelist.net")
-  private val kitsuClient = RestClient.create("https://kitsu.app/api/edge")
-  private val mangadexClient = RestClient.create("https://api.mangadex.org")
+  private val timeoutFactory = JdkClientHttpRequestFactory().apply {
+    setReadTimeout(Duration.ofSeconds(15))
+  }
+  private val anilistClient = RestClient.builder().baseUrl("https://graphql.anilist.co").requestFactory(timeoutFactory).build()
+  private val malClient = RestClient.builder().baseUrl("https://api.myanimelist.net").requestFactory(timeoutFactory).build()
+  private val kitsuClient = RestClient.builder().baseUrl("https://kitsu.app/api/edge").requestFactory(timeoutFactory).build()
+  private val mangadexClient = RestClient.builder().baseUrl("https://api.mangadex.org").requestFactory(timeoutFactory).build()
   private val searchCache = ConcurrentHashMap<String, Boolean>()
 
   override fun shouldLibraryHandlePatch(

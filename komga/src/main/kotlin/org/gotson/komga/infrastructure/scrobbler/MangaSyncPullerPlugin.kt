@@ -16,10 +16,12 @@ import org.gotson.komga.domain.persistence.ReadProgressRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.persistence.SyncStateRepository
 import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -47,9 +49,12 @@ class MangaSyncPullerPlugin(
   private val objectMapper: ObjectMapper,
 ) {
   private val pluginId = "manga-scrobbler"
-  private val anilistClient = RestClient.create("https://graphql.anilist.co")
-  private val malClient = RestClient.create("https://api.myanimelist.net")
-  private val kitsuClient = RestClient.create("https://kitsu.app/api/edge")
+  private val timeoutFactory = JdkClientHttpRequestFactory().apply {
+    setReadTimeout(Duration.ofSeconds(15))
+  }
+  private val anilistClient = RestClient.builder().baseUrl("https://graphql.anilist.co").requestFactory(timeoutFactory).build()
+  private val malClient = RestClient.builder().baseUrl("https://api.myanimelist.net").requestFactory(timeoutFactory).build()
+  private val kitsuClient = RestClient.builder().baseUrl("https://kitsu.app/api/edge").requestFactory(timeoutFactory).build()
 
   @Scheduled(fixedDelay = 3600_000, initialDelay = 120_000)
   fun pullAllTrackers() {
