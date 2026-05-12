@@ -49,6 +49,11 @@ class AutoMetadataApplier(
       return ApplyOutcome(matched = false, skippedReason = "disabled")
     }
 
+    if (matcher.isLibraryExcluded(series.libraryId)) {
+      logger.debug { "Auto-match: library ${series.libraryId} excluded, skipping series='${series.name}'" }
+      return ApplyOutcome(matched = false, skippedReason = "excluded-library")
+    }
+
     val meta = seriesMetadataRepository.findById(series.id)
 
     if (!force && meta.links.isNotEmpty()) {
@@ -56,8 +61,8 @@ class AutoMetadataApplier(
       return ApplyOutcome(matched = false, skippedReason = "already-linked")
     }
 
-    val match = matcher.match(series)
-      ?: return ApplyOutcome(matched = false, skippedReason = "no-match-above-threshold")
+    val scan = matcher.scan(series)
+    val match = scan.primary ?: return ApplyOutcome(matched = false, skippedReason = "no-match-above-threshold")
 
     val details =
       try {
@@ -73,11 +78,17 @@ class AutoMetadataApplier(
         skippedReason = "details-unavailable",
       )
 
+    val trackerLinkPairs =
+      scan.trackerLinkMatches.mapNotNull { m ->
+        seriesJsonWriter.providerOfPluginId(m.pluginId)?.let { tag -> tag to m.externalId }
+      }
+
     seriesJsonWriter.write(
       seriesPath = series.path,
       details = details,
       externalId = match.externalId,
       pluginId = match.pluginId,
+      trackerLinkPairs = trackerLinkPairs,
     )
 
     if (triggerRefresh) {

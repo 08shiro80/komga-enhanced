@@ -10,7 +10,6 @@ import org.gotson.komga.domain.service.MetadataSearchResult
 import org.gotson.komga.domain.service.OnlineMetadataProvider
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
-import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import java.net.URLEncoder
 import java.util.Base64
@@ -22,7 +21,7 @@ class MetronMetadataPlugin(
   private val objectMapper: ObjectMapper,
   private val pluginConfigRepository: PluginConfigRepository,
 ) : OnlineMetadataProvider {
-  private val restClient = RestClient.create("https://metron.cloud")
+  private val restClient = MetronHttp.restClient()
   private val pluginId = "metron-metadata"
 
   private fun credentials(): Pair<String, String> {
@@ -53,7 +52,7 @@ class MetronMetadataPlugin(
     }
 
     return try {
-      logger.info { "Searching Metron for: $query" }
+      logger.debug { "Searching Metron for: $query" }
       val encodedName = URLEncoder.encode(query, "UTF-8")
       val response = restClient.get()
         .uri("/api/series/?name=$encodedName")
@@ -105,7 +104,7 @@ class MetronMetadataPlugin(
     }
 
     return try {
-      logger.info { "Fetching Metron metadata for series ID: $externalId" }
+      logger.debug { "Fetching Metron metadata for series ID: $externalId" }
       val response = restClient.get()
         .uri("/api/series/$externalId/")
         .header("Authorization", authHeader())

@@ -58,8 +58,10 @@ class AutoMatchController(
     @PathVariable seriesId: String,
     @RequestParam(defaultValue = "false") force: Boolean,
   ) {
-    if (seriesRepository.findByIdOrNull(seriesId) == null) {
-      throw ResponseStatusException(HttpStatus.NOT_FOUND, "Series not found")
+    val series = seriesRepository.findByIdOrNull(seriesId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Series not found")
+    if (matcher.isLibraryExcluded(series.libraryId)) {
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Series library is excluded from auto-match")
     }
     taskEmitter.autoMatchSeriesMetadata(seriesId, force = force, priority = HIGH_PRIORITY - 1)
   }
@@ -74,15 +76,19 @@ class AutoMatchController(
     if (series.isEmpty()) {
       throw ResponseStatusException(HttpStatus.NOT_FOUND, "No series in library $libraryId")
     }
+    val excluded = matcher.excludedLibraryIds()
+    val toQueue = series.filter { it.libraryId !in excluded }
+    val skippedExcluded = series.size - toQueue.size
     if (!matcher.isEnabled()) {
-      logger.warn { "Auto-match queued for ${series.size} series in library=$libraryId but auto-metadata plugin is disabled — tasks will no-op until enabled." }
+      logger.warn { "Auto-match queued for ${toQueue.size} series in library=$libraryId but auto-metadata plugin is disabled — tasks will no-op until enabled." }
     }
-    series.forEach {
+    toQueue.forEach {
       taskEmitter.autoMatchSeriesMetadata(it.id, force = force, priority = HIGH_PRIORITY - 1)
     }
     return mapOf(
       "libraryId" to libraryId,
-      "queued" to series.size,
+      "queued" to toQueue.size,
+      "skippedExcludedLibrary" to skippedExcluded,
       "force" to force,
       "matcherEnabled" to matcher.isEnabled(),
     )

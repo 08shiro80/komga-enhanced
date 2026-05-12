@@ -9,6 +9,7 @@ import org.gotson.komga.domain.model.makeSeries
 import org.gotson.komga.infrastructure.metadata.mylar.dto.AgeRating
 import org.gotson.komga.infrastructure.metadata.mylar.dto.MylarMetadata
 import org.gotson.komga.infrastructure.metadata.mylar.dto.Series
+import org.gotson.komga.infrastructure.metadata.mylar.dto.TrackerLinkEntry
 import org.gotson.komga.infrastructure.metadata.mylar.dto.Status
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -208,5 +209,43 @@ class MylarSeriesProviderTest {
       assertThat(title).isEqualTo("Sandman")
       assertThat(titleSort).isEqualTo("Sandman")
     }
+  }
+
+  @Test
+  fun `given seriesJson with web_url and tracker_links when getting series metadata then links contain both without duplicate url`() {
+    val metadata =
+      MylarMetadata(
+        type = "comicSeries",
+        publisher = "Test",
+        imprint = null,
+        name = "One Piece",
+        comicid = "1",
+        year = null,
+        descriptionText = null,
+        descriptionFormatted = null,
+        volume = null,
+        bookType = "print",
+        ageRating = null,
+        comicImage = null,
+        totalIssues = null,
+        publicationRun = null,
+        status = Status.Continuing,
+        webUrl = "https://anilist.co/manga/21",
+        trackerLinks =
+          listOf(
+            TrackerLinkEntry("MangaDex", "https://mangadex.org/title/abc"),
+            TrackerLinkEntry("AniList", "https://anilist.co/manga/21"),
+          ),
+      )
+    val root = Series(metadata)
+    every { mockMapper.readValue(any<File>(), Series::class.java) } returns root
+
+    val patch = mylarSeriesProvider.getSeriesMetadata(series)!!
+
+    assertThat(patch.links).hasSize(2)
+    assertThat(patch.links!!.map { it.url.toString() }).containsExactlyInAnyOrder(
+      "https://anilist.co/manga/21",
+      "https://mangadex.org/title/abc",
+    )
   }
 }

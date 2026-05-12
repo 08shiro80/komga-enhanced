@@ -151,10 +151,10 @@ class PluginInitializer(
         ),
         Plugin(
           id = "manga-scrobbler",
-          name = "Manga Scrobbler (AniList / MyAnimeList)",
+          name = "Manga Scrobbler (AniList / MyAnimeList / Kitsu / MangaDex)",
           version = PluginVersions.MANGA_SCROBBLER,
           author = "Jack O'Hagan",
-          description = "Syncs read progress to AniList, MyAnimeList, and/or Kitsu when a book is marked completed. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net / kitsu.app) or via manual JSON mappings.",
+          description = "Syncs read progress to AniList, MyAnimeList, Kitsu, and/or MangaDex when a book is marked completed. Supports auto-refresh for expiring MAL/Kitsu OAuth2 tokens. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net / kitsu.app / mangadex.org) or via manual JSON mappings.",
           enabled = false,
           pluginType = PluginType.NOTIFIER,
           entryPoint = "org.gotson.komga.infrastructure.scrobbler.MangaScrobblerPlugin",
@@ -170,7 +170,7 @@ class PluginInitializer(
                   "type": "string",
                   "title": "Trackers to update",
                   "default": "anilist",
-                  "enum": ["anilist", "mal", "kitsu", "both", "both_kitsu", "all"]
+                  "enum": ["anilist", "mal", "kitsu", "mangadex", "both", "both_kitsu", "all"]
                 },
                 "anilist_token": {
                   "type": "string",
@@ -182,13 +182,69 @@ class PluginInitializer(
                   "type": "string",
                   "title": "MyAnimeList Access Token",
                   "format": "password",
-                  "description": "OAuth2 access token. NOTE: MAL tokens expire after ~1 month — refresh handling is not implemented in v1."
+                  "description": "OAuth2 access token. MAL tokens expire ~monthly — auto-refresh is supported when mal_client_id/mal_client_secret/mal_refresh_token are configured."
+                },
+                "mal_refresh_token": {
+                  "type": "string",
+                  "title": "MyAnimeList Refresh Token",
+                  "format": "password",
+                  "description": "OAuth2 refresh token returned during initial authorization."
+                },
+                "mal_client_id": {
+                  "type": "string",
+                  "title": "MyAnimeList Client ID",
+                  "description": "MAL OAuth2 app client ID (required for token refresh)."
+                },
+                "mal_client_secret": {
+                  "type": "string",
+                  "title": "MyAnimeList Client Secret",
+                  "format": "password",
+                  "description": "MAL OAuth2 app client secret (required for token refresh)."
                 },
                 "kitsu_token": {
                   "type": "string",
                   "title": "Kitsu Access Token",
                   "format": "password",
-                  "description": "OAuth2 bearer token from kitsu.io/api/oauth/token (password grant)."
+                  "description": "OAuth2 bearer token from kitsu.app/api/oauth/token. Auto-refresh is supported when kitsu_refresh_token/kitsu_client_id/kitsu_client_secret are configured."
+                },
+                "kitsu_refresh_token": {
+                  "type": "string",
+                  "title": "Kitsu Refresh Token",
+                  "format": "password",
+                  "description": "OAuth2 refresh token returned during initial authorization."
+                },
+                "kitsu_client_id": {
+                  "type": "string",
+                  "title": "Kitsu Client ID",
+                  "description": "Kitsu OAuth2 app client ID (required for token refresh)."
+                },
+                "kitsu_client_secret": {
+                  "type": "string",
+                  "title": "Kitsu Client Secret",
+                  "format": "password",
+                  "description": "Kitsu OAuth2 app client secret (required for token refresh)."
+                },
+                "mangadex_username": {
+                  "type": "string",
+                  "title": "MangaDex Username",
+                  "description": "MangaDex account username for reading status updates."
+                },
+                "mangadex_password": {
+                  "type": "string",
+                  "title": "MangaDex Password",
+                  "format": "password",
+                  "description": "MangaDex account password."
+                },
+                "mangadex_client_id": {
+                  "type": "string",
+                  "title": "MangaDex Client ID",
+                  "description": "MangaDex personal API client ID (from mangadex.org/settings)."
+                },
+                "mangadex_client_secret": {
+                  "type": "string",
+                  "title": "MangaDex Client Secret",
+                  "format": "password",
+                  "description": "MangaDex personal API client secret."
                 },
                 "auto_detect_links": {
                   "type": "string",
@@ -206,6 +262,11 @@ class PluginInitializer(
                   "type": "string",
                   "title": "Restrict to user ID",
                   "description": "Optional. If set, only progress changes from this Komga user ID are synced."
+                },
+                "exclude_library_ids": {
+                  "type": "string",
+                  "title": "Exclude libraries (CSV of library IDs)",
+                  "description": "Optional. Komga library IDs to never scrobble (e.g. your Western comics library when this plugin tracks manga). Find IDs in the library URL or API."
                 }
               },
               "required": []
@@ -258,6 +319,11 @@ class PluginInitializer(
                   "type": "string",
                   "title": "Restrict to user ID",
                   "description": "Optional. Only syncs reads from this Komga user."
+                },
+                "exclude_library_ids": {
+                  "type": "string",
+                  "title": "Exclude libraries (CSV of library IDs)",
+                  "description": "Optional. Library IDs to never send to Metron (e.g. manga libraries when this plugin is for Western comics)."
                 }
               },
               "required": ["metron_username", "metron_password"]
@@ -268,9 +334,9 @@ class PluginInitializer(
         Plugin(
           id = "auto-metadata",
           name = "Auto Metadata Match",
-          version = "1.0.0",
+          version = PluginVersions.AUTO_METADATA,
           author = "Jack O'Hagan",
-          description = "Automatically match new series against the configured metadata providers (AniList, MangaDex, Kitsu) on scan/import. Komf-style: walks a priority list, scores candidates by normalized-title similarity, and applies the first match above the score threshold. Existing series can be bulk-matched via POST /api/v1/automatch/libraries/{id}.",
+          description = "Automatically match new series against the configured metadata providers (AniList, MangaDex, Kitsu) on scan/import. Komf-style: walks a priority list, scores candidates by normalized-title similarity, and applies the first match above the score threshold. Writes multi-source tracker_links when secondary scores pass. Existing series can be bulk-matched via POST /api/v1/automatch/libraries/{id}.",
           enabled = true,
           pluginType = PluginType.METADATA,
           entryPoint = "org.gotson.komga.infrastructure.automatch.AutoMetadataApplier",
@@ -299,7 +365,17 @@ class PluginInitializer(
                   "type": "string",
                   "title": "Minimum match score (0.0-1.0)",
                   "default": "0.85",
-                  "description": "Token-set Jaccard score. 1.0 = normalized titles are exactly equal. 0.85 is a good default; lower if your titles include extra noise that the normalizer cannot strip; raise if you see false positives."
+                  "description": "Token-set Jaccard score for choosing the winning metadata provider and writing series.json. 1.0 = normalized titles are exactly equal. 0.85 is a good default."
+                },
+                "min_score_tracker_links": {
+                  "type": "string",
+                  "title": "Minimum score for extra tracker links (0.0–min_score)",
+                  "description": "Optional. Each enabled provider whose best search result scores at or above this value gets a URL in series.json tracker_links (in addition to web_url from the winner). If unset, defaults to min_score minus 0.08, capped at min_score. Lower = more extra links (higher false-positive risk)."
+                },
+                "exclude_library_ids": {
+                  "type": "string",
+                  "title": "Exclude libraries (CSV of library IDs)",
+                  "description": "Optional. Komga libraries where auto-match must not run (new-series enqueue, bulk queue, and per-series apply). Does not affect other metadata providers."
                 }
               },
               "required": []

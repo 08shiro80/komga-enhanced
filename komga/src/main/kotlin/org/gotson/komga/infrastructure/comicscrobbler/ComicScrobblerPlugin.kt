@@ -13,11 +13,11 @@ import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.persistence.PluginLogRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
+import org.gotson.komga.infrastructure.metadata.metron.MetronHttp
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
-import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import java.net.URLEncoder
 import java.time.LocalDateTime
@@ -40,7 +40,7 @@ class ComicScrobblerPlugin(
 ) {
   private val pluginId = "comic-scrobbler"
 
-  private val metronClient = RestClient.create("https://metron.cloud")
+  private val metronClient = MetronHttp.restClient()
 
   private val executor = Executors.newSingleThreadExecutor { r ->
     Thread(r, "comic-scrobbler-worker").apply { isDaemon = true }
@@ -90,6 +90,11 @@ class ComicScrobblerPlugin(
 
     val book = bookRepository.findByIdOrNull(bookId) ?: run {
       log(LogLevel.WARN, "Book $bookId not found"); return
+    }
+    val excludedLibs = parseExcludedLibraryIds(config)
+    if (book.libraryId in excludedLibs) {
+      logger.debug { "Skipping comic scrobble: library ${book.libraryId} is in exclude_library_ids" }
+      return
     }
     val bookMeta = bookMetadataRepository.findByIdOrNull(bookId) ?: run {
       log(LogLevel.WARN, "BookMetadata not found"); return
@@ -234,6 +239,13 @@ class ComicScrobblerPlugin(
 
   private fun isEnabled(): Boolean =
     try { pluginRepository.findByIdOrNull(pluginId)?.enabled == true } catch (_: Exception) { false }
+
+  private fun parseExcludedLibraryIds(config: Map<String, String?>): Set<String> =
+    config["exclude_library_ids"]
+      ?.split(',')
+      ?.mapNotNull { it.trim().takeIf { s -> s.isNotEmpty() } }
+      ?.toSet()
+      ?: emptySet()
 
   private fun loadConfig(): Map<String, String?> =
     pluginConfigRepository.findByPluginId(pluginId).associate { it.configKey to it.configValue }

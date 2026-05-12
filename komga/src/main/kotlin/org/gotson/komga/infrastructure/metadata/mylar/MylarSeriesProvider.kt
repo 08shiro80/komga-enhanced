@@ -63,31 +63,40 @@ class MylarSeriesProvider(
           }
         }
 
-      // Prefer an explicit web_url (provider-aware; written by PluginController.writeSeriesJson)
-      // and fall back to the legacy MangaDex assumption only when comicid is a MangaDex UUID.
-      // This is what makes scrobbler auto-detection work without a manual link + linksLock.
+      // Prefer an explicit web_url (provider-aware; written by PluginController / automatch)
+      // plus optional tracker_links (multi-source automatch). Fall back to legacy MangaDex UUID comicid.
       val links: List<WebLink>? = run {
-        val webUrl = metadata.webUrl?.takeIf { it.isNotBlank() }
-        if (webUrl != null) {
-          val label =
-            runCatching { URI(webUrl).host }.getOrNull()?.let { host ->
-              when {
-                host.contains("anilist.co") -> "AniList"
-                host.contains("mangadex.org") -> "MangaDex"
-                host.contains("kitsu") -> "Kitsu"
-                host.contains("myanimelist.net") -> "MyAnimeList"
-                host.contains("metron.cloud") -> "Metron"
-                else -> host
-              }
-            } ?: "Source"
-          listOf(WebLink(label, URI(webUrl)))
-        } else if (metadata.comicid.isNotBlank() &&
-          Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE)
-            .matches(metadata.comicid)
-        ) {
-          listOf(WebLink("MangaDex", URI("https://mangadex.org/title/${metadata.comicid}")))
-        } else {
-          null
+        fun labelForUrl(urlStr: String): String =
+          runCatching { URI(urlStr).host }.getOrNull()?.let { host ->
+            when {
+              host.contains("anilist.co") -> "AniList"
+              host.contains("mangadex.org") -> "MangaDex"
+              host.contains("kitsu") -> "Kitsu"
+              host.contains("myanimelist.net") -> "MyAnimeList"
+              host.contains("metron.cloud") -> "Metron"
+              else -> host
+            }
+          } ?: "Source"
+
+        val out = linkedMapOf<String, WebLink>()
+        fun addUrl(urlStr: String, preferredLabel: String?) {
+          val u = urlStr.trim().ifBlank { return }
+          if (!out.containsKey(u)) {
+            val label = preferredLabel?.takeIf { it.isNotBlank() } ?: labelForUrl(u)
+            out[u] = WebLink(label, URI(u))
+          }
+        }
+
+        metadata.webUrl?.let { addUrl(it, null) }
+        metadata.trackerLinks?.forEach { addUrl(it.url, it.label) }
+
+        when {
+          out.isNotEmpty() -> out.values.toList()
+          metadata.comicid.isNotBlank() &&
+            Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE)
+              .matches(metadata.comicid) ->
+            listOf(WebLink("MangaDex", URI("https://mangadex.org/title/${metadata.comicid}")))
+          else -> null
         }
       }
 

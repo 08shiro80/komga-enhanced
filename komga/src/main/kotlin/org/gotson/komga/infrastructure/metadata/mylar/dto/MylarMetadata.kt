@@ -11,6 +11,12 @@ data class AlternateTitleEntry(
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+data class TrackerLinkEntry(
+  val label: String,
+  val url: String,
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class MylarMetadata(
   val type: String = "comicSeries",
   val publisher: String = "",
@@ -46,6 +52,9 @@ data class MylarMetadata(
   val artists: List<String>? = null,
   @field:JsonProperty("web_url")
   val webUrl: String? = null,
+  /** Extra tracker URLs (e.g. from auto-metadata); merged into series links on import. */
+  @field:JsonProperty("tracker_links")
+  val trackerLinks: List<TrackerLinkEntry>? = null,
   @field:JsonProperty("content_rating")
   val contentRating: String? = null,
 )

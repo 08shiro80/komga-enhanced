@@ -26,6 +26,10 @@ class AutoMetadataEventListener(
       logger.debug { "Auto-match disabled — not enqueueing match for new series='${event.series.name}'" }
       return
     }
+    if (matcher.isLibraryExcluded(event.series.libraryId)) {
+      logger.debug { "Auto-match: library ${event.series.libraryId} excluded, not enqueueing '${event.series.name}'" }
+      return
+    }
     logger.info { "Enqueueing auto-match for new series='${event.series.name}' (id=${event.series.id})" }
     taskEmitter.autoMatchSeriesMetadata(event.series.id, force = false, priority = HIGH_PRIORITY - 1)
   }

@@ -33,10 +33,21 @@ class SeriesJsonWriter(
       "anilist" -> "https://anilist.co/manga/$ext"
       "mangadex" -> "https://mangadex.org/title/$ext"
       "kitsu" -> "https://kitsu.app/manga/$ext"
+      "mal" -> "https://myanimelist.net/manga/$ext"
       "metron" -> "https://metron.cloud/series/$ext/"
       else -> defaultWebUrl(ext)
     }
   }
+
+  private fun trackerLinkLabel(provider: String): String =
+    when (provider.lowercase()) {
+      "anilist" -> "AniList"
+      "mangadex" -> "MangaDex"
+      "kitsu" -> "Kitsu"
+      "mal" -> "MyAnimeList"
+      "metron" -> "Metron"
+      else -> provider.replaceFirstChar { it.titlecase() }
+    }
 
   /** UUID → MangaDex, all-digits → AniList. Used when caller didn't tell us the provider. */
   fun defaultWebUrl(externalId: String): String? {
@@ -88,6 +99,7 @@ class SeriesJsonWriter(
     pluginId: String?,
     authors: List<Pair<String, String>>? = null,
     altTitles: Map<String, String>? = null,
+    trackerLinkPairs: List<Pair<String, String>> = emptyList(),
   ): Path {
     val provider = providerOfPluginId(pluginId)
     val metadata = mutableMapOf<String, Any>("type" to "comicSeries", "name" to details.title)
@@ -113,6 +125,19 @@ class SeriesJsonWriter(
       if (artists.isNotEmpty()) metadata["artists"] = artists
     }
     webUrl(provider, externalId)?.let { metadata["web_url"] = it }
+
+    if (trackerLinkPairs.isNotEmpty()) {
+      val byUrl = LinkedHashMap<String, Map<String, String>>()
+      for ((provTag, ext) in trackerLinkPairs) {
+        val url = webUrl(provTag, ext) ?: continue
+        if (!byUrl.containsKey(url)) {
+          byUrl[url] = mapOf("label" to trackerLinkLabel(provTag), "url" to url)
+        }
+      }
+      if (byUrl.isNotEmpty()) {
+        metadata["tracker_links"] = byUrl.values.toList()
+      }
+    }
 
     val seriesJson = mapOf("metadata" to metadata)
     val target = seriesPath.resolve("series.json").toFile()

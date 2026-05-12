@@ -27,6 +27,16 @@ data class MatchResult(
 )
 
 /**
+ * Result of scanning all providers: [primary] is the first (by priority) whose
+ * best title score clears [min_score]; [trackerLinkMatches] includes every provider
+ * whose best score clears the (lower) tracker-links threshold for extra URLs in series.json.
+ */
+data class AutomatchScanResult(
+  val primary: MatchResult?,
+  val trackerLinkMatches: List<MatchResult>,
+)
+
+/**
  * Picks the best metadata match for a Komga `Series` across enabled metadata
  * plugins. Komf-style: walk a configured priority list, search each provider
  * with a normalized query, and accept the first provider whose top candidate
@@ -81,18 +91,49 @@ class AutoMetadataMatcher(
       ?.toDoubleOrNull() ?: DEFAULT_MIN_SCORE
 
   /**
-   * Run the match pipeline. Returns null if no provider produced a candidate
-   * scoring >= minScore.
-   *
-   * @param onlyEnabled if true (default), skips providers whose plugin row has `enabled = false`.
+   * Floor for extra `tracker_links` in series.json. Defaults to `min_score - 0.08`
+   * (never above [minScore]). Optional config `min_score_tracker_links` overrides.
    */
-  fun match(series: Series, onlyEnabled: Boolean = true): MatchResult? {
-    val threshold = minScore()
+  fun minScoreForTrackerLinks(): Double {
+    val p = minScore()
+    val explicit =
+      pluginConfigRepository
+        .findByPluginIdAndKey(AUTO_PLUGIN_ID, "min_score_tracker_links")
+        ?.configValue
+        ?.toDoubleOrNull()
+    val raw = explicit ?: (p - 0.08)
+    return raw.coerceIn(0.0, p)
+  }
+
+  fun excludedLibraryIds(): Set<String> =
+    pluginConfigRepository
+      .findByPluginIdAndKey(AUTO_PLUGIN_ID, "exclude_library_ids")
+      ?.configValue
+      ?.split(',')
+      ?.mapNotNull { it.trim().takeIf { s -> s.isNotEmpty() } }
+      ?.toSet()
+      ?: emptySet()
+
+  fun isLibraryExcluded(libraryId: String): Boolean = libraryId in excludedLibraryIds()
+
+  /**
+   * Single pass over [providerPriority]: first provider meeting [minScore] becomes [AutomatchScanResult.primary];
+   * every provider whose best candidate meets [minScoreForTrackerLinks] is listed in [AutomatchScanResult.trackerLinkMatches].
+   */
+  fun scan(
+    series: Series,
+    onlyEnabled: Boolean = true,
+  ): AutomatchScanResult {
+    val primaryThreshold = minScore()
+    val linkThreshold = minScoreForTrackerLinks()
     val priorities = providerPriority()
     if (priorities.isEmpty()) {
       logger.debug { "Auto-match: empty priority list, skipping series='${series.name}'" }
-      return null
+      return AutomatchScanResult(null, emptyList())
     }
+
+    var primary: MatchResult? = null
+    val trackerLinkMatches = mutableListOf<MatchResult>()
 
     for (short in priorities) {
       val provider = providerById(short) ?: run {
@@ -116,27 +157,45 @@ class AutoMetadataMatcher(
         }
       if (results.isEmpty()) continue
 
-      // Score every candidate's primary title, take the highest.
       var best: Pair<MetadataSearchResult, Double>? = null
       for (r in results) {
         val s = TitleNormalizer.score(series.name, r.title)
         if (best == null || s > best.second) best = r to s
-        if (s == 1.0) break // perfect — stop scanning this provider
+        if (s == 1.0) break
       }
       val (cand, score) = best ?: continue
-      logger.info { "Auto-match: provider='$short' best='${cand.title}' score=${"%.2f".format(score)} for series='${series.name}'" }
-      if (score >= threshold) {
-        return MatchResult(
-          pluginId = fullPluginId(short),
-          provider = provider,
-          externalId = cand.externalId,
-          score = score,
-          titleSeen = cand.title,
-          candidate = cand,
+      logger.debug { "Auto-match: provider='$short' best='${cand.title}' score=${"%.2f".format(score)} for series='${series.name}'" }
+
+      if (score >= linkThreshold) {
+        trackerLinkMatches.add(
+          MatchResult(
+            pluginId = fullPluginId(short),
+            provider = provider,
+            externalId = cand.externalId,
+            score = score,
+            titleSeen = cand.title,
+            candidate = cand,
+          ),
         )
       }
+      if (primary == null && score >= primaryThreshold) {
+        primary =
+          MatchResult(
+            pluginId = fullPluginId(short),
+            provider = provider,
+            externalId = cand.externalId,
+            score = score,
+            titleSeen = cand.title,
+            candidate = cand,
+          )
+      }
     }
-    logger.info { "Auto-match: no provider above threshold=${threshold} for series='${series.name}'" }
-    return null
+
+    if (primary == null) {
+      logger.debug { "Auto-match: no provider above primary threshold=$primaryThreshold for series='${series.name}'" }
+    }
+    return AutomatchScanResult(primary, trackerLinkMatches)
   }
+
+  fun match(series: Series, onlyEnabled: Boolean = true): MatchResult? = scan(series, onlyEnabled).primary
 }
