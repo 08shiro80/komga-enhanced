@@ -14,6 +14,7 @@ import org.gotson.komga.domain.persistence.PluginLogRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.infrastructure.metadata.metron.MetronHttp
+import org.gotson.komga.infrastructure.rate.MetronRateLimiter
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.http.MediaType
@@ -37,6 +38,7 @@ class ComicScrobblerPlugin(
   private val bookMetadataRepository: BookMetadataRepository,
   private val seriesMetadataRepository: SeriesMetadataRepository,
   private val objectMapper: ObjectMapper,
+  private val rateLimiter: MetronRateLimiter,
 ) {
   private val pluginId = "comic-scrobbler"
 
@@ -165,6 +167,7 @@ class ComicScrobblerPlugin(
     password: String,
   ): Int? {
     return try {
+      waitForMetronSlot()
       val encodedName = URLEncoder.encode(seriesTitle, "UTF-8")
       val seriesResponse = metronClient.get()
         .uri("/api/series/?name=$encodedName")
@@ -191,6 +194,7 @@ class ComicScrobblerPlugin(
     password: String,
   ): Int? {
     return try {
+      waitForMetronSlot()
       val encodedNumber = URLEncoder.encode(issueNumber.toString(), "UTF-8")
       val issueResponse = metronClient.get()
         .uri("/api/issue/?series_id=$seriesId&number=$encodedNumber")
@@ -216,6 +220,7 @@ class ComicScrobblerPlugin(
 
   private fun scrobble(issueId: Int, username: String, password: String, seriesTitle: String): Boolean {
     return try {
+      waitForMetronSlot()
       val now = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
       metronClient.post()
         .uri("/api/collection/scrobble/")
@@ -230,6 +235,16 @@ class ComicScrobblerPlugin(
       log(LogLevel.ERROR, "Metron scrobble failed for '$seriesTitle' (issue=$issueId): ${e.message}", e)
       false
     }
+  }
+
+  private fun waitForMetronSlot() {
+    var backoff = rateLimiter.suggestedBackoffMs()
+    while (backoff > 0) {
+      logger.debug { "Metron rate limit: waiting ${backoff}ms" }
+      Thread.sleep(backoff)
+      backoff = rateLimiter.suggestedBackoffMs()
+    }
+    rateLimiter.tryAcquire()
   }
 
   private fun basicAuth(username: String, password: String): String {

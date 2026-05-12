@@ -32,6 +32,7 @@ import java.util.concurrent.Executors
 import kotlin.math.max
 import java.net.http.HttpClient
 import org.springframework.http.client.JdkClientHttpRequestFactory
+import java.net.http.HttpClient
 
 private val logger = KotlinLogging.logger {}
 
@@ -49,9 +50,9 @@ class MangaScrobblerPlugin(
 ) {
   private val pluginId = "manga-scrobbler"
 
-  private val timeoutClient = JdkClientHttpRequestFactory().apply {
-    setReadTimeout(Duration.ofSeconds(30))
-  }
+  private val timeoutClient = JdkClientHttpRequestFactory(
+    HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build()
+  ).apply { setReadTimeout(Duration.ofSeconds(30)) }
   private val anilistClient = RestClient.builder().baseUrl("https://graphql.anilist.co").requestFactory(timeoutClient).build()
   private val malClient = RestClient.builder().baseUrl("https://api.myanimelist.net").requestFactory(timeoutClient).build()
   private val kitsuClient = RestClient.builder().baseUrl("https://kitsu.app/api/edge").requestFactory(timeoutClient).build()
@@ -114,11 +115,9 @@ class MangaScrobblerPlugin(
     val progress = event.progress
     if (!progress.completed) return
 
-    logger.info { "MangaScrobbler: dispatching handle for book ${progress.bookId}" }
     executor.submit {
       try {
         handle(progress.bookId, progress.userId)
-        logger.info { "MangaScrobbler: handle completed for book ${progress.bookId}" }
       } catch (e: Exception) {
         logger.error(e) { "Scrobbler failed for book ${progress.bookId}" }
         log(LogLevel.ERROR, "Unexpected error for book ${progress.bookId}: ${e.message}", e)
@@ -181,14 +180,14 @@ class MangaScrobblerPlugin(
     val tracker = config["tracker"] ?: "both"
     var anySuccess = false
 
-    if (tracker in listOf("anilist", "both") && ids.anilistId != null) {
+    if (tracker in listOf("anilist", "both", "both_kitsu", "all") && ids.anilistId != null) {
       if (updateAnilist(ids.anilistId, chapterNumber, config["anilist_token"] ?: "", seriesMeta.title)) {
         recordSync(book.seriesId, "anilist", chapterNumber, bookId)
         anySuccess = true
       }
     }
 
-    if (tracker in listOf("mal", "both") && ids.malId != null) {
+    if (tracker in listOf("mal", "both", "both_kitsu", "all") && ids.malId != null) {
       if (updateMal(ids.malId, chapterNumber, config, seriesMeta.title)) {
         recordSync(book.seriesId, "mal", chapterNumber, bookId)
         anySuccess = true
@@ -592,9 +591,9 @@ class MangaScrobblerPlugin(
   }
 
   private fun refreshMalToken(config: Map<String, String?>): String? {
-    val refreshTkn = config["mal_refresh_token"] ?: return null
-    val clientId = config["mal_client_id"] ?: return null
-    val clientSecret = config["mal_client_secret"] ?: return null
+    val refreshTkn = config["mal_refresh_token"]?.takeIf { it.isNotBlank() } ?: return null
+    val clientId = config["mal_client_id"]?.takeIf { it.isNotBlank() } ?: return null
+    val clientSecret = config["mal_client_secret"]?.takeIf { it.isNotBlank() } ?: return null
     return try {
       val body =
         "grant_type=refresh_token" +
@@ -632,9 +631,9 @@ class MangaScrobblerPlugin(
   }
 
   private fun refreshKitsuToken(config: Map<String, String?>): String? {
-    val refreshTkn = config["kitsu_refresh_token"] ?: return null
-    val clientId = config["kitsu_client_id"] ?: return null
-    val clientSecret = config["kitsu_client_secret"] ?: return null
+    val refreshTkn = config["kitsu_refresh_token"]?.takeIf { it.isNotBlank() } ?: return null
+    val clientId = config["kitsu_client_id"]?.takeIf { it.isNotBlank() } ?: return null
+    val clientSecret = config["kitsu_client_secret"]?.takeIf { it.isNotBlank() } ?: return null
     return try {
       val body =
         "grant_type=refresh_token" +
