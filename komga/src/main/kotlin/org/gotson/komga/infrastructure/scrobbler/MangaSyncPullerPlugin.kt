@@ -17,7 +17,6 @@ import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.persistence.SyncStateRepository
 import org.springframework.http.MediaType
 import org.springframework.http.client.JdkClientHttpRequestFactory
-import java.net.http.HttpClient
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -51,7 +50,7 @@ class MangaSyncPullerPlugin(
 ) {
   private val pluginId = "manga-scrobbler"
   private val timeoutFactory = JdkClientHttpRequestFactory(
-    HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
+    java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
   ).apply { setReadTimeout(Duration.ofSeconds(15)) }
   private val anilistClient = RestClient.builder().baseUrl("https://graphql.anilist.co").requestFactory(timeoutFactory).build()
   private val malClient = RestClient.builder().baseUrl("https://api.myanimelist.net").requestFactory(timeoutFactory).build()

@@ -30,9 +30,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlin.math.max
-import java.net.http.HttpClient
 import org.springframework.http.client.JdkClientHttpRequestFactory
-import java.net.http.HttpClient
 
 private val logger = KotlinLogging.logger {}
 
@@ -51,7 +49,7 @@ class MangaScrobblerPlugin(
   private val pluginId = "manga-scrobbler"
 
   private val timeoutClient = JdkClientHttpRequestFactory(
-    HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build()
+    java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build()
   ).apply { setReadTimeout(Duration.ofSeconds(30)) }
   private val anilistClient = RestClient.builder().baseUrl("https://graphql.anilist.co").requestFactory(timeoutClient).build()
   private val malClient = RestClient.builder().baseUrl("https://api.myanimelist.net").requestFactory(timeoutClient).build()
