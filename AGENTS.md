@@ -29,15 +29,14 @@ shows up in the config UI, but it isn't an `OnlineMetadataProvider` itself
 
 The project ships a single root `Dockerfile` that does Gradle + node, then
 runs the result via Spring Boot's layered jarmode. Image is consumed by
-`/home/jack/docker/komga/docker-compose.yml`.
+`docker-compose.yml`.
 
 ```sh
 # rebuild image
-cd /home/jack/dev/komga-enhanced
-docker build -t komga-scrobbler:latest .
+docker build -t komga-enhanced:latest .
 
 # IMPORTANT: docker restart will not pick up a new image. Use compose recreate.
-cd /home/jack/docker/komga
+cd docker/komga
 docker compose up -d --force-recreate
 ```
 
@@ -287,8 +286,8 @@ These are throwaway scripts kept around because the scenarios recur:
 
 ## Suwayomi quirk
 
-The user's library is sourced from Suwayomi at
-`/mnt/drive2/suwayomi/downloads/mangas/<source>/<series>/`. Suwayomi
+The library is sourced from Suwayomi at
+`/data/manga/<source>/<series>/`. Suwayomi
 **rewrites `series.json`** on every chapter download and uses uppercase
 status strings (`RELEASING`, `FINISHED`, `HIATUS`, `CANCELLED`). Any change
 to that file made by Komga's apply flow will be clobbered the next time
@@ -304,13 +303,10 @@ Going forward, `writeSeriesJson` writes `web_url` itself; for Suwayomi-
 authored files, the heuristic in `MylarSeriesProvider` (digits → AniList)
 covers them without any disk migration.
 
-## Containers in this homelab
+## Containers
 
-Komga runs in WSL2 Ubuntu-22.04 alongside ~25 other containers. Compose
-file: `/home/jack/docker/komga/docker-compose.yml`. Named volumes are
-**bind mounts**: `/home/jack/docker/komga:/config` and
-`/mnt/drive2:/data`. The `:/data` mount is what makes the manga library
-reachable to Komga at `/data/suwayomi/...`.
+Komga is typically deployed via Docker alongside other services. Compose
+file usage is shown in the Build & Deploy section above. Bind mounts like
+`/config` and `/data` are used for persistence and media access.
 
-Image is rebuilt locally as `komga-scrobbler:latest`. There is no
-registry push.
+Image is rebuilt locally; there is no registry push.
