@@ -382,7 +382,11 @@ class MangaScrobblerPlugin(
   // --- MangaDex ---
 
   private fun updateMangaDex(mangaId: String, progress: Int, config: Map<String, String?>, title: String): Boolean {
-    val token = getValidMangaDexToken(config) ?: return false
+    val token = getValidMangaDexToken(config)
+    if (token == null) {
+      log(LogLevel.WARN, "MangaDex auth failed for '$title'")
+      return false
+    }
     return try {
       mangadexClient.post()
         .uri("/manga/$mangaId/read")

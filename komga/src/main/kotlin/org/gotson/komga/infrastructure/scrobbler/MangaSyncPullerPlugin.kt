@@ -82,10 +82,12 @@ class MangaSyncPullerPlugin(
       val query =
         """
         query (${'$'}id: Int) {
-          MediaList(mediaId: ${'$'}id) {
-            progress
-            status
-            updatedAt
+          Media(id: ${'$'}id) {
+            mediaListEntry {
+              progress
+              status
+              updatedAt
+            }
           }
         }
         """.trimIndent()
@@ -100,7 +102,7 @@ class MangaSyncPullerPlugin(
             .body(String::class.java)
 
         val json = response?.let { objectMapper.readTree(it) }
-        val mediaList = json?.get("data")?.get("MediaList")
+        val mediaList = json?.get("data")?.get("Media")?.get("mediaListEntry")
         if (mediaList == null || mediaList.isNull) continue
 
         val remoteProgress = mediaList.get("progress")?.asInt(0) ?: 0
