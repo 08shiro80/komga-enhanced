@@ -73,7 +73,7 @@ jobs:
 
       - name: Cache built komga JAR
         id: cache_jar
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: komga/build/libs/
           key: komga-jar-${{ steps.versions.outputs.version_next }}-${{ hashFiles('komga/src/**', 'komga-webui/src/**', 'komga-webui/package-lock.json', '**/build.gradle.kts', 'settings.gradle', 'gradle.properties', 'plugins/**/build.gradle.kts', 'plugins/**/src/**') }}
