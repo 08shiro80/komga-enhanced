@@ -681,7 +681,7 @@ export default Vue.extend({
         this.splitResults = response.data
       } catch (e: any) {
         if (e.response?.status === 409) {
-          this.$eventHub.$emit('error', {message: 'Split-All läuft bereits — bitte warten.'})
+          this.$eventHub.$emit('error', {message: 'Split-All is already running — please wait.'})
           this.pollSplitAllStatus()
           return
         }

@@ -182,7 +182,7 @@ tasks {
     inputs.file("$webui/package.json").withPropertyName("packageJson").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file("$webui/package-lock.json").withPropertyName("packageLock").withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir("$webui/node_modules").withPropertyName("nodeModules")
-    outputs.cacheIf { true }
+    outputs.cacheIf { false }
     commandLine(
       if (Os.isFamily(Os.FAMILY_WINDOWS)) {
         "npm.cmd"

@@ -22,6 +22,7 @@ object CbzSafeWriter {
 
   fun safelyReplace(
     target: Path,
+    verifyContent: ((Path) -> Unit)? = null,
     write: (OutputStream) -> Unit,
   ) {
     val parent = target.parent ?: throw IOException("CbzSafeWriter: target $target has no parent")
@@ -60,6 +61,16 @@ object CbzSafeWriter {
       Files.deleteIfExists(tmp)
       logger.warn(e) { "CbzSafeWriter: tmp verify failed for ${target.fileName} (original untouched)" }
       throw e
+    }
+
+    if (verifyContent != null) {
+      try {
+        verifyContent(tmp)
+      } catch (e: Exception) {
+        Files.deleteIfExists(tmp)
+        logger.warn(e) { "CbzSafeWriter: content verify failed for ${target.fileName} (original untouched)" }
+        throw e
+      }
     }
 
     val bak =

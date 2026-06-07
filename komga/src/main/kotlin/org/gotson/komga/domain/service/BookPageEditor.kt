@@ -111,23 +111,54 @@ class BookPageEditor(
       }
 
     logger.info { "Rewriting ${book.path.fileName} via CbzSafeWriter (remove ${pagesToDelete.size} pages)" }
+    var verifiedMedia: Media? = null
     try {
-      org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(book.path) { outStream ->
-        ZipArchiveOutputStream(outStream).use { zipStream ->
-          zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
-          zipStream.setLevel(Deflater.NO_COMPRESSION)
-          if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
+      org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(
+        target = book.path,
+        write = { outStream ->
+          ZipArchiveOutputStream(outStream).use { zipStream ->
+            zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
+            zipStream.setLevel(Deflater.NO_COMPRESSION)
+            if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
 
-          pagesToKeep
-            .map { it.fileName }
-            .union(media.files.map { it.fileName })
-            .forEach { entry ->
-              zipStream.putArchiveEntry(ZipArchiveEntry(entry))
-              zipStream.write(bookAnalyzer.getFileContent(BookWithMedia(book, media), entry))
-              zipStream.closeArchiveEntry()
-            }
-        }
-      }
+            pagesToKeep
+              .map { it.fileName }
+              .union(media.files.map { it.fileName })
+              .forEach { entry ->
+                zipStream.putArchiveEntry(ZipArchiveEntry(entry))
+                zipStream.write(bookAnalyzer.getFileContent(BookWithMedia(book, media), entry))
+                zipStream.closeArchiveEntry()
+              }
+          }
+        },
+        verifyContent = { tmpPath ->
+          val tmpScanned =
+            fileSystemScanner.scanFile(tmpPath)
+              ?: throw BookConversionException("Tmp file could not be scanned: $tmpPath")
+          val tmpBook =
+            tmpScanned.copy(
+              id = book.id,
+              seriesId = book.seriesId,
+              libraryId = book.libraryId,
+            )
+          val tmpMedia = bookAnalyzer.analyze(tmpBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
+          when {
+            tmpMedia.status != Media.Status.READY ->
+              throw BookConversionException("Created file could not be analyzed, aborting page removal")
+            tmpMedia.mediaType != MediaType.ZIP.type ->
+              throw BookConversionException("Created file is not a zip file, aborting page removal")
+            !tmpMedia.pages
+              .map { FilenameUtils.getName(it.fileName) to it.mediaType }
+              .containsAll(pagesToKeep.map { FilenameUtils.getName(it.fileName) to it.mediaType }) ->
+              throw BookConversionException("Created file does not contain all pages to keep from existing file, aborting conversion")
+            !tmpMedia.files
+              .map { FilenameUtils.getName(it.fileName) }
+              .containsAll(media.files.map { FilenameUtils.getName(it.fileName) }) ->
+              throw BookConversionException("Created file does not contain all files from existing file, aborting page removal")
+          }
+          verifiedMedia = tmpMedia
+        },
+      )
     } catch (e: ZipException) {
       mediaRepository.findById(book.id).let { current ->
         if (current.status != Media.Status.ERROR) {
@@ -136,9 +167,12 @@ class BookPageEditor(
       }
       logger.warn { "Corrupt CBZ at ${book.path} — flagged as ERROR, skipping page removal (${e.message})" }
       return null
+    } catch (e: BookConversionException) {
+      failedPageRemoval += book.id
+      throw e
     }
 
-    val newBook =
+    val rescannedNewBook =
       fileSystemScanner
         .scanFile(book.path)
         ?.copy(
@@ -148,35 +182,13 @@ class BookPageEditor(
         )
         ?: throw IllegalStateException("Newly created book could not be scanned after rewrite: ${book.path}")
 
-    val createdMedia = bookAnalyzer.analyze(newBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
-
-    try {
-      when {
-        createdMedia.status != Media.Status.READY
-        -> throw BookConversionException("Created file could not be analyzed, aborting page removal")
-
-        createdMedia.mediaType != MediaType.ZIP.type
-        -> throw BookConversionException("Created file is not a zip file, aborting page removal")
-
-        !createdMedia.pages
-          .map { FilenameUtils.getName(it.fileName) to it.mediaType }
-          .containsAll(pagesToKeep.map { FilenameUtils.getName(it.fileName) to it.mediaType })
-        -> throw BookConversionException("Created file does not contain all pages to keep from existing file, aborting conversion")
-
-        !createdMedia.files
-          .map { FilenameUtils.getName(it.fileName) }
-          .containsAll(media.files.map { FilenameUtils.getName(it.fileName) })
-        -> throw BookConversionException("Created file does not contain all files from existing file, aborting page removal")
-      }
-    } catch (e: BookConversionException) {
-      failedPageRemoval += book.id
-      throw e
-    }
-
+    val createdMedia =
+      verifiedMedia
+        ?: throw IllegalStateException("CbzSafeWriter did not run verifyContent for ${book.path}")
     val mediaWithHashes = createdMedia.copy(pages = createdMedia.pages.restoreHashFrom(media.pages))
 
     transactionTemplate.executeWithoutResult {
-      bookRepository.update(newBook)
+      bookRepository.update(rescannedNewBook)
       mediaRepository.update(mediaWithHashes)
       pagesToDelete
         .mapNotNull { pageHashRepository.findKnown(it.fileHash) }
@@ -184,7 +196,7 @@ class BookPageEditor(
     }
 
     pagesToDelete.forEach { historicalEventRepository.insert(HistoricalEvent.DuplicatePageDeleted(book, it)) }
-    eventPublisher.publishEvent(DomainEvent.BookUpdated(newBook))
+    eventPublisher.publishEvent(DomainEvent.BookUpdated(rescannedNewBook))
 
     return if (pagesToDelete.any { it.pageNumber == 1 }) BookAction.GENERATE_THUMBNAIL else null
   }
@@ -242,23 +254,54 @@ class BookPageEditor(
       }
 
     logger.info { "Rewriting ${book.path.fileName} via CbzSafeWriter (delete pages)" }
+    var verifiedMedia: Media? = null
     try {
-      org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(book.path) { outStream ->
-        ZipArchiveOutputStream(outStream).use { zipStream ->
-          zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
-          zipStream.setLevel(Deflater.NO_COMPRESSION)
-          if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
+      org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(
+        target = book.path,
+        write = { outStream ->
+          ZipArchiveOutputStream(outStream).use { zipStream ->
+            zipStream.setMethod(ZipArchiveOutputStream.DEFLATED)
+            zipStream.setLevel(Deflater.NO_COMPRESSION)
+            if (!originalComment.isNullOrBlank()) zipStream.setComment(originalComment)
 
-          pagesToKeep
-            .map { it.fileName }
-            .union(media.files.map { it.fileName })
-            .forEach { entry ->
-              zipStream.putArchiveEntry(ZipArchiveEntry(entry))
-              zipStream.write(bookAnalyzer.getFileContent(BookWithMedia(book, media), entry))
-              zipStream.closeArchiveEntry()
-            }
-        }
-      }
+            pagesToKeep
+              .map { it.fileName }
+              .union(media.files.map { it.fileName })
+              .forEach { entry ->
+                zipStream.putArchiveEntry(ZipArchiveEntry(entry))
+                zipStream.write(bookAnalyzer.getFileContent(BookWithMedia(book, media), entry))
+                zipStream.closeArchiveEntry()
+              }
+          }
+        },
+        verifyContent = { tmpPath ->
+          val tmpScanned =
+            fileSystemScanner.scanFile(tmpPath)
+              ?: throw BookConversionException("Tmp file could not be scanned: $tmpPath")
+          val tmpBook =
+            tmpScanned.copy(
+              id = book.id,
+              seriesId = book.seriesId,
+              libraryId = book.libraryId,
+            )
+          val tmpMedia = bookAnalyzer.analyze(tmpBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
+          when {
+            tmpMedia.status != Media.Status.READY ->
+              throw BookConversionException("Created file could not be analyzed, aborting page removal")
+            tmpMedia.mediaType != MediaType.ZIP.type ->
+              throw BookConversionException("Created file is not a zip file, aborting page removal")
+            !tmpMedia.pages
+              .map { FilenameUtils.getName(it.fileName) to it.mediaType }
+              .containsAll(pagesToKeep.map { FilenameUtils.getName(it.fileName) to it.mediaType }) ->
+              throw BookConversionException("Created file does not contain all pages to keep from existing file, aborting conversion")
+            !tmpMedia.files
+              .map { FilenameUtils.getName(it.fileName) }
+              .containsAll(media.files.map { FilenameUtils.getName(it.fileName) }) ->
+              throw BookConversionException("Created file does not contain all files from existing file, aborting page removal")
+          }
+          verifiedMedia = tmpMedia
+        },
+      )
     } catch (e: ZipException) {
       mediaRepository.findById(book.id).let { current ->
         if (current.status != Media.Status.ERROR) {
@@ -267,9 +310,12 @@ class BookPageEditor(
       }
       logger.warn { "Corrupt CBZ at ${book.path} — flagged as ERROR, skipping page deletion (${e.message})" }
       return null
+    } catch (e: BookConversionException) {
+      failedPageRemoval += book.id
+      throw e
     }
 
-    val newBook =
+    val rescannedNewBook =
       fileSystemScanner
         .scanFile(book.path)
         ?.copy(
@@ -279,40 +325,18 @@ class BookPageEditor(
         )
         ?: throw IllegalStateException("Newly created book could not be scanned after rewrite: ${book.path}")
 
-    val createdMedia = bookAnalyzer.analyze(newBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
-
-    try {
-      when {
-        createdMedia.status != Media.Status.READY
-        -> throw BookConversionException("Created file could not be analyzed, aborting page removal")
-
-        createdMedia.mediaType != MediaType.ZIP.type
-        -> throw BookConversionException("Created file is not a zip file, aborting page removal")
-
-        !createdMedia.pages
-          .map { FilenameUtils.getName(it.fileName) to it.mediaType }
-          .containsAll(pagesToKeep.map { FilenameUtils.getName(it.fileName) to it.mediaType })
-        -> throw BookConversionException("Created file does not contain all pages to keep from existing file, aborting conversion")
-
-        !createdMedia.files
-          .map { FilenameUtils.getName(it.fileName) }
-          .containsAll(media.files.map { FilenameUtils.getName(it.fileName) })
-        -> throw BookConversionException("Created file does not contain all files from existing file, aborting page removal")
-      }
-    } catch (e: BookConversionException) {
-      failedPageRemoval += book.id
-      throw e
-    }
-
+    val createdMedia =
+      verifiedMedia
+        ?: throw IllegalStateException("CbzSafeWriter did not run verifyContent for ${book.path}")
     val mediaWithHashes = createdMedia.copy(pages = createdMedia.pages.restoreHashFrom(media.pages))
 
     transactionTemplate.executeWithoutResult {
-      bookRepository.update(newBook)
+      bookRepository.update(rescannedNewBook)
       mediaRepository.update(mediaWithHashes)
     }
 
-    historicalEventRepository.insert(HistoricalEvent.BookConverted(newBook, book))
-    eventPublisher.publishEvent(DomainEvent.BookUpdated(newBook))
+    historicalEventRepository.insert(HistoricalEvent.BookConverted(rescannedNewBook, book))
+    eventPublisher.publishEvent(DomainEvent.BookUpdated(rescannedNewBook))
 
     return if (1 in pageNumbers) BookAction.GENERATE_THUMBNAIL else null
   }

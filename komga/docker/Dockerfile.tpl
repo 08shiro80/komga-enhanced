@@ -13,8 +13,10 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETARCH},sharing=
     --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETARCH},sharing=locked \
     apt-get -y update && \
     apt-get -y install --no-install-recommends \
-      ca-certificates libheif1 libwebp7 libarchive13 \
-      curl python3 python3-pip zip && \
+      ca-certificates libheif1 libwebp7 libjxl0.7 libarchive13 \
+      curl python3 python3-pip zip locales && \
+    sed -i '/^# *\(en_US\|de_DE\|ja_JP\|ko_KR\|zh_CN\|zh_TW\|fr_FR\|es_ES\|it_IT\|pt_BR\|ru_RU\)\.UTF-8 UTF-8/s/^# *//' /etc/locale.gen && \
+    locale-gen && \
     rm -rf /var/lib/apt/lists/*
 RUN KEPUBIFY_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "64bit" || echo "$TARGETARCH") && \
     curl -sL --retry 3 \
@@ -38,10 +40,20 @@ ENV LD_LIBRARY_PATH="/usr/lib"
 # amd64
 FROM build-linux AS build-amd64
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu"
+RUN cd /usr/lib/x86_64-linux-gnu && \
+    ln -sf libwebp.so.7 libwebp.so && \
+    ln -sf libheif.so.1 libheif.so && \
+    ln -sf libjxl.so.0.7 libjxl.so && \
+    ln -sf libarchive.so.13 libarchive.so
 
 # arm64
 FROM build-linux AS build-arm64
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu"
+RUN cd /usr/lib/aarch64-linux-gnu && \
+    ln -sf libwebp.so.7 libwebp.so && \
+    ln -sf libheif.so.1 libheif.so && \
+    ln -sf libjxl.so.0.7 libjxl.so && \
+    ln -sf libarchive.so.13 libarchive.so
 
 FROM build-${TARGETARCH} AS runner
 VOLUME /config

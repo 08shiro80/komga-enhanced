@@ -6,6 +6,76 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.5.1] - 2026-06-06
+
+### Fix: `BookPageEditor` produced empty CBZ files when semantic verification ran after the file swap
+
+`removeHashedPages` and `removePagesByNumber` rewrote a CBZ via `CbzSafeWriter.safelyReplace`, then on the **replaced** target file ran `fileSystemScanner.scanFile` + `bookAnalyzer.analyze` and checked that all pages-to-keep were still present. `CbzSafeWriter`'s built-in verification (`verifyFile`) only asserts the archive is structurally readable with at least one entry — it does not understand what an "image page" is. So an output containing only `ComicInfo.xml` (~1.6 KB) and no images passed structural verification, the move-rotate swap completed, then the analyzer reported "Book does not contain any pages", a `BookConversionException` was thrown — and the original was already replaced with the 1.6 KB husk.
+
+This was observed on 2026-06-08: a wave of `FindDuplicatePagesToDelete` tasks ran auto-removal across several series, and for at least five books the swap completed while `pagesToKeep` was effectively empty (cause TBD — possibly page-hash collisions or stale auto-delete page hashes after a re-analyze). Each affected file dropped from several MB to 1669 bytes.
+
+Fix: `CbzSafeWriter.safelyReplace` now accepts an optional `verifyContent: (Path) -> Unit` callback that runs **after structural ZIP verification but before any move-rotate**. `BookPageEditor.removeHashedPages` and `removePagesByNumber` pass the analyze + pages-contained-in-output + files-contained-in-output checks into this callback, so a semantically broken rewrite is now caught while the original target is still untouched — the `tmp` file is deleted and the original CBZ stays as-is. The `BookConversionException` is still thrown so the book is added to `failedPageRemoval` and the user sees the error, but no data is destroyed.
+
+The two callsites also drop the now-redundant post-swap analyze pass and reuse the `Media` already produced by the in-flight verification (`verifiedMedia`), saving one full archive analyze per page-removal task.
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `komga/src/main/kotlin/org/gotson/komga/infrastructure/util/CbzSafeWriter.kt` | `safelyReplace` gains an optional `verifyContent: ((Path) -> Unit)?` parameter; invoked after `verifyFile(tmp)` and before the move-rotate sequence. On throw, `tmp` is deleted and the original target is never moved. |
+| `komga/src/main/kotlin/org/gotson/komga/domain/service/BookPageEditor.kt` | `removeHashedPages` and `removePagesByNumber` pass the existing semantic checks into `verifyContent`. The post-swap `bookAnalyzer.analyze` is removed; instead the in-flight verified `Media` is captured and reused for the DB update. A final `fileSystemScanner.scanFile(book.path)` still runs after the swap to pick up the new `fileLastModified` / `fileSize`. |
+
+---
+
+### Fix: `libarchive` native library not loadable in Docker (`libarchive.so` symlink)
+
+Same root cause as the WebP / HEIF / JXL symlinks in the 0.1.5.1 NightMonkeys fix below: `debian:bookworm-slim` ships `libarchive13` as `libarchive.so.13` only, and `System.loadLibrary("archive")` (used by `c.github.gotson.nightcompress.Archive` for `CBR` / `RAR` / `7z` extraction) searches for the unversioned `libarchive.so` and fails with `no archive in java.library.path`. The reporter on #32 still saw this warning after the locale fix.
+
+Fix: extend the per-arch symlink block in `Dockerfile.tpl` with `ln -sf libarchive.so.13 libarchive.so`. Same pattern, same multiarch dir, same `LD_LIBRARY_PATH` resolution.
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `komga/docker/Dockerfile.tpl` | Each of the per-arch `RUN` blocks gains `ln -sf libarchive.so.13 libarchive.so` next to the existing webp / heif / jxl symlinks. |
+
+---
+
+### Fix: Non-roman series paths crash in Docker (selective `locale-gen` for common UTF-8 locales)
+
+Slimming the Docker image in 0.1.4.3 silently dropped the locale setup: `debian:bookworm-slim` only ships the glibc built-ins (`C` / `POSIX` / `C.UTF-8`) and none of the `ja_JP.UTF-8` / `ko_KR.UTF-8` / `zh_*.UTF-8` archives. As long as `LANG=C.UTF-8` is honoured the JVM can in principle encode UTF-8 paths, but on hosts like Synology DSM the container env is partially overridden by the host (e.g. with `POSIX` or with a locale that is not actually generated inside the image), and `sun.jnu.encoding` falls back to `ANSI_X3.4-1968` (ASCII). `UnixPath.encode()` then throws `InvalidPathException: Malformed input or input contains unmappable characters` for any path containing Korean, Japanese or Chinese characters. The visible regression was `Series.path` (`url.toURI().toPath()`), called from `ChapterUrlImporter.extractUuidFromSeriesJson` during `scanRootFolder` — the warning was logged for every non-roman series and the chapter URL import was skipped for those series (see #32).
+
+Fix: install the `locales` package and selectively run `locale-gen` for the eleven UTF-8 locales most likely to be set by hosts (`en_US`, `de_DE`, `ja_JP`, `ko_KR`, `zh_CN`, `zh_TW`, `fr_FR`, `es_ES`, `it_IT`, `pt_BR`, `ru_RU`). Each generated locale costs ~1 MB unpacked, so the total layer delta is ~15 MB instead of the ~220 MB that `locales-all` would add. Glibc now finds a valid UTF-8 locale regardless of the host env override and `sun.jnu.encoding` reliably initialises to `UTF-8`.
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `komga/docker/Dockerfile.tpl` | `locales` added to the apt-install line (after `zip`); a `sed` step un-comments the eleven UTF-8 locale lines in `/etc/locale.gen`, followed by `locale-gen`. |
+
+---
+
+### Performance: NightMonkeys native image plugins now actually load in Docker (`libwebp` / `libheif` / `libjxl` symlinks)
+
+Komga registers two WebP `ImageReaderSpi` providers at startup: TwelveMonkeys' pure-Java decoder (`com.twelvemonkeys.imageio:imageio-webp`) and NightMonkeys' Panama-FFI wrapper around the native libwebp (`com.github.gotson.nightmonkeys:imageio-webp`). `ImageConverter.chooseWebpReader` then deregisters every WebP provider except NightMonkeys when both are present — the native path is several times faster on real-world page decodes and avoids allocating a full `width × height × 4`-byte `BufferedImage` in the Java heap for every frame. The same architecture applies to the HEIF and JPEG-XL providers (`com.github.gotson.nightmonkeys:imageio-heif`, `imageio-jxl`).
+
+In the 0.1.5 Docker image none of the three NightMonkeys plugins could actually load. Debian bookworm's runtime packages (`libwebp7`, `libheif1`, `libjxl0.7`) ship only the versioned filenames (`libwebp.so.7`, `libheif.so.1`, `libjxl.so.0.7`); the unversioned `libwebp.so` / `libheif.so` / `libjxl.so` symlinks only come with the corresponding `-dev` packages. `System.loadLibrary("webp")` searches for the unversioned name and failed: `Could not load libwebp, plugin will be disabled. no webp in java.library.path: /usr/lib:/usr/lib/x86_64-linux-gnu:/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib`. NightMonkeys deregistered itself, `chooseWebpReader`'s `providers.size > 1` branch never fired, and every WebP decode silently fell back to TwelveMonkeys' pure-Java path. For libraries with WebP-heavy series (most webtoons, modern manga rip dumps) this meant slow thumbnails and heap pressure under concurrent decodes. `libjxl` was not installed in the image at all, so NightMonkeys' JPEG-XL plugin never had a chance.
+
+Three things changed in `Dockerfile.tpl`:
+
+1. `libjxl0.7` is now apt-installed alongside the existing `libheif1` / `libwebp7`. The `0.7` suffix is the binary-package name on Debian bookworm; the package also ships `libjxl_threads.so.0.7` for threaded JXL decode, so no second install is needed.
+2. Each arch-specific stage now creates the three missing unversioned symlinks in one `RUN` block: `cd /usr/lib/<multiarch> && ln -sf libwebp.so.7 libwebp.so && ln -sf libheif.so.1 libheif.so && ln -sf libjxl.so.0.7 libjxl.so`. Relative targets resolve inside the same multiarch dir; the `LD_LIBRARY_PATH` entry already declared two lines above (`ENV LD_LIBRARY_PATH=...`) picks them up.
+3. The change lives in the per-arch stages (`build-amd64`, `build-arm64`), not in the common `build-linux` stage, so each `ln -sf` only ever runs on its target architecture and there is no risk of cross-arch library names.
+
+The exact `libjxl0.7` / `libwebp7` / `libheif1` package contents were verified against `packages.debian.org/bookworm/<pkg>/filelist` before pinning the versioned `.so` targets; the symlinks are stable across bookworm point releases (a bookworm-to-trixie base bump would invalidate `libjxl.so.0.7` → `libjxl.so.0.11`, but `libwebp.so.7` and `libheif.so.1` survive).
+
+Expected effect: native WebP / HEIF / JXL decode whenever the plugin is exercised, smaller Java heap for image-heavy operations (thumbnail generation, page splitter, oversized-pages scan), and `Supported read formats` in the startup log now includes `JPEG-XL` and `HEIF` instead of just JPEG/PNG/WebP.
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `komga/docker/Dockerfile.tpl` | apt-install line: `libjxl0.7` added between `libwebp7` and `libarchive13`. Each `FROM build-linux AS build-{amd64,arm64}` stage gains a `RUN cd /usr/lib/<multiarch> && ln -sf libwebp.so.7 libwebp.so && ln -sf libheif.so.1 libheif.so && ln -sf libjxl.so.0.7 libjxl.so` block right after the `ENV LD_LIBRARY_PATH=...` line. |
+| `gradle.properties` | `forkVersion=0.1.5` → `0.1.5.1`, `version=1.24.4-fork-0.1.5` → `1.24.4-fork-0.1.5.1`. |
+
+---
+
 ## [0.1.5] - 2026-06-06
 
 ### Fix: PageSplitter race condition destroyed CBZ files under concurrent `/split-all` calls
@@ -455,7 +525,7 @@ The 0.1.5 PageSplitter mutex (semaphore + per-book lock) serialised concurrent s
 
 **Why the request thread guard:** the user explicitly wanted the button to remain unclickable across a page reload — a client-side `splitting` boolean alone resets to `false` on every fresh mount. Server-side AtomicBoolean is the only way for tab N to know that tab M kicked off a run that's still running.
 
-`OversizedPagesController` gains a `private val splitAllInProgress = AtomicBoolean(false)`. `splitAllTallPages` does `compareAndSet(false, true)` before any work; if it fails the endpoint throws `ResponseStatusException(409, "Split-All operation already in progress")`. The actual loop is moved into `runSplitAll(request)` so the try/finally that resets the flag wraps the entire run. A new `GET split-all/status` returns `{inProgress: Boolean}` for the frontend mount hook: on page load `OversizedPages.vue` defaults `splitting = true` (button greyed), then calls `/split-all/status`; if the response is `inProgress: false` it flips to `false` (button re-enabled). If true, the existing 3 s polling loop reuses `pollSplitAllStatus` to keep the button disabled until the run finishes, then `loadPages()` refreshes the table. A 409 from a click is handled by switching to the same poll loop and surfacing a "Split-All läuft bereits — bitte warten" snackbar. The initial-true default prevents the brief enabled-flash between mount and the first `/status` response.
+`OversizedPagesController` gains a `private val splitAllInProgress = AtomicBoolean(false)`. `splitAllTallPages` does `compareAndSet(false, true)` before any work; if it fails the endpoint throws `ResponseStatusException(409, "Split-All operation already in progress")`. The actual loop is moved into `runSplitAll(request)` so the try/finally that resets the flag wraps the entire run. A new `GET split-all/status` returns `{inProgress: Boolean}` for the frontend mount hook: on page load `OversizedPages.vue` defaults `splitting = true` (button greyed), then calls `/split-all/status`; if the response is `inProgress: false` it flips to `false` (button re-enabled). If true, the existing 3 s polling loop reuses `pollSplitAllStatus` to keep the button disabled until the run finishes, then `loadPages()` refreshes the table. A 409 from a click is handled by switching to the same poll loop and surfacing a "Split-All is already running — please wait" snackbar. The initial-true default prevents the brief enabled-flash between mount and the first `/status` response.
 
 #### Modified files
 | File | Change |
