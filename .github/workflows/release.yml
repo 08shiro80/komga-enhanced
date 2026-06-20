@@ -30,7 +30,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # On a release from main, evict GHA build caches that belong to other refs
       # (PR branches, feature branches, deleted branches). GHA cache is capped at
