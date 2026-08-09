@@ -23,6 +23,7 @@ object CbzSafeWriter {
   fun safelyReplace(
     target: Path,
     verifyContent: ((Path) -> Unit)? = null,
+    releaseTarget: (() -> Unit)? = null,
     write: (OutputStream) -> Unit,
   ) {
     val parent = target.parent ?: throw IOException("CbzSafeWriter: target $target has no parent")
@@ -70,6 +71,17 @@ object CbzSafeWriter {
         Files.deleteIfExists(tmp)
         logger.warn(e) { "CbzSafeWriter: content verify failed for ${target.fileName} (original untouched)" }
         throw e
+      }
+    }
+
+    // Release any read handle the caller holds on `target` (e.g. a ZipFile opened to copy its
+    // entries) before the move. On Windows and on CIFS/SMB mounts a file cannot be renamed while
+    // the same process keeps it open — that is the "used by another process" failure on move.
+    if (releaseTarget != null) {
+      try {
+        releaseTarget()
+      } catch (e: Exception) {
+        logger.debug(e) { "CbzSafeWriter: releaseTarget callback failed for ${target.fileName}" }
       }
     }
 

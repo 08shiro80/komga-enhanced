@@ -20,6 +20,9 @@ export default new Vuex.Store({
     // add chapter download
     addChapterDownloadSeries: undefined as SeriesDto | undefined,
     addChapterDownloadDialog: false,
+    // download sources (follow list linked to a series)
+    downloadSourcesSeries: undefined as SeriesDto | undefined,
+    downloadSourcesDialog: false,
     // collections
     addToCollectionSeriesIds: [] as string[],
     addToCollectionDialog: false,
@@ -111,6 +114,13 @@ export default new Vuex.Store({
     },
     setAddChapterDownloadDialog(state, dialog) {
       state.addChapterDownloadDialog = dialog
+    },
+    // Download sources
+    setDownloadSourcesSeries(state, series: SeriesDto | undefined) {
+      state.downloadSourcesSeries = series
+    },
+    setDownloadSourcesDialog(state, dialog) {
+      state.downloadSourcesDialog = dialog
     },
     // Collections
     setAddToCollectionSeriesIds(state, seriesIds: string[]) {
@@ -236,6 +246,14 @@ export default new Vuex.Store({
     },
     dialogAddChapterDownloadDisplay({commit}, value) {
       commit('setAddChapterDownloadDialog', value)
+    },
+    // download sources
+    dialogDownloadSources({commit}, series: SeriesDto) {
+      commit('setDownloadSourcesSeries', series)
+      commit('setDownloadSourcesDialog', true)
+    },
+    dialogDownloadSourcesDisplay({commit}, value) {
+      commit('setDownloadSourcesDialog', value)
     },
     // collections
     dialogAddSeriesToCollection({commit}, seriesIds: string[]) {

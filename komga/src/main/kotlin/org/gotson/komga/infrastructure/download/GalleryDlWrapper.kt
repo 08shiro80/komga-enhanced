@@ -126,6 +126,7 @@ class GalleryDlWrapper(
         pluginConfig["mangadex_username"],
         pluginConfig["mangadex_password"],
         pluginConfig["default_language"] ?: "en",
+        pluginConfig["flaresolverr_url"],
       )
 
     try {
@@ -215,6 +216,7 @@ class GalleryDlWrapper(
         pluginConfig["mangadex_username"],
         pluginConfig["mangadex_password"],
         pluginConfig["default_language"] ?: "en",
+        pluginConfig["flaresolverr_url"],
       )
 
     try {
@@ -531,8 +533,6 @@ class GalleryDlWrapper(
 
         if (galleryDlChapterMap.isNotEmpty()) totalChapters = galleryDlChapterMap.size
 
-        filesDownloaded.set(existingCbzCountAtStart)
-
         val effectiveCommand = command
 
         logger.debug { "Starting bulk download: $url ($totalChapters chapters in source listing, $existingCbzCountAtStart CBZ already in destDir)" }
@@ -547,14 +547,10 @@ class GalleryDlWrapper(
 
         onProcessStarted(process)
         var lastProgress = 0
+        val chaptersCompleted = AtomicInteger(0)
         if (totalChapters > 0) {
-          val done = filesDownloaded.get()
-          onProgress(DownloadProgress(done, totalChapters, done * 100 / totalChapters, "Resuming download"))
+          onProgress(DownloadProgress(0, totalChapters, 0, "Resuming download"))
         }
-
-        val seenChapterDirs =
-          java.util.concurrent.ConcurrentHashMap
-            .newKeySet<String>()
 
         val stdoutThread =
           Thread {
@@ -563,23 +559,20 @@ class GalleryDlWrapper(
                 appendBounded(output, line)
                 logger.debug { "gallery-dl: $line" }
 
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty()) {
-                  val file = File(trimmed)
-                  val parentDir = file.parentFile?.name ?: ""
-                  if (parentDir.isNotEmpty() && seenChapterDirs.add(parentDir)) {
-                    val count = filesDownloaded.incrementAndGet()
-                    val total = if (totalChapters > 0) totalChapters else 0
-                    val percent = if (totalChapters > 0) (count * 100) / totalChapters else 0
-                    onProgress(
-                      DownloadProgress(
-                        currentChapter = count,
-                        totalChapters = total,
-                        percent = percent,
-                        message = "Downloading chapter $count" + if (totalChapters > 0) "/$totalChapters" else "",
-                      ),
-                    )
-                  }
+                // The gallery-dl `komga` postprocessor prints this marker once per
+                // completed chapter directory (see komga.py `_emit_chapter_progress`) —
+                // count those for real chapter progress instead of guessing from file paths.
+                if (line.trim() == "[komga] chapter-complete") {
+                  val count = chaptersCompleted.incrementAndGet()
+                  val total = maxOf(totalChapters, count)
+                  onProgress(
+                    DownloadProgress(
+                      currentChapter = count,
+                      totalChapters = total,
+                      percent = count * 100 / total,
+                      message = "Downloading chapter $count/$total",
+                    ),
+                  )
                 }
               }
             }
@@ -593,7 +586,7 @@ class GalleryDlWrapper(
                 appendBounded(errorOutput, line)
                 logger.debug { "gallery-dl stderr: $line" }
 
-                val progress = parseGalleryDlProgress(line, filesDownloaded.get())
+                val progress = parseGalleryDlProgress(line, chaptersCompleted.get())
                 if (progress != null && progress.percent > lastProgress) {
                   lastProgress = progress.percent
                   onProgress(progress)
@@ -621,7 +614,17 @@ class GalleryDlWrapper(
         deleteQuietly(configFile)
 
         if (exitCode != 0) {
-          throw GalleryDlException("Download failed with exit code $exitCode: ${errorOutput.toString().trim()}")
+          val stderr = errorOutput.toString().trim()
+          val stdout = output.toString().trim()
+          // gallery-dl prints most output (incl. some errors) to stdout and only part to stderr.
+          // Surface whichever carries the failure so the Komga log shows the real cause.
+          val detail =
+            when {
+              stderr.isNotEmpty() -> stderr.takeLast(4000)
+              stdout.isNotEmpty() -> stdout.takeLast(4000)
+              else -> "(gallery-dl produced no output)"
+            }
+          throw GalleryDlException("Download failed with exit code $exitCode: $detail")
         }
 
         val allFiles = destDir.walkTopDown().toList()
@@ -816,21 +819,12 @@ class GalleryDlWrapper(
                 logger.warn { "Could not find CBZ file for chapter $chapterNum (expected $expected)" }
               } else {
                 try {
-                  val chapterInfo =
-                    ChapterInfo(
-                      chapterNumber = chapter.chapterNumber,
-                      chapterTitle = chapter.chapterTitle,
-                      volume = chapter.volume,
-                      pages = chapter.pages,
-                      scanlationGroup = chapter.scanlationGroup,
-                      publishDate = chapter.publishDate,
-                      language = chapter.language,
-                    )
-                  if (!comicInfoGenerator.hasComicInfoXml(targetCbz)) {
-                    addComicInfoToCbzWithChapterInfo(targetCbz.toPath(), mangaInfo, chapterInfo, chapter.chapterUrl)
-                  } else {
-                    logger.debug { "ComicInfo.xml already present from gallery-dl postprocessor: ${targetCbz.name}" }
-                  }
+                  // ComicInfo.xml is written by gallery-dl's `komga` postprocessor during the
+                  // download. Komga no longer injects it here: this fallback only ever fired for
+                  // files gallery-dl had not produced (pre-existing chapters) and, due to number-only
+                  // file matching, could rewrite an unrelated older chapter of a different scanlation
+                  // group with the wrong metadata. The manual "Re-inject ComicInfo" maintenance
+                  // action remains for deliberate backfills.
                   if (komgaSeriesId != null && !chapterUrlRepository.existsByUrl(chapter.chapterUrl)) {
                     val chapterNumVal =
                       chapter.chapterNumber
@@ -1141,20 +1135,25 @@ class GalleryDlWrapper(
   private fun deriveTitleFromUrl(url: String): String? =
     try {
       val uri = URI(url)
-      val host = uri.host?.removePrefix("www.") ?: return null
-      val siteName = host.substringBeforeLast(".")
       val pathSegments =
         uri.path
           ?.split("/")
           ?.filter { it.isNotBlank() }
           ?: emptyList()
-      val lastSegment = pathSegments.lastOrNull() ?: return null
-      val decoded =
-        lastSegment
-          .replace("-", " ")
-          .replace("_", " ")
-          .trim()
-      "$siteName - $decoded"
+      val genericSegments =
+        setOf("list", "home", "index", "read", "chapter", "chapters", "all", "manga", "comic", "episode", "episodes", "viewer")
+      val meaningfulSegment =
+        pathSegments
+          .dropLastWhile { it.lowercase() in genericSegments || it.all { c -> c.isDigit() } }
+          .lastOrNull()
+          ?: pathSegments.lastOrNull()
+          ?: return null
+      meaningfulSegment
+        .replace("-", " ")
+        .replace("_", " ")
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
     } catch (e: Exception) {
       logger.debug(e) { "Failed to derive title from URL" }
       null

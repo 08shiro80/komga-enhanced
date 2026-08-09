@@ -8,6 +8,7 @@ import jakarta.annotation.PreDestroy
 import org.gotson.komga.domain.model.PluginConfig
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
+import org.gotson.komga.domain.persistence.FollowRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.persistence.PluginRepository
@@ -38,6 +39,7 @@ class MangaDexSubscriptionSyncer(
   private val pluginRepository: PluginRepository,
   private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
+  private val followRepository: FollowRepository,
   private val seriesRepository: SeriesRepository,
   private val chapterUrlRepository: ChapterUrlRepository,
   private val blacklistedChapterRepository: BlacklistedChapterRepository,
@@ -127,24 +129,18 @@ class MangaDexSubscriptionSyncer(
   )
 
   fun syncFollowsToMangaDex(libraryId: String): SyncResult {
-    val library =
-      libraryRepository.findByIdOrNull(libraryId)
-        ?: return SyncResult(0, 0, "Library not found")
-
-    val followFile = library.path.resolve("follow.txt").toFile()
-    if (!followFile.exists()) {
-      return SyncResult(0, 0, "No follow.txt found")
-    }
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: return SyncResult(0, 0, "Library not found")
 
     val mangaDexIds =
-      followFile
-        .readLines()
-        .filter { it.isNotBlank() && !it.trimStart().startsWith("#") }
-        .mapNotNull { GalleryDlWrapper.extractMangaDexId(it.trim()) }
+      followRepository
+        .findAllByLibraryId(libraryId)
+        .filter { it.enabled }
+        .mapNotNull { GalleryDlWrapper.extractMangaDexId(it.url) }
         .distinct()
 
     if (mangaDexIds.isEmpty()) {
-      return SyncResult(0, 0, "No MangaDex URLs found in follow.txt")
+      return SyncResult(0, 0, "No MangaDex URLs in follow list")
     }
 
     val config = loadConfig()

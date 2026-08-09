@@ -122,7 +122,7 @@ class ComicInfoGenerator {
     useStored: Boolean,
   ) {
     ZipFile(cbzPath.toFile()).use { zin ->
-      org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbzPath) { outStream ->
+      org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbzPath, releaseTarget = { zin.close() }) { outStream ->
         ZipOutputStream(outStream).use { zipOut ->
           zipOut.setComment(zipComment)
           zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
@@ -148,7 +148,7 @@ class ComicInfoGenerator {
     for (attempt in 1..maxRetries) {
       try {
         ZipFile(cbzPath.toFile()).use { zin ->
-          org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbzPath) { outStream ->
+          org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbzPath, releaseTarget = { zin.close() }) { outStream ->
             ZipOutputStream(outStream).use { zipOut ->
               zipOut.setComment(zipComment)
               val writtenEntries = mutableSetOf<String>()
@@ -187,14 +187,6 @@ class ComicInfoGenerator {
       }
     }
   }
-
-  fun hasComicInfoXml(cbzFile: File): Boolean =
-    try {
-      ZipFile(cbzFile).use { it.getEntry("ComicInfo.xml") != null }
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to check ComicInfo.xml in ${cbzFile.name}" }
-      false
-    }
 
   // Returns the <Number> from the CBZ's ComicInfo.xml, or null if the file has no
   // ComicInfo / no number / is unreadable. Lets resume identify a finished chapter

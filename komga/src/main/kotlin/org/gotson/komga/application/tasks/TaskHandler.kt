@@ -76,7 +76,13 @@ class TaskHandler(
   private fun isSqliteBusy(e: Throwable): Boolean {
     var cur: Throwable? = e
     while (cur != null) {
-      if (cur is SQLiteException && cur.resultCode == SQLiteErrorCode.SQLITE_BUSY) return true
+      if (cur is SQLiteException) {
+        if (cur.resultCode == SQLiteErrorCode.SQLITE_BUSY) return true
+        // Extended codes (SQLITE_BUSY_SNAPSHOT=517, SQLITE_BUSY_RECOVERY, …) map to a different
+        // enum value than the primary SQLITE_BUSY, so match the message as well.
+        val msg = cur.message
+        if (msg != null && (msg.contains("SQLITE_BUSY") || msg.contains("database is locked"))) return true
+      }
       cur = cur.cause
     }
     return false

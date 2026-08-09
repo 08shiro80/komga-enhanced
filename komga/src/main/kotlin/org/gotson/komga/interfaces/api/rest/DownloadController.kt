@@ -3,27 +3,32 @@ package org.gotson.komga.interfaces.api.rest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import jakarta.validation.Valid
-import org.gotson.komga.domain.model.FollowConfig
+import org.gotson.komga.domain.model.DuplicateNameException
+import org.gotson.komga.domain.model.EntryNotFoundException
+import org.gotson.komga.domain.model.Follow
+import org.gotson.komga.domain.model.FollowSchedule
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
-import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
-import org.gotson.komga.domain.service.ChapterChecker
 import org.gotson.komga.domain.service.DownloadExecutor
-import org.gotson.komga.domain.service.DownloadScheduler
+import org.gotson.komga.domain.service.FollowLifecycle
+import org.gotson.komga.domain.service.FollowScheduleLifecycle
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.infrastructure.download.MangaDexSubscriptionSyncer
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration.TagNames
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
-import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckResultDto
-import org.gotson.komga.interfaces.api.rest.dto.ChapterCheckSummaryDto
 import org.gotson.komga.interfaces.api.rest.dto.ClearResultDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadActionDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadCreateDto
 import org.gotson.komga.interfaces.api.rest.dto.DownloadDto
-import org.gotson.komga.interfaces.api.rest.dto.FollowTxtDto
-import org.gotson.komga.interfaces.api.rest.dto.FollowTxtUpdateDto
-import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsDto
-import org.gotson.komga.interfaces.api.rest.dto.SchedulerSettingsUpdateDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowBatchCreationDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowBatchDeleteDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowBatchResultDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowCheckResultDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowCreationDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowScheduleDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowScheduleUpdateDto
+import org.gotson.komga.interfaces.api.rest.dto.FollowUpdateDto
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -31,6 +36,7 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -53,12 +59,11 @@ private val logger = KotlinLogging.logger {}
 class DownloadController(
   private val downloadExecutor: DownloadExecutor,
   private val downloadQueueRepository: DownloadQueueRepository,
-  private val followConfigRepository: FollowConfigRepository,
-  private val downloadScheduler: DownloadScheduler,
   private val libraryRepository: LibraryRepository,
-  private val chapterChecker: ChapterChecker,
   private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
   private val galleryDlWrapper: GalleryDlWrapper,
+  private val followService: FollowLifecycle,
+  private val followScheduleLifecycle: FollowScheduleLifecycle,
 ) {
   @GetMapping
   @Operation(summary = "List all downloads", tags = [TagNames.DOWNLOADS])
@@ -174,105 +179,6 @@ class DownloadController(
       status = "PENDING",
       message = "Cleared $count pending downloads",
     )
-  }
-
-  @PostMapping("check-new")
-  @Operation(summary = "Check for new chapters across all followed manga", tags = [TagNames.DOWNLOADS])
-  fun checkForNewChapters(): ResponseEntity<Map<String, String>> {
-    java.util.concurrent.CompletableFuture.runAsync {
-      try {
-        chapterChecker.checkAndQueueNewChapters()
-      } catch (e: Exception) {
-        logger.error(e) { "Background chapter check failed" }
-      }
-    }
-    return ResponseEntity
-      .status(HttpStatus.ACCEPTED)
-      .body(mapOf("message" to "Chapter check started in background"))
-  }
-
-  @PostMapping("check-only")
-  @Operation(summary = "Check for new chapters without queuing downloads", tags = [TagNames.DOWNLOADS])
-  fun checkOnly(): ChapterCheckSummaryDto {
-    val summary = chapterChecker.checkAll()
-    return ChapterCheckSummaryDto(
-      totalManga = summary.totalManga,
-      checkedCount = summary.checkedCount,
-      needsDownloadCount = summary.needsDownloadCount,
-      upToDateCount = summary.upToDateCount,
-      errorCount = summary.errorCount,
-      results =
-        summary.results.map { r ->
-          ChapterCheckResultDto(
-            url = r.url,
-            mangaId = r.mangaId,
-            title = r.title,
-            apiChapterCount = r.apiChapterCount,
-            downloadedChapterCount = r.downloadedChapterCount,
-            filesystemChapterCount = r.filesystemChapterCount,
-            newChaptersEstimate = r.newChaptersEstimate,
-            needsDownload = r.needsDownload,
-            error = r.error,
-          )
-        },
-      durationMs = summary.durationMs,
-    )
-  }
-
-  @GetMapping("follow-txt/{libraryId}")
-  @Operation(summary = "Get follow.txt content for a library", tags = [TagNames.DOWNLOADS])
-  fun getFollowTxt(
-    @PathVariable libraryId: String,
-  ): FollowTxtDto {
-    val library =
-      libraryRepository.findByIdOrNull(libraryId)
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
-
-    val followFile = library.path.resolve("follow.txt").toFile()
-    val content =
-      if (followFile.exists()) {
-        followFile.readText()
-      } else {
-        ""
-      }
-
-    return FollowTxtDto(
-      libraryId = libraryId,
-      libraryName = library.name,
-      content = content,
-    )
-  }
-
-  @PutMapping("follow-txt/{libraryId}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Update follow.txt content for a library", tags = [TagNames.DOWNLOADS])
-  fun updateFollowTxt(
-    @PathVariable libraryId: String,
-    @Valid @RequestBody update: FollowTxtUpdateDto,
-  ) {
-    val library =
-      libraryRepository.findByIdOrNull(libraryId)
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
-
-    val followFile = library.path.resolve("follow.txt").toFile()
-    followFile.writeText(update.content)
-  }
-
-  @PostMapping("follow-txt/{libraryId}/check-now")
-  @Operation(summary = "Trigger immediate check for a library's follow.txt", tags = [TagNames.DOWNLOADS])
-  fun checkFollowTxtNow(
-    @PathVariable libraryId: String,
-  ): ResponseEntity<Map<String, String>> {
-    java.util.concurrent.CompletableFuture.runAsync {
-      try {
-        downloadScheduler.checkFollowListNow(libraryId)
-      } catch (e: Exception) {
-        logger.error(e) { "Background follow list check failed for library $libraryId" }
-      }
-    }
-    return ResponseEntity
-      .status(HttpStatus.ACCEPTED)
-      .body(mapOf("message" to "Follow list check started in background"))
   }
 
   @PostMapping("{libraryId}/migrate-to-uuid")
@@ -403,8 +309,8 @@ class DownloadController(
   @Operation(summary = "Progress for the currently running or last finished re-inject job", tags = [TagNames.DOWNLOADS])
   fun repairComicInfoStatus(): RepairProgress = repairProgress.get()
 
-  @PostMapping("follow-txt/{libraryId}/sync-to-mangadex")
-  @Operation(summary = "Upload follow.txt MangaDex URLs to MangaDex follows list", tags = [TagNames.DOWNLOADS])
+  @PostMapping("follows/{libraryId}/sync-to-mangadex")
+  @Operation(summary = "Upload a library's MangaDex follow URLs to the MangaDex follows list", tags = [TagNames.DOWNLOADS])
   fun syncFollowsToMangaDex(
     @PathVariable libraryId: String,
   ): ResponseEntity<Map<String, Any>> {
@@ -458,42 +364,147 @@ class DownloadController(
       .body(mapOf("success" to result.success, "message" to result.message))
   }
 
-  @GetMapping("scheduler")
-  @Operation(summary = "Get scheduler settings", tags = [TagNames.DOWNLOADS])
-  fun getSchedulerSettings(): SchedulerSettingsDto {
-    val config = followConfigRepository.findDefault() ?: FollowConfig()
-    return config.toSchedulerDto()
+  @GetMapping("follows/{libraryId}")
+  @Operation(summary = "List follow entries for a library", tags = [TagNames.DOWNLOADS])
+  fun getFollows(
+    @PathVariable libraryId: String,
+  ): List<FollowDto> {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    return followService.getAll(libraryId).map { it.toDto() }
   }
 
-  @PostMapping("scheduler")
-  @Operation(summary = "Update scheduler settings", tags = [TagNames.DOWNLOADS])
-  fun updateSchedulerSettings(
-    @Valid @RequestBody update: SchedulerSettingsUpdateDto,
-  ): SchedulerSettingsDto {
-    val existingConfig = followConfigRepository.findDefault() ?: FollowConfig()
+  @GetMapping("follows/by-series/{seriesId}")
+  @Operation(summary = "List follow entries linked to a series", tags = [TagNames.DOWNLOADS])
+  fun getFollowsBySeries(
+    @PathVariable seriesId: String,
+  ): List<FollowDto> = followService.getBySeries(seriesId).map { it.toDto() }
 
-    val updatedConfig =
-      existingConfig.copy(
-        enabled = update.enabled,
-        checkIntervalHours = update.intervalHours,
-        scheduleMode = update.scheduleMode,
-        checkTime = update.checkTime,
-      )
-
-    val saved = followConfigRepository.save(updatedConfig)
-    downloadScheduler.updateSchedule(saved.enabled, saved.checkIntervalHours, saved.scheduleMode, saved.checkTime)
-
-    return saved.toSchedulerDto()
-  }
-
-  @PostMapping("scheduler/check-now")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Trigger immediate follow list check", tags = [TagNames.DOWNLOADS])
-  fun triggerFollowCheck() {
-    val config = followConfigRepository.findDefault()
-    if (config != null && config.urls.isNotEmpty()) {
-      downloadScheduler.processFollowConfigNow(config)
+  @PostMapping("follows/{libraryId}")
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(summary = "Add a follow entry for a library", tags = [TagNames.DOWNLOADS])
+  fun addFollow(
+    @PathVariable libraryId: String,
+    @Valid @RequestBody creation: FollowCreationDto,
+  ): FollowDto {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    return try {
+      followService
+        .add(
+          libraryId = libraryId,
+          url = creation.url,
+          title = creation.title,
+          seriesId = creation.seriesId,
+        ).toDto()
+    } catch (e: DuplicateNameException) {
+      throw ResponseStatusException(HttpStatus.CONFLICT, e.message)
     }
+  }
+
+  @PostMapping("follows/{libraryId}/batch")
+  @Operation(summary = "Add multiple follow entries at once (skips duplicates)", tags = [TagNames.DOWNLOADS])
+  fun addFollowsBatch(
+    @PathVariable libraryId: String,
+    @Valid @RequestBody creation: FollowBatchCreationDto,
+  ): FollowBatchResultDto {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    val (added, skipped) = followService.addBatch(libraryId, creation.urls)
+    return FollowBatchResultDto(added = added, skipped = skipped)
+  }
+
+  @PatchMapping("follows/{libraryId}/{id}")
+  @Operation(summary = "Update a follow entry", tags = [TagNames.DOWNLOADS])
+  fun updateFollow(
+    @PathVariable libraryId: String,
+    @PathVariable id: String,
+    @RequestBody update: FollowUpdateDto,
+  ): FollowDto =
+    try {
+      followService
+        .update(
+          id = id,
+          title = update.title,
+          enabled = update.enabled,
+        ).toDto()
+    } catch (e: EntryNotFoundException) {
+      throw ResponseStatusException(HttpStatus.NOT_FOUND, e.message)
+    }
+
+  @DeleteMapping("follows/{libraryId}/batch")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Delete multiple follow entries at once", tags = [TagNames.DOWNLOADS])
+  fun deleteFollowsBatch(
+    @PathVariable libraryId: String,
+    @Valid @RequestBody request: FollowBatchDeleteDto,
+  ) {
+    followService.deleteBatch(request.ids)
+  }
+
+  @DeleteMapping("follows/{libraryId}/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Delete a follow entry", tags = [TagNames.DOWNLOADS])
+  fun deleteFollow(
+    @PathVariable libraryId: String,
+    @PathVariable id: String,
+  ) {
+    followService.delete(id)
+  }
+
+  @PostMapping("follows/{libraryId}/check-now")
+  @Operation(summary = "Check all enabled follows now and queue new chapters", tags = [TagNames.DOWNLOADS])
+  fun checkFollowsNow(
+    @PathVariable libraryId: String,
+  ): FollowCheckResultDto {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    return FollowCheckResultDto(queued = followService.checkNow(libraryId))
+  }
+
+  @PostMapping("follows/{libraryId}/import-follow-txt")
+  @Operation(summary = "Import a library's legacy follow.txt entries into the follow list (skips duplicates)", tags = [TagNames.DOWNLOADS])
+  fun importFollowTxt(
+    @PathVariable libraryId: String,
+  ): Map<String, Any> {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    val (added, skipped) = followService.importFromFollowTxt(libraryId)
+    return mapOf(
+      "added" to added,
+      "skipped" to skipped,
+      "message" to "Imported $added follows from follow.txt ($skipped skipped)",
+    )
+  }
+
+  @GetMapping("follows/{libraryId}/schedule")
+  @Operation(summary = "Get the follow-check schedule for a library", tags = [TagNames.DOWNLOADS])
+  fun getFollowSchedule(
+    @PathVariable libraryId: String,
+  ): FollowScheduleDto {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    return followScheduleLifecycle.getSchedule(libraryId).toDto()
+  }
+
+  @PutMapping("follows/{libraryId}/schedule")
+  @Operation(summary = "Set the follow-check schedule for a library", tags = [TagNames.DOWNLOADS])
+  fun updateFollowSchedule(
+    @PathVariable libraryId: String,
+    @RequestBody update: FollowScheduleUpdateDto,
+  ): FollowScheduleDto {
+    libraryRepository.findByIdOrNull(libraryId)
+      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found: $libraryId")
+    return followScheduleLifecycle
+      .updateSchedule(
+        FollowSchedule(
+          libraryId = libraryId,
+          enabled = update.enabled,
+          scheduleMode = update.scheduleMode,
+          intervalHours = update.intervalHours,
+          checkTime = update.checkTime,
+        ),
+      ).toDto()
   }
 
   companion object {
@@ -504,6 +515,28 @@ class DownloadController(
     private val repairProgress: AtomicReference<RepairProgress> = AtomicReference(RepairProgress.idle())
   }
 }
+
+fun Follow.toDto() =
+  FollowDto(
+    id = id,
+    libraryId = libraryId,
+    url = url,
+    title = title,
+    seriesId = seriesId,
+    enabled = enabled,
+    addedAt = addedAt,
+    lastCheckedAt = lastCheckedAt,
+  )
+
+fun FollowSchedule.toDto() =
+  FollowScheduleDto(
+    libraryId = libraryId,
+    enabled = enabled,
+    scheduleMode = scheduleMode,
+    intervalHours = intervalHours,
+    checkTime = checkTime,
+    lastCheckTime = lastCheckTime,
+  )
 
 data class RepairProgress(
   val running: Boolean,
@@ -531,15 +564,6 @@ data class RepairProgress(
       )
   }
 }
-
-fun FollowConfig.toSchedulerDto() =
-  SchedulerSettingsDto(
-    enabled = enabled,
-    intervalHours = checkIntervalHours,
-    scheduleMode = scheduleMode,
-    checkTime = checkTime,
-    lastCheckTime = lastCheckTime?.toString(),
-  )
 
 fun org.gotson.komga.domain.model.DownloadQueue.toDto() =
   DownloadDto(

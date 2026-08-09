@@ -1,16 +1,12 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.gotson.komga.domain.model.DownloadStatus
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
-import org.gotson.komga.domain.persistence.DownloadQueueRepository
-import org.gotson.komga.domain.persistence.FollowConfigRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.infrastructure.download.ChapterMatcher
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.springframework.stereotype.Service
-import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
@@ -57,27 +53,14 @@ data class ChapterCheckSummary(
 
 @Service
 class ChapterChecker(
-  private val followConfigRepository: FollowConfigRepository,
   private val chapterUrlRepository: ChapterUrlRepository,
   private val blacklistedChapterRepository: BlacklistedChapterRepository,
-  private val downloadQueueRepository: DownloadQueueRepository,
-  private val downloadExecutor: DownloadExecutor,
   private val libraryRepository: LibraryRepository,
   private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
   private val galleryDlWrapper: GalleryDlWrapper,
   private val chapterMatcher: ChapterMatcher,
 ) {
   private val concurrencyLimit = Semaphore(5)
-
-  fun checkAll(): ChapterCheckSummary {
-    val config = followConfigRepository.findDefault()
-    if (config == null || config.urls.isEmpty()) {
-      logger.info { "No follow config URLs to check" }
-      return ChapterCheckSummary(0, 0, 0, 0, 0, emptyList(), 0)
-    }
-
-    return checkUrls(config.urls)
-  }
 
   fun checkUrls(urls: List<String>): ChapterCheckSummary {
     val startTime = System.currentTimeMillis()
@@ -147,42 +130,6 @@ class ChapterChecker(
       results = results,
       durationMs = durationMs,
     )
-  }
-
-  fun checkAndQueueNewChapters(): ChapterCheckSummary {
-    val summary = checkAll()
-
-    summary.results
-      .filter { it.needsDownload }
-      .forEach { result ->
-        val alreadyQueued =
-          downloadQueueRepository.existsBySourceUrlAndStatusIn(
-            result.url,
-            listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING),
-          )
-        if (!alreadyQueued) {
-          try {
-            downloadExecutor.createDownload(
-              sourceUrl = result.url,
-              libraryId = result.libraryId,
-              title = result.title,
-              createdBy = "chapter-checker",
-              priority = 5,
-            )
-            logger.info { "Queued download for ${result.title ?: result.url}: ~${result.newChaptersEstimate} new chapters" }
-          } catch (e: Exception) {
-            logger.warn(e) { "Failed to queue download for ${result.url}" }
-          }
-        } else {
-          logger.debug { "Skipping already-queued URL: ${result.url}" }
-        }
-      }
-
-    followConfigRepository.findDefault()?.let { config ->
-      followConfigRepository.save(config.copy(lastCheckTime = LocalDateTime.now()))
-    }
-
-    return summary
   }
 
   private fun checkSingleUrl(
@@ -256,18 +203,54 @@ class ChapterChecker(
     }
   }
 
-  // Non-MangaDex sources have no stable identifier (URL domain + title both change), so a reliable "already have it?" pre-check isn't possible. Queue unconditionally; the download resume keys off the on-disk CBZ <Number> and re-downloads only the missing chapters.
-  private fun checkNonMangaDexUrl(url: String): ChapterCheckResult =
-    ChapterCheckResult(
-      url = url,
-      mangaId = null,
-      title = null,
-      apiChapterCount = 0,
-      downloadedChapterCount = 0,
-      filesystemChapterCount = 0,
-      newChaptersEstimate = 0,
-      needsDownload = true,
-    )
+  // For non-MangaDex sources, run gallery-dl --simulate (fetchGalleryDlChapterMapping) to enumerate
+  // the available chapter URLs, then check which are missing from CHAPTER_URL (populated by the
+  // download flow). Only genuinely new chapters trigger a download. Falls back to unconditional
+  // queuing when the simulate returns nothing or errors, so network issues never silently drop chapters.
+  private fun checkNonMangaDexUrl(url: String): ChapterCheckResult {
+    return try {
+      val chapters = galleryDlWrapper.fetchGalleryDlChapterMapping(url)
+      if (chapters.isEmpty()) {
+        return ChapterCheckResult(
+          url = url,
+          mangaId = null,
+          title = null,
+          apiChapterCount = 0,
+          downloadedChapterCount = 0,
+          filesystemChapterCount = 0,
+          newChaptersEstimate = 0,
+          needsDownload = true,
+        )
+      }
+      val existence = chapterUrlRepository.existsByUrls(chapters.keys)
+      val downloadedCount = existence.values.count { it }
+      val missingCount = existence.values.count { !it }
+      logger.debug { "Non-MangaDex check for $url: total=${chapters.size}, downloaded=$downloadedCount, missing=$missingCount" }
+      ChapterCheckResult(
+        url = url,
+        mangaId = null,
+        title = null,
+        apiChapterCount = chapters.size,
+        downloadedChapterCount = downloadedCount,
+        filesystemChapterCount = 0,
+        newChaptersEstimate = missingCount,
+        needsDownload = missingCount > 0,
+      )
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to check non-MangaDex URL $url, will attempt download" }
+      ChapterCheckResult(
+        url = url,
+        mangaId = null,
+        title = null,
+        apiChapterCount = 0,
+        downloadedChapterCount = 0,
+        filesystemChapterCount = 0,
+        newChaptersEstimate = 0,
+        needsDownload = true,
+        error = e.message,
+      )
+    }
+  }
 
   private fun findSeriesForManga(
     mangaId: String,

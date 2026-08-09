@@ -12,7 +12,6 @@ import org.gotson.komga.domain.model.Library
 import org.springframework.stereotype.Service
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 import java.util.zip.GZIPInputStream
 
 private val logger = KotlinLogging.logger {}
@@ -22,7 +21,9 @@ private val logger = KotlinLogging.logger {}
  * Extracts MangaDex URLs and adds them to a library's follow.txt file.
  */
 @Service
-class TachiyomiImporter {
+class TachiyomiImporter(
+  private val followLifecycle: FollowLifecycle,
+) {
   // MangaDex source ID in Tachiyomi
   private val mangaDexSourceId = 2499283573021220255L
 
@@ -61,10 +62,8 @@ class TachiyomiImporter {
     val errors = mutableListOf<String>()
     val urlsToAdd = mutableListOf<String>()
 
-    val followFile = targetLibrary.path.resolve("follow.txt")
-
-    // Load existing URLs to avoid duplicates
-    val existingUrls = loadExistingUrls(followFile)
+    // Load existing URLs from the DB follow list to avoid duplicates
+    val existingUrls = followLifecycle.getAll(targetLibrary.id).map { it.url }.toSet()
 
     mangaDexManga.forEach { manga ->
       try {
@@ -89,9 +88,9 @@ class TachiyomiImporter {
       }
     }
 
-    // Write all URLs at once
+    // Insert all new URLs into the DB follow list at once
     if (urlsToAdd.isNotEmpty()) {
-      appendUrlsToFollowFile(followFile, urlsToAdd)
+      followLifecycle.addBatch(targetLibrary.id, urlsToAdd)
     }
 
     logger.info {
@@ -173,58 +172,6 @@ class TachiyomiImporter {
 
     logger.info { "Parsed ${mangaList.size} manga from JSON" }
     return Backup(backupManga = mangaList)
-  }
-
-  private fun loadExistingUrls(followFile: Path): Set<String> {
-    if (!Files.exists(followFile)) {
-      return emptySet()
-    }
-
-    return try {
-      Files
-        .readAllLines(followFile)
-        .map { it.trim() }
-        .filter { it.isNotEmpty() && !it.startsWith("#") }
-        .toSet()
-    } catch (e: Exception) {
-      logger.warn(e) { "Could not read existing follow.txt" }
-      emptySet()
-    }
-  }
-
-  private fun appendUrlsToFollowFile(
-    followFile: Path,
-    urls: List<String>,
-  ) {
-    val sb = StringBuilder()
-
-    // Check if file exists and ensure it ends with newline
-    if (Files.exists(followFile)) {
-      val content = Files.readString(followFile)
-      if (content.isNotEmpty() && !content.endsWith("\n")) {
-        sb.append("\n")
-      }
-    } else {
-      // Create header for new file
-      sb.append("# MangaDex URLs to follow\n")
-      sb.append("# Imported from Tachiyomi backup\n")
-    }
-
-    // Add all URLs, each on its own line
-    urls.forEach { url ->
-      sb.append(url)
-      sb.append("\n")
-    }
-
-    // Write all at once
-    Files.writeString(
-      followFile,
-      sb.toString(),
-      StandardOpenOption.CREATE,
-      StandardOpenOption.APPEND,
-    )
-
-    logger.info { "Wrote ${urls.size} URLs to follow.txt" }
   }
 
   /**

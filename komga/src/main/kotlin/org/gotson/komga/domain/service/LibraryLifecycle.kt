@@ -9,6 +9,7 @@ import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.DuplicateNameException
 import org.gotson.komga.domain.model.Library
 import org.gotson.komga.domain.model.PathContainedInPath
+import org.gotson.komga.domain.persistence.FollowRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.persistence.SidecarRepository
@@ -26,6 +27,7 @@ class LibraryLifecycle(
   private val seriesLifecycle: SeriesLifecycle,
   private val seriesRepository: SeriesRepository,
   private val sidecarRepository: SidecarRepository,
+  private val followRepository: FollowRepository,
   private val taskEmitter: TaskEmitter,
   private val eventPublisher: ApplicationEventPublisher,
   private val transactionTemplate: TransactionTemplate,
@@ -123,6 +125,7 @@ class LibraryLifecycle(
     transactionTemplate.executeWithoutResult {
       seriesLifecycle.deleteMany(series)
       sidecarRepository.deleteByLibraryId(library.id)
+      followRepository.deleteAllByLibraryId(library.id)
 
       libraryRepository.delete(library.id)
     }

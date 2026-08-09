@@ -15,6 +15,10 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETARCH},sharing=
     apt-get -y install --no-install-recommends \
       ca-certificates libheif1 libwebp7 libjxl0.7 libarchive13 \
       curl python3 python3-pip zip locales && \
+    # FORK-CRITICAL (issue #32): libjxl0.7 + locale-gen below MUST stay.
+    # Without the non-roman locales, sun.jnu.encoding falls back to ASCII on
+    # hosts that override the container env (e.g. Synology DSM) and
+    # UnixPath.encode() throws InvalidPathException for non-roman series paths.
     sed -i '/^# *\(en_US\|de_DE\|ja_JP\|ko_KR\|zh_CN\|zh_TW\|fr_FR\|es_ES\|it_IT\|pt_BR\|ru_RU\)\.UTF-8 UTF-8/s/^# *//' /etc/locale.gen && \
     locale-gen && \
     rm -rf /var/lib/apt/lists/*
@@ -34,10 +38,14 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=pip-${TARGETARCH} \
       https://codeload.github.com/08shiro80/gallery-dl-komga/tar.gz/${GALLERY_DL_SHA} && \
     pip3 install --break-system-packages --no-cache-dir --force-reinstall \
       /tmp/gallery-dl-fork.tar.gz && \
+    pip3 install --break-system-packages --no-cache-dir Pillow && \
     rm /tmp/gallery-dl-fork.tar.gz
 ENV LD_LIBRARY_PATH="/usr/lib"
 
 # amd64
+# FORK-CRITICAL (native image plugins): the unversioned symlinks below let
+# NightMonkeys' native ImageReaderSpi providers load. Drop them and Komga
+# silently falls back to TwelveMonkeys' pure-Java path (JXL/HEIF/WebP broken).
 FROM build-linux AS build-amd64
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu"
 RUN cd /usr/lib/x86_64-linux-gnu && \

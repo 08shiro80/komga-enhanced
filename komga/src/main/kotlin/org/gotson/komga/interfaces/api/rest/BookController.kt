@@ -759,10 +759,9 @@ class BookController(
     @PathVariable bookId: String,
   ) {
     try {
+      // clear chapter URLs from all sources (not just MangaDex) so the download can re-trigger
       val metadata = bookMetadataRepository.findById(bookId)
-      metadata.links
-        .filter { it.url.toString().contains("mangadex.org/chapter/") }
-        .forEach { chapterUrlRepository.deleteByUrl(it.url.toString()) }
+      metadata.links.forEach { chapterUrlRepository.deleteByUrl(it.url.toString()) }
     } catch (_: Exception) {
     }
     taskEmitter.deleteBook(

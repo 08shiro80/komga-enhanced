@@ -99,8 +99,22 @@
             <v-card-text>
               <p class="body-2 mb-3">{{ fix.description }}</p>
               <template v-for="p in fix.params">
+                <v-select
+                  v-if="p.type === 'library'"
+                  :key="p.key"
+                  v-model="dynamicState[fix.id][p.key]"
+                  :items="libraries"
+                  item-text="name"
+                  item-value="id"
+                  :label="p.label"
+                  :hint="p.hint"
+                  persistent-hint
+                  outlined
+                  dense
+                  class="mb-3"
+                />
                 <v-text-field
-                  v-if="p.type === 'number'"
+                  v-else-if="p.type === 'number'"
                   :key="p.key"
                   v-model.number="dynamicState[fix.id][p.key]"
                   :label="p.label"
@@ -140,7 +154,7 @@
               <v-btn
                 color="warning"
                 :loading="!!dynamicRunning[fix.id]"
-                :disabled="!!dynamicRunning[fix.id]"
+                :disabled="!!dynamicRunning[fix.id] || fixRunDisabled(fix)"
                 @click="runDynamicFix(fix)"
               >
                 <v-icon left>mdi-play</v-icon>
@@ -292,15 +306,29 @@ export default {
         this.dynamicFixes = []
       }
     },
+    fixRunDisabled(fix) {
+      const state = this.dynamicState[fix.id] || {}
+      return (fix.params || []).some(p => p.type === 'library' && !state[p.key])
+    },
     async runDynamicFix(fix) {
       this.$set(this.dynamicRunning, fix.id, true)
       this.$set(this.dynamicResult, fix.id, null)
       try {
         const method = (fix.method || 'POST').toLowerCase()
-        const params = this.dynamicState[fix.id] || {}
+        // Substitute {key} placeholders in the endpoint from params; send the rest as query params.
+        let url = fix.endpoint
+        const params = {}
+        for (const [key, val] of Object.entries(this.dynamicState[fix.id] || {})) {
+          const placeholder = `{${key}}`
+          if (url.includes(placeholder)) {
+            url = url.replace(placeholder, encodeURIComponent(val))
+          } else {
+            params[key] = val
+          }
+        }
         const response = method === 'get'
-          ? await this.$http.get(fix.endpoint, { params })
-          : await this.$http.request({ url: fix.endpoint, method, params })
+          ? await this.$http.get(url, { params })
+          : await this.$http.request({ url, method, params })
         const msg = response.data && response.data.message ? response.data.message : `${fix.title}: done`
         this.$set(this.dynamicResult, fix.id, msg)
         this.showSnack(msg, 'success')

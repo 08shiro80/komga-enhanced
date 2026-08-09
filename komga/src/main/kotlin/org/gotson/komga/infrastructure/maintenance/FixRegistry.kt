@@ -58,6 +58,30 @@ class FixRegistry(
           ),
         isEnabled = { pluginRepository.findByIdOrNull("mangadex-subscription")?.enabled == true },
       ),
+      Registration(
+        fix =
+          Fix(
+            id = "import-follow-txt",
+            title = "Import legacy follow.txt → Follow list",
+            description = "One-time migration: reads the selected library's follow.txt file and inserts its URLs into the DB-backed follow list (duplicates are skipped). The follow.txt file is left untouched.",
+            icon = "mdi-file-import-outline",
+            endpoint = "/api/v1/downloads/follows/{libraryId}/import-follow-txt",
+            method = "POST",
+            params =
+              listOf(
+                Param(
+                  key = "libraryId",
+                  label = "Library",
+                  type = "library",
+                  default = null,
+                  min = null,
+                  max = null,
+                  hint = "Library whose follow.txt should be imported",
+                ),
+              ),
+          ),
+        isEnabled = { true },
+      ),
     )
 
   fun findAll(): List<Fix> =

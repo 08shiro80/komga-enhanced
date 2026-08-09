@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS FOLLOW_SCHEDULE (
+    LIBRARY_ID      varchar  NOT NULL PRIMARY KEY,
+    ENABLED         boolean  NOT NULL DEFAULT 0,
+    SCHEDULE_MODE   varchar  NOT NULL DEFAULT 'interval',
+    INTERVAL_HOURS  integer  NOT NULL DEFAULT 24,
+    CHECK_TIME      varchar,
+    LAST_CHECK_TIME datetime
+);

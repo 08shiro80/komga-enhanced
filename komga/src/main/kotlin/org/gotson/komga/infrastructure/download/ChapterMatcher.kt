@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.zip.ZipInputStream
 
 private val logger = KotlinLogging.logger {}
 
@@ -155,27 +154,27 @@ class ChapterMatcher {
           urls.add(urlFromComment)
           continue
         }
-        ZipInputStream(cbzFile.inputStream().buffered()).use { zipIn ->
-          var entry = zipIn.nextEntry
-          while (entry != null) {
-            if (entry.name == "ComicInfo.xml") {
-              val xml = zipIn.readBytes().toString(Charsets.UTF_8)
-              val match = comicInfoWebRegex.find(xml)
-              if (match != null) {
-                val url =
-                  match.groupValues[1]
-                    .replace("&amp;", "&")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&quot;", "\"")
-                    .replace("&apos;", "'")
-                if (url.contains("mangadex.org/chapter/")) {
-                  urls.add(url)
-                }
+        java.util.zip.ZipFile(cbzFile).use { zip ->
+          val entry = zip.getEntry("ComicInfo.xml")
+          if (entry != null) {
+            val xml =
+              zip
+                .getInputStream(entry)
+                .use { it.readBytes() }
+                .toString(Charsets.UTF_8)
+            val match = comicInfoWebRegex.find(xml)
+            if (match != null) {
+              val url =
+                match.groupValues[1]
+                  .replace("&amp;", "&")
+                  .replace("&lt;", "<")
+                  .replace("&gt;", ">")
+                  .replace("&quot;", "\"")
+                  .replace("&apos;", "'")
+              if (url.contains("mangadex.org/chapter/")) {
+                urls.add(url)
               }
-              break
             }
-            entry = zipIn.nextEntry
           }
         }
       } catch (e: Exception) {

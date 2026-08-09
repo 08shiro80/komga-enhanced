@@ -8,6 +8,127 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ## [0.1.5.1] - 2026-06-06
 
+### 2026-08-09
+
+**Fixes**
+- **Webtoons downloaded a single `None.jpg` per episode instead of the full strip:** the webtoons site config used the `{page}` filename field, which that extractor doesn't provide (it numbers images via `num`) — so all ~60+ slices of an episode rendered as `None.jpg` and overwrote each other, leaving one page. Confirmed against gallery-dl directly (an episode yields 67 images with `num` 1…67); filename is now `{num:>03}.{extension}` → `001.jpg`…`067.jpg`.
+- **Deleting a book now clears its chapter URLs for _all_ sources, not just MangaDex:** a deleted (e.g. broken single-page) chapter is re-fetched by the follow-check instead of being skipped as already-present. Blacklist still prevents re-download.
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `infrastructure/download/GalleryDlProcess.kt` | webtoons `filename` `{page}` → `{num}`. |
+| `interfaces/api/rest/BookController.kt` | `deleteBookFile` clears `CHAPTER_URL` for all sources (was MangaDex-only). |
+
+### 2026-08-08
+
+**Upstream merge — base 1.24.4 → 1.25.0** (`baseVersion` → 1.25.0), adopted selectively:
+- **Solid RAR4 support** — dropped the "Solid RAR archives are not supported" (`ERR_1003`) guard in `RarExtractor` and bumped junrar 7.5.5 → 7.6.0. Solid `.cbr` archives now open.
+- **Dependency alignment** — Spring Boot 3.5.12 → 3.5.14, jOOQ 3.19.24 → 3.19.32. **Requires `./gradlew jooq-codegen-primary` on the next build.**
+- Skipped: Kobo content-restriction enforcement (conflicts with the fork's `KoboController` raw-body proxy; niche), OpenAPI schema flattening (API-doc only), webui dep/i18n/CI bumps.
+
+**Features**
+- **Link a follow URL to a specific series** (issue #40): a follow can now be tied to a Komga series (`FOLLOW.SERIES_ID`) — it then downloads **straight into that series**, deterministically, instead of relying on URL↔metadata-link matching. The series 3-dot menu gains **"Download sources…"** → a dialog to list/add/remove/toggle the URLs linked to that series. On series delete the link falls back to null so the follow survives library-wide.
+- **Follow list — auto-name + batch delete:** adding a single follow without a name now resolves the title the way the downloader does (MangaDex API / gallery-dl `--simulate`, URL-derived fallback) instead of leaving `(no name)`; rows are multi-selectable with a `Delete (n)` batch action.
+- **Single-page chapter check** on `/media-management/analysis`: a section listing books whose archive holds only one image (`PAGE_COUNT = 1`) — a safety net for chapters that downloaded as a single frame. Per-row 0/1 **Ignore** toggle plus **multi-select for bulk delete** (removes the CBZ from disk) **or bulk ignore**; ignored rows drop off unless "Show ignored" is on.
+
+**Fixes**
+- **Webtoons folder naming** (issue #40): the URL-derived fallback title (used when the source gives no title) took the last path segment, which for webtoons is always `list` → every series became `webtoons - list` and collided in one folder. `deriveTitleFromUrl` now skips trailing generic (`list`/`home`/`chapter`/…) and numeric segments, drops the site-name prefix, and title-cases the manga slug → `Kubera` (folder **and** series.json).
+- **`SQLITE_BUSY_SNAPSHOT` no longer strands books in UNKNOWN:** `AnalyzeBook` could fail with this WAL stale-snapshot error (extended code 517) that the task retry didn't recognise (it matched only the primary `SQLITE_BUSY` enum) → the book stayed `UNKNOWN` and its metadata refresh was skipped, showing a wrong or missing chapter number. The retry now matches the error message too, so the task completes.
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `RarExtractor.kt` · `build.gradle.kts` · `gradle/libs.versions.toml` · `gradle.properties` | upstream 1.25.0: solid-RAR, junrar/springboot/jooq bumps, version → 1.25.0. |
+| `V20260608000000__follow_list.sql` · `domain/model/Follow.kt` · `FollowRepository.kt` · `infrastructure/jooq/main/FollowDao.kt` | `SERIES_ID`; `findAllBySeriesId`, `clearSeriesId`, `deleteByIds`. |
+| `domain/service/FollowLifecycle.kt` | `add(seriesId)` + blank-title auto-resolve, `getBySeries`, `deleteBatch`, `checkNow` series override, `@EventListener onSeriesDeleted → clearSeriesId`. |
+| `interfaces/api/rest/DownloadController.kt` · `dto/DownloadDto.kt` | `seriesId` in Follow(Creation)Dto, `GET follows/by-series/{seriesId}`, `DELETE follows/{libraryId}/batch`. |
+| `V20260809000000__single_page_book_ignore.sql` · `SinglePageBookCandidate.kt` · `SinglePageBookDto.kt` · `SinglePageBookIgnoreRepository.kt`/`Dao` · `SinglePageBooksController.kt` · `MediaRepository.kt` · `MediaDao.kt` | single-page check: candidate query + 0/1 ignore store. |
+| `infrastructure/download/GalleryDlWrapper.kt` | `deriveTitleFromUrl` skips generic/numeric path segments. |
+| `application/tasks/TaskHandler.kt` | `isSqliteBusy` matches `SQLITE_BUSY_SNAPSHOT` via message. |
+| `komga-webui` | `DownloadSourcesDialog.vue` (new) + `SeriesActionsMenu.vue`/`store.ts`/`ReusableDialogs.vue`/`komga-follows.*` (series-linked follows), `MediaAnalysis.vue` (single-page section), `DownloadDashboard.vue` (batch delete). |
+
+### Fix: chapter progress in non-MangaDex single download — no more >100 % (2026-06-16)
+
+The non-MangaDex single-download path derived live progress from gallery-dl's stdout file paths (distinct parent dirs) while `filesDownloaded` started at the count of CBZs already in the folder. On a multi-source resume — existing MangaDex chapters in the folder + one new chapter from another source whose `-j --simulate` lists only its own chapters — this showed e.g. "15 / 1" (1500 %). Progress now counts the `[komga] chapter-complete` markers the gallery-dl `komga` postprocessor prints per finished chapter (0-based, `total = max(sourceChapters, done)`), so it reflects the current operation and never exceeds 100 %. `filesDownloaded` no longer drives the single-download display; the final result still counts CBZs on disk.
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `infrastructure/download/GalleryDlWrapper.kt` | single-download progress counts `[komga] chapter-complete` markers (0-based) instead of stdout parent-dir guessing; dropped the now-unused `filesDownloaded.set(existingCbzCountAtStart)`. |
+| gallery-dl-fork `postprocessor/komga.py` | emits `[komga] chapter-complete` per finished chapter (`post-after` + `finalize`). |
+
+### Feature: multi-source download — match a download URL against series links and download into that folder (2026-06-15)
+
+A single series can carry several source links in its metadata (e.g. MangaDex + Mangafire for the same manga). When a non-MangaDex download is queued (follow.txt / follow list), the downloader now matches the source URL against `SERIES_METADATA_LINK` and, if a series already holds that exact link, downloads into **that series' folder** instead of creating a new title-named folder. This is the same folder-reuse the MangaDex path already did by UUID, generalised to any source via the stored links — so chapters from multiple sources land in one folder.
+
+- Reuses the existing `findSeriesIdByLinkUrlContaining(libraryId, url)` lookup (no new DB method, no migration).
+- Only the non-MangaDex branch changes; MangaDex UUID matching is untouched. Falls back to the title-named folder when no link matches.
+- Replaces the removed "Other sources" listing, which was dead weight in this workflow (one manga = one series, so it never had a second series to show and never rendered).
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `domain/service/DownloadExecutor.kt` | non-MangaDex branch matches `sourceUrl` against series links → downloads into the existing series folder. |
+| `interfaces/api/rest/SeriesController.kt` · `domain/persistence/SeriesMetadataRepository.kt` · `infrastructure/jooq/main/SeriesMetadataDao.kt` | removed `getRelatedSeries` endpoint + `findRelatedSeriesIdsByLinks`. |
+| `komga-webui/src/services/komga-series.service.ts` · `views/BrowseSeries.vue` · `locales/en.json` | removed `getRelatedSeries`, "Other sources" section, `browse_series.other_sources` key. |
+
+### Feature: DB-backed follow list + per-library schedule + one-time follow.txt auto-import (2026-06-15)
+
+Replaces the old per-library `follow.txt` text-area on `/downloads` with a DB-backed follow list as the single source of truth. Each library has its own follow list (URL + optional name + enabled toggle) and its own check schedule (interval or fixed daily time); the recurring new-chapter check reads the DB list per library instead of the global `FollowConfig` + `follow.txt` files.
+
+- **Add via dedicated dialog** on the `/downloads` Configuration tab: single URL + optional name, plus a batch text-area (one URL per line). A per-row pencil opens an Edit-name dialog. (Was an inline text-area; moved to a dialog to avoid crowding.)
+- **Per-library schedule card** (`GET/PUT /api/v1/downloads/follows/{libraryId}/schedule`), driven by `FollowScheduleLifecycle` (`@EventListener(ApplicationReadyEvent)`; interval or `fixed_time` cron).
+- **One-time auto-import on the first start after the update:** `FollowLifecycle.autoImportFollowTxtOnFirstStart()` imports each library's existing `follow.txt` into the DB list, but only for libraries that have no follows yet — effectively once, and it never re-adds deleted entries. No marker file, no extra dependency; `follow.txt` is left untouched.
+- **Manual re-import** stays available as a schema-driven `/settings/fixes` card (`import-follow-txt`, via `FixRegistry`, new `library` param type).
+- The MangaDex-search Follow toggle + `refreshFollowedUuids` now read/write the DB list via `$komgaFollows` instead of `follow.txt`; "Sync to MangaDex" stays per-library. The old `follow-txt` read/write/check-now REST endpoints were removed (no remaining consumers); `sync-to-mangadex` moved under `follows/`.
+
+### Change: Komga no longer injects ComicInfo.xml during download — gallery-dl's `komga` postprocessor does (2026-06-15)
+
+The download loop previously back-filled `ComicInfo.xml` for any chapter CBZ that lacked it. In practice that only ever fired for pre-existing files (gallery-dl's `komga` postprocessor already writes ComicInfo for fresh downloads) and, due to number-only file matching across scanlation groups, could rewrite an unrelated older chapter with the wrong metadata. The automatic injection was removed; the manual "Re-inject ComicInfo" maintenance action (repair path) is unchanged, `chapterUrl` tracking is kept, and the now-unused `ComicInfoGenerator.hasComicInfoXml` was dropped.
+
+### Fix: CbzSafeWriter could not replace a CBZ held open by the same process (Windows / CIFS) (2026-06-15)
+
+`ComicInfoGenerator` and `DownloadExecutor` kept a `ZipFile` read handle open on the target CBZ across `CbzSafeWriter.safelyReplace`, so `Files.move(target → .bak)` failed with "used by another process" on Windows and on CIFS/SMB mounts, producing repeated retry warnings. `safelyReplace` gained an optional `releaseTarget` callback, invoked after the tmp file is written and verified but before the swap; the callers pass `{ zin.close() }`. Atomic swap + verify + rollback are unchanged. `BookPageEditor`/`PageSplitter` read only inside the write lambda and were untouched.
+
+### Fix: ChapterMatcher crashed reading a STORED CBZ with a data descriptor (2026-06-15)
+
+`ChapterMatcher.extractChapterUrlsFromCbzFiles` (the resume's embedded chapter-URL reader) used `ZipInputStream`, which throws `only DEFLATED entries can have EXT descriptor` on STORED entries written with a data descriptor (Komga sets `compression: store`). It now uses `java.util.zip.ZipFile` (central-directory based), which reads such archives fine; otherwise the chapter URL went unread and the chapter could be re-downloaded.
+
+### Fix: FlareSolverr was not applied to gallery-dl metadata/simulate calls (2026-06-15)
+
+Only the main download config carried the `flaresolverr` option; the `-j --simulate` info / chapter-mapping config (`createInfoConfigFile`) did not. On Cloudflare-protected sites (e.g. utoon.net) those calls returned `403 Forbidden`, so chapter detection failed ("0 chapters", URL-derived title) and an already-complete chapter was reported as a failed download. `flaresolverr_url` is now passed to the info/simulate config as well.
+
+### Improvement: gallery-dl's output surfaced in the download error (2026-06-15)
+
+`GalleryDlWrapper` now puts gallery-dl's stderr (or, when empty, the stdout tail) into the `GalleryDlException` message instead of a bare "exit code N:", so the real cause appears in `komga.log`.
+
+#### Modified / new files (2026-06-15)
+| File | Change |
+|------|--------|
+| `domain/model/Follow.kt`, `FollowSchedule.kt` · `domain/persistence/FollowRepository.kt`, `FollowScheduleRepository.kt` · `infrastructure/jooq/main/FollowDao.kt`, `FollowScheduleDao.kt` · flyway `V20260608000000__follow_list.sql`, `V20260615000000__follow_schedule.sql` | DB-backed follow list + per-library schedule (model / persistence / migrations). |
+| `domain/service/FollowLifecycle.kt` | CRUD + `checkNow`, `importFromFollowTxt`, one-time `autoImportFollowTxtOnFirstStart`. |
+| `domain/service/FollowScheduleLifecycle.kt` | Per-library scheduler (`ApplicationReadyEvent`). |
+| `interfaces/api/rest/DownloadController.kt` · `dto/DownloadDto.kt` | Follow + schedule + `import-follow-txt` endpoints; removed `follow-txt` read/write/check-now + `FollowTxt*Dto`; `sync-to-mangadex` moved under `follows/`. |
+| `domain/service/LibraryLifecycle.kt` · `infrastructure/download/MangaDexSubscriptionSyncer.kt` · `domain/service/TachiyomiImporter.kt` | FOLLOW cleanup on library delete; DB-follow reads instead of `follow.txt`. |
+| `infrastructure/maintenance/FixRegistry.kt` | `import-follow-txt` migration card (`library` param type). |
+| `infrastructure/util/CbzSafeWriter.kt` | `releaseTarget` callback before the move. |
+| `infrastructure/download/ComicInfoGenerator.kt` · `domain/service/DownloadExecutor.kt` | Pass `releaseTarget = { zin.close() }`; drop unused `hasComicInfoXml`. |
+| `infrastructure/download/GalleryDlWrapper.kt` | Remove download-time ComicInfo injection; surface gallery-dl output in the exception; pass `flaresolverr_url` to the info config. |
+| `infrastructure/download/GalleryDlProcess.kt` | `createInfoConfigFile` accepts/sets `flaresolverr`. |
+| `infrastructure/download/ChapterMatcher.kt` | `ZipInputStream` → `ZipFile` (STORED+EXT CBZ). |
+| `komga-webui/src/views/DownloadDashboard.vue`, `HomeView.vue`, `SettingsFixes.vue` · `services/komga-follows.service.ts`, `types/komga-follows.ts`, `plugins/komga-follows.plugin.ts`, `main.ts` | DB follow-list UI (Add/Edit dialogs, schedule card), Fixes `library`-param renderer + import card, sidebar migration marker. |
+
+### Feature: GigaViewer (tonarinoyj) scrambled-page unscrambling enabled in the gallery-dl config
+
+Cherry-picked from sfai05 (`sfai05/gallery-dl-komga` postprocessor + the wrapper wiring in `sfai05/komga-enhanced`). The gallery-dl-fork ships a `gigaviewer_unscramble` postprocessor that reverses the 4×4 block transposition Shueisha's GigaViewer applies to some pages (flagged `_scrambled` by the `tonarinoyj` extractor). `GalleryDlProcess.createTempConfigFile` now lists it as the first postprocessor — before `zip` — with `condition = _scrambled`, so scrambled tonarinoyj pages are descrambled before they are written into the CBZ. The postprocessor self-guards on the `_scrambled` flag, so it is a no-op for every other source. Pillow (the postprocessor's only runtime dependency) is installed into the Docker image alongside gallery-dl.
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `komga/src/main/kotlin/org/gotson/komga/infrastructure/download/GalleryDlProcess.kt` | `gigaviewer_unscramble` postprocessor added before `zip` in the generated config (`condition = _scrambled`). |
+| `komga/docker/Dockerfile.tpl` | `pip3 install Pillow` added after the gallery-dl install (runtime dependency for the unscramble postprocessor). |
+
 ### Fix: `BookPageEditor` produced empty CBZ files when semantic verification ran after the file swap
 
 `removeHashedPages` and `removePagesByNumber` rewrote a CBZ via `CbzSafeWriter.safelyReplace`, then on the **replaced** target file ran `fileSystemScanner.scanFile` + `bookAnalyzer.analyze` and checked that all pages-to-keep were still present. `CbzSafeWriter`'s built-in verification (`verifyFile`) only asserts the archive is structurally readable with at least one entry — it does not understand what an "image page" is. So an output containing only `ComicInfo.xml` (~1.6 KB) and no images passed structural verification, the move-rotate swap completed, then the analyzer reported "Book does not contain any pages", a `BookConversionException` was thrown — and the original was already replaced with the 1.6 KB husk.

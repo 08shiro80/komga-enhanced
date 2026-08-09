@@ -19,6 +19,9 @@
         <v-list-item @click="addChapterDownload" v-if="isAdmin">
           <v-list-item-title>Add Chapter Download…</v-list-item-title>
         </v-list-item>
+        <v-list-item @click="downloadSources" v-if="isAdmin">
+          <v-list-item-title>Download sources…</v-list-item-title>
+        </v-list-item>
         <v-list-item @click="addToCollection" v-if="isAdmin">
           <v-list-item-title>{{ $t('menu.add_to_collection') }}</v-list-item-title>
         </v-list-item>
@@ -94,6 +97,9 @@ export default Vue.extend({
     },
     addChapterDownload() {
       this.$store.dispatch('dialogAddChapterDownload', this.series)
+    },
+    downloadSources() {
+      this.$store.dispatch('dialogDownloadSources', this.series)
     },
     async addToReadList() {
       const books = await this.$komgaBooks.getBooksList({

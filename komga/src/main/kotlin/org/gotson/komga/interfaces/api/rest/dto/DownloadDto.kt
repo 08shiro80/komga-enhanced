@@ -1,5 +1,7 @@
 package org.gotson.komga.interfaces.api.rest.dto
 
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
 import java.time.LocalDateTime
 
 data class DownloadDto(
@@ -59,31 +61,6 @@ data class DownloadActionDto(
   val action: String, // pause, resume, cancel, retry
 )
 
-data class FollowTxtDto(
-  val libraryId: String,
-  val libraryName: String,
-  val content: String,
-)
-
-data class FollowTxtUpdateDto(
-  val content: String,
-)
-
-data class SchedulerSettingsDto(
-  val enabled: Boolean,
-  val intervalHours: Int,
-  val scheduleMode: String,
-  val checkTime: String?,
-  val lastCheckTime: String?,
-)
-
-data class SchedulerSettingsUpdateDto(
-  val enabled: Boolean,
-  val intervalHours: Int,
-  val scheduleMode: String = "interval",
-  val checkTime: String? = null,
-)
-
 data class ClearResultDto(
   val deletedCount: Int,
   val status: String,
@@ -110,4 +87,59 @@ data class ChapterCheckSummaryDto(
   val errorCount: Int,
   val results: List<ChapterCheckResultDto>,
   val durationMs: Long,
+)
+
+data class FollowDto(
+  val id: String,
+  val libraryId: String,
+  val url: String,
+  val title: String?,
+  val seriesId: String?,
+  val enabled: Boolean,
+  val addedAt: LocalDateTime,
+  val lastCheckedAt: LocalDateTime?,
+)
+
+data class FollowCreationDto(
+  @field:NotBlank val url: String,
+  val title: String? = null,
+  val seriesId: String? = null,
+)
+
+data class FollowUpdateDto(
+  val title: String? = null,
+  val enabled: Boolean? = null,
+)
+
+data class FollowBatchCreationDto(
+  @field:NotEmpty val urls: List<String>,
+)
+
+data class FollowBatchDeleteDto(
+  @field:NotEmpty val ids: List<String>,
+)
+
+data class FollowBatchResultDto(
+  val added: Int,
+  val skipped: Int,
+)
+
+data class FollowCheckResultDto(
+  val queued: Int,
+)
+
+data class FollowScheduleDto(
+  val libraryId: String,
+  val enabled: Boolean,
+  val scheduleMode: String,
+  val intervalHours: Int,
+  val checkTime: String?,
+  val lastCheckTime: LocalDateTime?,
+)
+
+data class FollowScheduleUpdateDto(
+  val enabled: Boolean,
+  val scheduleMode: String = "interval",
+  val intervalHours: Int = 24,
+  val checkTime: String? = null,
 )

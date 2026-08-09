@@ -412,7 +412,7 @@ class DownloadExecutor(
   fun isUrlAlreadyQueued(url: String): Boolean =
     downloadQueueRepository.existsBySourceUrlAndStatusIn(
       url,
-      listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.COMPLETED),
+      listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING),
     )
 
   fun setActiveProcess(
@@ -525,8 +525,19 @@ class DownloadExecutor(
             ?: newFolderPath
         komgaSeriesId = existingFolder?.komgaSeriesId
       } else {
-        destinationPath = libraryPath.resolve(sanitizeFileName(download.title ?: "Unknown"))
-        komgaSeriesId = null
+        val linkedSeries =
+          download.libraryId
+            ?.let { seriesMetadataRepository.findSeriesIdByLinkUrlContaining(it, download.sourceUrl) }
+            ?.let { seriesRepository.findByIdOrNull(it) }
+            ?.takeIf { it.path.toFile().exists() }
+        if (linkedSeries != null) {
+          destinationPath = linkedSeries.path
+          komgaSeriesId = linkedSeries.id
+          logger.info { "Multi-source: source URL matches existing series ${linkedSeries.name}, downloading into $destinationPath" }
+        } else {
+          destinationPath = libraryPath.resolve(sanitizeFileName(download.title ?: "Unknown"))
+          komgaSeriesId = null
+        }
       }
 
       if (!destinationPath.toFile().exists()) {
@@ -850,7 +861,7 @@ class DownloadExecutor(
     if (!hasOverride) return
     try {
       ZipFile(cbz).use { zin ->
-        org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbz.toPath()) { outStream ->
+        org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbz.toPath(), releaseTarget = { zin.close() }) { outStream ->
           ZipOutputStream(outStream).use { zout ->
             zout.setComment(zin.comment ?: "")
             val xmlBytes =

@@ -9,6 +9,7 @@ import org.gotson.komga.domain.model.MediaExtension
 import org.gotson.komga.domain.model.MediaFile
 import org.gotson.komga.domain.model.OversizedPageCandidate
 import org.gotson.komga.domain.model.ProxyExtension
+import org.gotson.komga.domain.model.SinglePageBookCandidate
 import org.gotson.komga.domain.persistence.MediaRepository
 import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
 import org.gotson.komga.infrastructure.jooq.TempTable.Companion.withTempTable
@@ -141,6 +142,42 @@ class MediaDao(
           height = r[p.HEIGHT] ?: 0,
           fileSize = r[p.FILE_SIZE] ?: 0L,
           mediaType = r[p.MEDIA_TYPE] ?: "",
+        )
+      }
+  }
+
+  override fun findAllSinglePageBookCandidates(): Collection<SinglePageBookCandidate> {
+    val s = Tables.SERIES
+    val sm = Tables.SERIES_METADATA
+    return dslRO
+      .select(
+        b.ID,
+        b.NAME,
+        b.SERIES_ID,
+        s.NAME,
+        sm.TITLE,
+        b.FILE_SIZE,
+        m.MEDIA_TYPE,
+      ).from(m)
+      .join(b)
+      .on(m.BOOK_ID.eq(b.ID))
+      .leftJoin(s)
+      .on(b.SERIES_ID.eq(s.ID))
+      .leftJoin(sm)
+      .on(b.SERIES_ID.eq(sm.SERIES_ID))
+      .where(m.PAGE_COUNT.eq(1))
+      .and(m.STATUS.eq(Media.Status.READY.name))
+      .and(b.DELETED_DATE.isNull)
+      .fetch()
+      .map { r ->
+        SinglePageBookCandidate(
+          bookId = r[b.ID],
+          bookName = r[b.NAME],
+          seriesId = r[b.SERIES_ID],
+          seriesName = r[s.NAME] ?: "",
+          seriesTitle = r[sm.TITLE],
+          fileSize = r[b.FILE_SIZE] ?: 0L,
+          mediaType = r[m.MEDIA_TYPE] ?: "",
         )
       }
   }

@@ -243,8 +243,8 @@
               <v-badge
                 dot
                 inline
-                :value="$store.getters.getUnreadAnnouncementsCount()"
-                color="info"
+                :value="$store.getters.getUnreadAnnouncementsCount() || fixesBadge"
+                :color="fixesBadge ? 'primary' : 'info'"
               >
                 <v-icon>mdi-cog</v-icon>
               </v-badge>
@@ -273,8 +273,11 @@
               <v-list-item-title>Plugins</v-list-item-title>
             </v-list-item>
 
-            <v-list-item :to="{name: 'settings-fixes'}">
+            <v-list-item :to="{name: 'settings-fixes'}" @click="acknowledgeFixesBadge">
               <v-list-item-title>Fixes</v-list-item-title>
+              <v-list-item-action v-if="fixesBadge" class="ma-0 align-self-center">
+                <span class="downloads-badge-dot" title="One-time migration available — import your follow list"></span>
+              </v-list-item-action>
             </v-list-item>
 
             <v-list-item :to="{name: 'metrics'}">
@@ -426,6 +429,8 @@ import {BookSearch, SearchConditionAnyOfBook, SearchConditionMediaStatus, Search
 import LibrariesActionsMenu from '@/components/menus/LibrariesActionsMenu.vue'
 import ReorderLibraries from '@/components/ReorderLibraries.vue'
 
+const FIXES_FOLLOWMIGRATION_SEEN_KEY = 'komga.fork.fixes.followmigration.seen'
+
 export default Vue.extend({
   name: 'HomeView',
   components: {
@@ -448,6 +453,7 @@ export default Vue.extend({
       expandAccount: false,
       expandUnpinned: false,
       showReorder: false,
+      fixesBadge: false,
     }
   },
   async created() {
@@ -472,6 +478,9 @@ export default Vue.extend({
         .then(x => this.$store.commit('setGalleryDlForkUpdates', x))
         .catch(() => this.$store.commit('setGalleryDlForkUpdates', {installedSha: null, behindCount: -1, commits: []}))
     }
+    try {
+      this.fixesBadge = this.isAdmin && localStorage.getItem(FIXES_FOLLOWMIGRATION_SEEN_KEY) !== '1'
+    } catch (_) { /* localStorage unavailable — skip the badge */ }
     this.checkRoute(this.$route)
   },
   watch: {
@@ -572,6 +581,12 @@ export default Vue.extend({
     addLibrary() {
       this.$store.dispatch('dialogAddLibrary')
     },
+    acknowledgeFixesBadge() {
+      this.fixesBadge = false
+      try {
+        localStorage.setItem(FIXES_FOLLOWMIGRATION_SEEN_KEY, '1')
+      } catch (_) { /* localStorage unavailable — nothing to persist */ }
+    },
     goToLogin() {
       this.$store.commit('setGuestMode', false)
       this.$router.push({name: 'login'})
@@ -579,3 +594,27 @@ export default Vue.extend({
   },
 })
 </script>
+
+<style scoped>
+.downloads-badge-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--v-primary-base, #1976d2);
+  box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.6);
+  animation: downloads-badge-pulse 1.6s ease-out infinite;
+}
+
+@keyframes downloads-badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(25, 118, 210, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+  }
+}
+</style>

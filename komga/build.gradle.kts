@@ -89,7 +89,7 @@ dependencies {
 
   implementation("org.apache.tika:tika-core:3.2.3")
   implementation("org.apache.commons:commons-compress:1.27.1")
-  implementation("com.github.junrar:junrar:7.5.5")
+  implementation("com.github.junrar:junrar:7.6.0")
   implementation("com.github.gotson.nightcompress:nightcompress:1.1.1")
   implementation("org.apache.pdfbox:pdfbox:3.0.5")
   implementation("net.grey-panther:natural-comparator:1.1")

@@ -97,8 +97,13 @@ class GalleryDlProcess {
     }
 
     if (chapterNaming != null) {
+      // Sites that use chapter_string instead of a numeric chapter must keep their own directory
+      // template — the global chapterNaming override would clobber it and break their folders.
+      val chapterStringSites = setOf("dm5", "komiic", "tonarinoyj")
       for ((site, cfg) in websiteConfigs.toList()) {
-        websiteConfigs[site] = cfg.toMutableMap().apply { put("directory", listOf(chapterNaming)) }
+        if (site !in chapterStringSites) {
+          websiteConfigs[site] = cfg.toMutableMap().apply { put("directory", listOf(chapterNaming)) }
+        }
       }
     }
 
@@ -115,6 +120,10 @@ class GalleryDlProcess {
           },
         "postprocessors" to
           listOf(
+            mapOf(
+              "name" to "gigaviewer_unscramble",
+              "condition" to "_scrambled",
+            ),
             mapOf(
               "name" to "zip",
               "extension" to "cbz",
@@ -139,6 +148,7 @@ class GalleryDlProcess {
     mangadexUsername: String?,
     mangadexPassword: String?,
     defaultLanguage: String,
+    flaresolverrUrl: String? = null,
   ): File {
     val tempFile = File.createTempFile("gallery-dl-info-", ".json")
     val config =
@@ -151,7 +161,9 @@ class GalleryDlProcess {
                 if (!mangadexUsername.isNullOrBlank()) this["username"] = mangadexUsername
                 if (!mangadexPassword.isNullOrBlank()) this["password"] = mangadexPassword
               },
-          ),
+          ).apply {
+            if (!flaresolverrUrl.isNullOrBlank()) put("flaresolverr", flaresolverrUrl)
+          },
       )
     tempFile.writeText(objectMapper.writeValueAsString(config))
     return tempFile
@@ -223,8 +235,10 @@ class GalleryDlProcess {
         ),
       "webtoons" to
         mapOf(
+          // webtoons' extractor numbers images via `num`, not `page`; `{page}` renders as
+          // None → every image writes to `None.jpg` and overwrites the last, leaving 1 page.
           "directory" to listOf("e{episode:>03}"),
-          "filename" to "{page:>03}.{extension}",
+          "filename" to "{num:>03}.{extension}",
         ),
       "asurascans" to
         mapOf(
@@ -244,6 +258,21 @@ class GalleryDlProcess {
       "mangaplus" to
         mapOf(
           "directory" to listOf("c{chapter:>03}"),
+          "filename" to "{page:>03}.{extension}",
+        ),
+      "dm5" to
+        mapOf(
+          "directory" to listOf("{chapter_string}"),
+          "filename" to "{page:>03}.{extension}",
+        ),
+      "komiic" to
+        mapOf(
+          "directory" to listOf("{chapter_string}"),
+          "filename" to "{page:>03}.{extension}",
+        ),
+      "tonarinoyj" to
+        mapOf(
+          "directory" to listOf("{chapter_string}"),
           "filename" to "{page:>03}.{extension}",
         ),
       "imgur" to

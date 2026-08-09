@@ -85,6 +85,63 @@
         </v-btn>
       </template>
     </v-data-table>
+
+    <v-divider class="my-6"></v-divider>
+    <div class="d-flex align-center flex-wrap mb-1">
+      <h3 class="text-h6">Single-page chapters ({{ singlePageBooks.length }})</h3>
+      <v-spacer></v-spacer>
+      <template v-if="selectedSinglePage.length > 0">
+        <v-btn small color="error" class="mr-2" :loading="singlePageBusy" @click="deleteSelectedSinglePage">
+          <v-icon left small>mdi-delete-outline</v-icon>
+          Delete ({{ selectedSinglePage.length }})
+        </v-btn>
+        <v-btn small text class="mr-2" :disabled="singlePageBusy" @click="ignoreSelectedSinglePage">
+          <v-icon left small>mdi-eye-off-outline</v-icon>
+          Ignore ({{ selectedSinglePage.length }})
+        </v-btn>
+      </template>
+      <v-checkbox
+        v-model="singlePageIncludeIgnored"
+        label="Show ignored"
+        dense hide-details class="mt-0 mr-4"
+        @change="loadSinglePageBooks"
+      ></v-checkbox>
+      <v-btn icon @click="loadSinglePageBooks">
+        <v-icon>mdi-refresh</v-icon>
+      </v-btn>
+    </div>
+    <p class="text-caption text--secondary mb-2">
+      Chapters whose archive contains only a single image. Check them; flip Ignore for the ones that are correct so they drop off the list.
+    </p>
+    <v-data-table
+      v-model="selectedSinglePage"
+      :headers="singlePageHeaders"
+      :items="singlePageBooks"
+      :loading="singlePageLoading"
+      item-key="bookId"
+      show-select
+      class="elevation-1"
+      :items-per-page="20"
+      :footer-props="{ itemsPerPageOptions: [20, 50, 100] }"
+    >
+      <template v-slot:item.bookName="{ item }">
+        <router-link :to="{name: 'browse-book', params: {bookId: item.bookId, seriesId: item.seriesId}}">
+          {{ item.bookName }}
+        </router-link>
+      </template>
+      <template v-slot:item.fileSize="{ item }">
+        {{ formatBytes(item.fileSize) }}
+      </template>
+      <template v-slot:item.ignored="{ item }">
+        <v-switch
+          :key="item.bookId"
+          :input-value="item.ignored"
+          dense hide-details class="mt-0"
+          @change="toggleSinglePageIgnore(item)"
+        ></v-switch>
+      </template>
+    </v-data-table>
+
     <v-snackbar v-model="rescanSnack" :timeout="4000" bottom>
       {{ rescanMsg }}
       <template v-slot:action="{ attrs }">
@@ -135,10 +192,23 @@ export default Vue.extend({
       rescanning: false,
       rescanMsg: '',
       rescanSnack: false,
+      singlePageBooks: [] as any[],
+      selectedSinglePage: [] as any[],
+      singlePageLoading: false,
+      singlePageBusy: false,
+      singlePageIncludeIgnored: false,
+      singlePageHeaders: [
+        {text: 'Series', value: 'seriesTitle'},
+        {text: 'Chapter', value: 'bookName'},
+        {text: 'Type', value: 'mediaType'},
+        {text: 'Size', value: 'fileSize'},
+        {text: 'Ignore', value: 'ignored', sortable: false},
+      ] as object[],
     }
   },
   mounted() {
     this.refreshVerifyStatus()
+    this.loadSinglePageBooks()
   },
   beforeDestroy() {
     if (this.verifyPollHandle) clearInterval(this.verifyPollHandle)
@@ -293,6 +363,89 @@ export default Vue.extend({
       }
 
       this.loading = false
+    },
+    async loadSinglePageBooks() {
+      this.selectedSinglePage = []
+      this.singlePageLoading = true
+      try {
+        const r = await this.$http.get('/api/v1/media-management/single-page-books', {
+          params: {includeIgnored: this.singlePageIncludeIgnored},
+        })
+        this.singlePageBooks = r.data
+      } catch (e: any) {
+        this.$eventHub.$emit('error', {message: e.message})
+      } finally {
+        this.singlePageLoading = false
+      }
+    },
+    async toggleSinglePageIgnore(item: any) {
+      const url = `/api/v1/media-management/single-page-books/${item.bookId}/ignore`
+      try {
+        if (item.ignored) {
+          await this.$http.delete(url)
+        } else {
+          await this.$http.post(url)
+        }
+        item.ignored = !item.ignored
+        if (!this.singlePageIncludeIgnored && item.ignored) {
+          this.singlePageBooks = this.singlePageBooks.filter((x: any) => x.bookId !== item.bookId)
+        }
+      } catch (e: any) {
+        this.$eventHub.$emit('error', {message: e.message})
+        this.loadSinglePageBooks()
+      }
+    },
+    async deleteSelectedSinglePage() {
+      const items = this.selectedSinglePage.slice()
+      if (items.length === 0) return
+      if (!window.confirm(`Delete ${items.length} book file(s) from disk? This cannot be undone.`)) return
+      this.singlePageBusy = true
+      let failed = 0
+      for (const it of items) {
+        try {
+          await this.$komgaBooks.deleteBook(it.bookId)
+        } catch (e: any) {
+          failed++
+        }
+      }
+      const ids = new Set(items.map((x: any) => x.bookId))
+      this.singlePageBooks = this.singlePageBooks.filter((x: any) => !ids.has(x.bookId))
+      this.selectedSinglePage = []
+      this.singlePageBusy = false
+      this.rescanMsg = `Queued ${items.length - failed} book(s) for deletion` + (failed ? ` (${failed} failed)` : '')
+      this.rescanSnack = true
+    },
+    async ignoreSelectedSinglePage() {
+      const items = this.selectedSinglePage.slice()
+      if (items.length === 0) return
+      this.singlePageBusy = true
+      for (const it of items) {
+        if (it.ignored) continue
+        try {
+          await this.$http.post(`/api/v1/media-management/single-page-books/${it.bookId}/ignore`)
+        } catch (e: any) {
+          // skip individual failures
+        }
+      }
+      const ids = new Set(items.map((x: any) => x.bookId))
+      if (this.singlePageIncludeIgnored) {
+        this.singlePageBooks.forEach((x: any) => { if (ids.has(x.bookId)) x.ignored = true })
+      } else {
+        this.singlePageBooks = this.singlePageBooks.filter((x: any) => !ids.has(x.bookId))
+      }
+      this.selectedSinglePage = []
+      this.singlePageBusy = false
+    },
+    formatBytes(bytes: number): string {
+      if (!bytes) return '—'
+      const units = ['B', 'KB', 'MB', 'GB']
+      let v = bytes
+      let i = 0
+      while (v >= 1024 && i < units.length - 1) {
+        v /= 1024
+        i++
+      }
+      return `${v.toFixed(1)} ${units[i]}`
     },
   },
 })
