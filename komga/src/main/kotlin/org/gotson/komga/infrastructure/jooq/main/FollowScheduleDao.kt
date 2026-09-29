@@ -39,7 +39,6 @@ class FollowScheduleDao(
       ?.toDomain()
 
   override fun save(schedule: FollowSchedule) {
-    dslRW.deleteFrom(table).where(libraryIdField.eq(schedule.libraryId)).execute()
     dslRW
       .insertInto(table)
       .columns(
@@ -56,7 +55,14 @@ class FollowScheduleDao(
         schedule.intervalHours,
         schedule.checkTime,
         schedule.lastCheckTime,
-      ).execute()
+      ).onConflict(libraryIdField)
+      .doUpdate()
+      .set(enabledField, schedule.enabled)
+      .set(scheduleModeField, schedule.scheduleMode)
+      .set(intervalHoursField, schedule.intervalHours)
+      .set(checkTimeField, schedule.checkTime)
+      .set(lastCheckTimeField, schedule.lastCheckTime)
+      .execute()
   }
 
   override fun delete(libraryId: String) {

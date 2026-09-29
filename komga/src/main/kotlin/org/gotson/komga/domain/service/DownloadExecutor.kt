@@ -11,8 +11,6 @@ import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
-import org.gotson.komga.interfaces.api.websocket.DownloadProgressDto
-import org.gotson.komga.interfaces.api.websocket.DownloadProgressHandler
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.context.event.EventListener
@@ -52,7 +50,6 @@ class DownloadExecutor(
   private val libraryContentLifecycle: LibraryContentLifecycle,
   private val taskEmitter: TaskEmitter,
   private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
-  private val downloadProgressHandler: DownloadProgressHandler,
   private val eventPublisher: ApplicationEventPublisher,
 ) {
   private val processing = AtomicBoolean(false)
@@ -171,19 +168,15 @@ class DownloadExecutor(
           retryDownload(download.id)
           logger.warn { "Auto-retry queued: ${download.id} - ${download.title} (attempt ${download.retryCount + 1})" }
 
-          downloadProgressHandler.broadcastProgress(
-            DownloadProgressDto(
-              type = "retry",
+          eventPublisher.publishEvent(
+            DomainEvent.DownloadProgress(
               downloadId = download.id,
-              mangaTitle = download.title,
-              url = download.sourceUrl,
+              title = download.title,
               status = "PENDING",
+              progressPercent = 0,
               currentChapter = null,
               totalChapters = download.totalChapters,
-              completedChapters = null,
-              filesDownloaded = 0,
-              percentage = 0,
-              error = "Auto-retrying (attempt ${download.retryCount + 1}/${download.maxRetries})",
+              message = "Auto-retrying (attempt ${download.retryCount + 1}/${download.maxRetries})",
             ),
           )
         } catch (e: Exception) {
@@ -265,11 +258,13 @@ class DownloadExecutor(
       ),
     )
 
-    cancelledIds.add(downloadId)
-    activeDownloads.remove(downloadId)?.let { active ->
-      active.process?.let { proc ->
-        logger.info { "Killing gallery-dl subprocess for download $downloadId (pid=${proc.pid()})" }
-        proc.destroyForcibly()
+    synchronized(activeDownloads) {
+      cancelledIds.add(downloadId)
+      activeDownloads.remove(downloadId)?.let { active ->
+        active.process?.let { proc ->
+          logger.info { "Killing gallery-dl subprocess for download $downloadId (pid=${proc.pid()})" }
+          proc.destroyForcibly()
+        }
       }
     }
     logger.info { "Cancelled download: $downloadId" }
@@ -287,11 +282,13 @@ class DownloadExecutor(
       ),
     )
 
-    cancelledIds.add(downloadId)
-    activeDownloads.remove(downloadId)?.let { active ->
-      active.process?.let { proc ->
-        logger.info { "Killing gallery-dl subprocess for paused download $downloadId (pid=${proc.pid()})" }
-        proc.destroyForcibly()
+    synchronized(activeDownloads) {
+      cancelledIds.add(downloadId)
+      activeDownloads.remove(downloadId)?.let { active ->
+        active.process?.let { proc ->
+          logger.info { "Killing gallery-dl subprocess for paused download $downloadId (pid=${proc.pid()})" }
+          proc.destroyForcibly()
+        }
       }
     }
     logger.info { "Paused download: $downloadId (resume re-queues and downloads only the missing chapters)" }
@@ -342,11 +339,13 @@ class DownloadExecutor(
 
   fun deleteDownload(downloadId: String) {
     downloadQueueRepository.delete(downloadId)
-    cancelledIds.add(downloadId)
-    activeDownloads.remove(downloadId)?.let { active ->
-      active.process?.let { proc ->
-        logger.info { "Killing gallery-dl subprocess for deleted download $downloadId (pid=${proc.pid()})" }
-        proc.destroyForcibly()
+    synchronized(activeDownloads) {
+      cancelledIds.add(downloadId)
+      activeDownloads.remove(downloadId)?.let { active ->
+        active.process?.let { proc ->
+          logger.info { "Killing gallery-dl subprocess for deleted download $downloadId (pid=${proc.pid()})" }
+          proc.destroyForcibly()
+        }
       }
     }
     logger.info { "Deleted download: $downloadId" }
@@ -419,7 +418,15 @@ class DownloadExecutor(
     downloadId: String,
     process: Process,
   ) {
-    activeDownloads[downloadId]?.process = process
+    synchronized(activeDownloads) {
+      val active = activeDownloads[downloadId]
+      if (active == null || cancelledIds.contains(downloadId)) {
+        logger.info { "Download $downloadId cancelled before its subprocess started, killing orphan (pid=${process.pid()})" }
+        process.destroyForcibly()
+        return
+      }
+      active.process = process
+    }
   }
 
   private fun processDownload(download: DownloadQueue) {
@@ -457,21 +464,6 @@ class DownloadExecutor(
     try {
       updateDownloadStatus(download, DownloadStatus.DOWNLOADING, startedDate = LocalDateTime.now())
 
-      downloadProgressHandler.broadcastProgress(
-        DownloadProgressDto(
-          type = "started",
-          downloadId = download.id,
-          mangaTitle = download.title,
-          url = download.sourceUrl,
-          status = "DOWNLOADING",
-          currentChapter = null,
-          totalChapters = download.totalChapters,
-          completedChapters = 0,
-          filesDownloaded = 0,
-          percentage = 0,
-          error = null,
-        ),
-      )
       eventPublisher.publishEvent(
         DomainEvent.DownloadStarted(
           downloadId = download.id,
@@ -525,9 +517,21 @@ class DownloadExecutor(
             ?: newFolderPath
         komgaSeriesId = existingFolder?.komgaSeriesId
       } else {
+        val webtoonsTitleNo =
+          if (download.sourceUrl.contains("webtoons.com", ignoreCase = true)) {
+            WEBTOONS_TITLE_NO_REGEX.find(download.sourceUrl)?.groupValues?.get(1)
+          } else {
+            null
+          }
+        val libId = download.libraryId
+        val linkedSeriesId =
+          when {
+            libId == null -> null
+            webtoonsTitleNo != null -> seriesMetadataRepository.findSeriesIdByLinkQueryParam(libId, "title_no", webtoonsTitleNo)
+            else -> seriesMetadataRepository.findSeriesIdByLinkUrlContaining(libId, download.sourceUrl)
+          }
         val linkedSeries =
-          download.libraryId
-            ?.let { seriesMetadataRepository.findSeriesIdByLinkUrlContaining(it, download.sourceUrl) }
+          linkedSeriesId
             ?.let { seriesRepository.findByIdOrNull(it) }
             ?.takeIf { it.path.toFile().exists() }
         if (linkedSeries != null) {
@@ -562,7 +566,6 @@ class DownloadExecutor(
         ) { progress ->
           if (isCancelled()) {
             logger.info { "Download ${download.id} cancelled during processing, aborting" }
-            cancelledIds.remove(download.id)
             throw InterruptedException("Download cancelled: ${download.id}")
           }
           val now = System.currentTimeMillis()
@@ -578,22 +581,6 @@ class DownloadExecutor(
             )
           }
 
-          downloadProgressHandler.broadcastProgress(
-            DownloadProgressDto(
-              type = "progress",
-              downloadId = download.id,
-              mangaTitle = download.title,
-              url = download.sourceUrl,
-              status = "DOWNLOADING",
-              currentChapter = progress.currentChapter.toString(),
-              totalChapters = if (progress.totalChapters > 0) progress.totalChapters else download.totalChapters,
-              completedChapters = progress.currentChapter,
-              filesDownloaded = progress.currentChapter,
-              percentage = progress.percent,
-              error = null,
-              chapterTitle = progress.chapterTitle,
-            ),
-          )
           eventPublisher.publishEvent(
             DomainEvent.DownloadProgress(
               downloadId = download.id,
@@ -606,6 +593,11 @@ class DownloadExecutor(
             ),
           )
         }
+
+      if (cancelledIds.remove(download.id)) {
+        logger.info { "Download ${download.id} was cancelled during processing, keeping CANCELLED status" }
+        return
+      }
 
       if (result.success) {
         val finalTitle = result.mangaTitle ?: download.title
@@ -626,33 +618,33 @@ class DownloadExecutor(
             ?: download.totalChapters?.takeIf { it > 0 }
         val finalCurrentChapter = result.newlyDownloaded.takeIf { it > 0 } ?: finalTotalChapters
 
-        updateDownloadStatus(
-          download.copy(
-            title = finalTitle,
-            totalChapters = finalTotalChapters,
-            currentChapter = finalCurrentChapter,
-          ),
-          DownloadStatus.COMPLETED,
-          completedDate = LocalDateTime.now(),
-          progressPercent = 100,
-          destinationPath = finalPath.toString(),
-        )
+        // Re-check cancellation and write the terminal status atomically: cancelDownload adds to
+        // cancelledIds under this same lock, so if a cancel lands in the window after the early check
+        // above, we must not overwrite its CANCELLED row with COMPLETED.
+        val completed =
+          synchronized(activeDownloads) {
+            if (cancelledIds.remove(download.id)) {
+              false
+            } else {
+              updateDownloadStatus(
+                download.copy(
+                  title = finalTitle,
+                  totalChapters = finalTotalChapters,
+                  currentChapter = finalCurrentChapter,
+                ),
+                DownloadStatus.COMPLETED,
+                completedDate = LocalDateTime.now(),
+                progressPercent = 100,
+                destinationPath = finalPath.toString(),
+              )
+              true
+            }
+          }
+        if (!completed) {
+          logger.info { "Download ${download.id} was cancelled just before completion, keeping CANCELLED status" }
+          return
+        }
 
-        downloadProgressHandler.broadcastProgress(
-          DownloadProgressDto(
-            type = "completed",
-            downloadId = download.id,
-            mangaTitle = finalTitle ?: download.title,
-            url = download.sourceUrl,
-            status = "COMPLETED",
-            currentChapter = null,
-            totalChapters = finalTotalChapters,
-            completedChapters = finalTotalChapters,
-            filesDownloaded = result.filesDownloaded,
-            percentage = 100,
-            error = null,
-          ),
-        )
         eventPublisher.publishEvent(
           DomainEvent.DownloadCompleted(
             downloadId = download.id,
@@ -707,21 +699,6 @@ class DownloadExecutor(
           errorMessage = result.errorMessage ?: "Download failed",
         )
 
-        downloadProgressHandler.broadcastProgress(
-          DownloadProgressDto(
-            type = "failed",
-            downloadId = download.id,
-            mangaTitle = download.title,
-            url = download.sourceUrl,
-            status = "FAILED",
-            currentChapter = null,
-            totalChapters = download.totalChapters,
-            completedChapters = null,
-            filesDownloaded = 0,
-            percentage = null,
-            error = result.errorMessage ?: "Download failed",
-          ),
-        )
         eventPublisher.publishEvent(
           DomainEvent.DownloadFailed(
             downloadId = download.id,
@@ -733,6 +710,11 @@ class DownloadExecutor(
         logger.error { "Download failed: ${download.id} - ${result.errorMessage}" }
       }
     } catch (e: Exception) {
+      if (cancelledIds.remove(download.id)) {
+        logger.info { "Download ${download.id} was cancelled during processing, keeping CANCELLED status" }
+        return
+      }
+
       logger.error(e) { "Error processing download ${download.id}" }
 
       updateDownloadStatus(
@@ -741,21 +723,6 @@ class DownloadExecutor(
         errorMessage = e.message ?: "Unknown error",
       )
 
-      downloadProgressHandler.broadcastProgress(
-        DownloadProgressDto(
-          type = "error",
-          downloadId = download.id,
-          mangaTitle = download.title,
-          url = download.sourceUrl,
-          status = "FAILED",
-          currentChapter = null,
-          totalChapters = download.totalChapters,
-          completedChapters = null,
-          filesDownloaded = 0,
-          percentage = null,
-          error = e.message ?: "Unknown error",
-        ),
-      )
       eventPublisher.publishEvent(
         DomainEvent.DownloadFailed(
           downloadId = download.id,
@@ -1155,6 +1122,7 @@ class DownloadExecutor(
 
   companion object {
     private val MANGADEX_UUID_REGEX = Regex("""^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$""")
+    private val WEBTOONS_TITLE_NO_REGEX = Regex("""[?&]title_no=(\d+)""")
   }
 }
 

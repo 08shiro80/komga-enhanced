@@ -1,15 +1,17 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PreDestroy
+import org.gotson.komga.domain.model.Series
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.infrastructure.download.ChapterMatcher
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
+import org.gotson.komga.infrastructure.download.MangaDexApiClient
 import org.springframework.stereotype.Service
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
@@ -59,8 +61,20 @@ class ChapterChecker(
   private val seriesRepository: org.gotson.komga.domain.persistence.SeriesRepository,
   private val galleryDlWrapper: GalleryDlWrapper,
   private val chapterMatcher: ChapterMatcher,
+  private val mangaDexApiClient: MangaDexApiClient,
 ) {
-  private val concurrencyLimit = Semaphore(5)
+  // Shared across calls: the 5-thread pool itself bounds concurrency to 5 in-flight checks
+  // (no separate semaphore needed). Reused instead of created-per-call to avoid thread churn.
+  private val executor = Executors.newFixedThreadPool(5)
+
+  @PreDestroy
+  fun shutdown() {
+    executor.shutdown()
+    if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
+      logger.warn { "Chapter check executor timed out, forcing shutdown" }
+      executor.shutdownNow()
+    }
+  }
 
   fun checkUrls(urls: List<String>): ChapterCheckSummary {
     val startTime = System.currentTimeMillis()
@@ -69,46 +83,14 @@ class ChapterChecker(
     val libraries = libraryRepository.findAll()
     val folderIndex = buildFolderIndex(libraries)
 
-    val executor = Executors.newFixedThreadPool(5)
-    val results: List<ChapterCheckResult>
-    try {
-      val futures =
-        urls.map { url ->
-          CompletableFuture.supplyAsync(
-            {
-              try {
-                concurrencyLimit.acquire()
-                try {
-                  checkSingleUrl(url, folderIndex, libraries)
-                } finally {
-                  concurrencyLimit.release()
-                }
-              } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-                ChapterCheckResult(
-                  url = url,
-                  mangaId = null,
-                  title = null,
-                  apiChapterCount = 0,
-                  downloadedChapterCount = 0,
-                  filesystemChapterCount = 0,
-                  newChaptersEstimate = 0,
-                  needsDownload = false,
-                  error = "Interrupted",
-                )
-              }
-            },
-            executor,
-          )
-        }
-      results = futures.map { it.join() }
-    } finally {
-      executor.shutdown()
-      if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
-        logger.warn { "Chapter check executor timed out, forcing shutdown" }
-        executor.shutdownNow()
+    val futures =
+      urls.map { url ->
+        CompletableFuture.supplyAsync(
+          { checkSingleUrl(url, folderIndex, libraries) },
+          executor,
+        )
       }
-    }
+    val results = futures.map { it.join() }
 
     val durationMs = System.currentTimeMillis() - startTime
     val needsDownload = results.filter { it.needsDownload }
@@ -321,58 +303,154 @@ class ChapterChecker(
     return index
   }
 
-  fun scanDeletedChaptersForLibrary(libraryId: String): DeletedChapterScanResult {
+  fun scanDeletedChaptersForLibrary(
+    libraryId: String,
+    dryRun: Boolean = false,
+    limit: Int? = null,
+    offset: Int = 0,
+  ): DeletedChapterScanResult {
     val allSeries = seriesRepository.findAllByLibraryId(libraryId)
+
+    // Availability guard: if the library root is missing or unreadable (detached mount, IO/permission
+    // error), abort the scan instead of letting every series folder look "deleted" — a transient unmount
+    // would otherwise wipe all CHAPTER_URL tracking rows and trigger mass false re-downloads.
+    if (isLibraryRootUnavailable(libraryId)) {
+      logger.warn { "Deleted chapters scan aborted: library $libraryId root missing or unreadable — nothing removed" }
+      return DeletedChapterScanResult(0, 0, allSeries.size, emptyList())
+    }
+
+    val window =
+      if (limit != null) {
+        allSeries.drop(offset).take(limit)
+      } else {
+        allSeries
+      }
     var seriesScanned = 0
     var totalRemoved = 0
     val details = mutableListOf<DeletedChapterDetail>()
 
-    allSeries.forEach { series ->
-      val chapterUrls = chapterUrlRepository.findBySeriesId(series.id)
-      if (chapterUrls.isEmpty()) return@forEach
-
-      seriesScanned++
-      val seriesDir = series.path.toFile()
-
-      if (!seriesDir.exists()) {
-        val count = chapterUrls.size
-        chapterUrlRepository.deleteBySeriesId(series.id)
-        totalRemoved += count
-        details.add(DeletedChapterDetail(series.name, count, 0, 0))
-        logger.info { "Deleted chapters scan: folder missing for '${series.name}', removed $count entries" }
-        return@forEach
-      }
-
-      val cbzCount =
-        seriesDir
-          .listFiles()
-          ?.count { it.isFile && it.extension.lowercase() == "cbz" }
-          ?: 0
-
-      if (cbzCount == 0) {
-        val count = chapterUrls.size
-        chapterUrlRepository.deleteBySeriesId(series.id)
-        totalRemoved += count
-        details.add(DeletedChapterDetail(series.name, count, 0, 0))
-        logger.info { "Deleted chapters scan: no CBZ files in '${series.name}', removed $count entries" }
-        return@forEach
-      }
-
-      val existingUrls = chapterMatcher.extractChapterUrlsFromCbzFiles(seriesDir)
-      val staleEntries = chapterUrls.filter { it.url !in existingUrls }
-      if (staleEntries.isNotEmpty()) {
-        staleEntries.forEach { chapterUrlRepository.delete(it.id) }
-        totalRemoved += staleEntries.size
-        val remaining = chapterUrls.size - staleEntries.size
-        details.add(DeletedChapterDetail(series.name, staleEntries.size, remaining, cbzCount))
-        logger.info {
-          "Deleted chapters scan: '${series.name}' had ${chapterUrls.size} DB entries, $cbzCount files, removed ${staleEntries.size} stale entries"
-        }
-      }
+    window.forEach { series ->
+      val outcome = reconcileSeries(series, dryRun)
+      if (outcome.scanned) seriesScanned++
+      totalRemoved += outcome.removed
+      outcome.detail?.let { details.add(it) }
     }
 
-    logger.info { "Deleted chapters scan complete: scanned $seriesScanned series, removed $totalRemoved entries" }
+    val verb = if (dryRun) "would remove" else "removed"
+    logger.info {
+      "Deleted chapters scan complete${if (dryRun) " (dry-run)" else ""}: scanned $seriesScanned series " +
+        "(window offset=$offset limit=${limit ?: "all"} of ${allSeries.size}), $verb $totalRemoved entries"
+    }
     return DeletedChapterScanResult(seriesScanned, totalRemoved, allSeries.size, details)
+  }
+
+  fun scanDeletedChaptersForSeries(
+    seriesId: String,
+    dryRun: Boolean = false,
+  ): DeletedChapterScanResult {
+    val series =
+      seriesRepository.findByIdOrNull(seriesId)
+        ?: return DeletedChapterScanResult(0, 0, 0, emptyList())
+
+    if (isLibraryRootUnavailable(series.libraryId)) {
+      logger.warn { "Deleted chapters scan aborted: library ${series.libraryId} root missing or unreadable — nothing removed" }
+      return DeletedChapterScanResult(0, 0, 1, emptyList())
+    }
+
+    val outcome = reconcileSeries(series, dryRun)
+    return DeletedChapterScanResult(
+      seriesScanned = if (outcome.scanned) 1 else 0,
+      entriesRemoved = outcome.removed,
+      totalSeries = 1,
+      details = listOfNotNull(outcome.detail),
+    )
+  }
+
+  private fun isLibraryRootUnavailable(libraryId: String): Boolean {
+    val libraryDir = libraryRepository.findByIdOrNull(libraryId)?.path?.toFile()
+    return libraryDir == null || !libraryDir.exists() || libraryDir.listFiles() == null
+  }
+
+  private data class ReconcileOutcome(
+    val scanned: Boolean,
+    val removed: Int,
+    val detail: DeletedChapterDetail?,
+  )
+
+  private fun reconcileSeries(
+    series: Series,
+    dryRun: Boolean,
+  ): ReconcileOutcome {
+    val chapterUrls = chapterUrlRepository.findBySeriesId(series.id)
+    if (chapterUrls.isEmpty()) return ReconcileOutcome(false, 0, null)
+
+    val verb = if (dryRun) "would remove" else "removed"
+    val seriesDir = series.path.toFile()
+
+    if (!seriesDir.exists()) {
+      val count = chapterUrls.size
+      if (!dryRun) chapterUrlRepository.deleteBySeriesId(series.id)
+      logger.info { "Deleted chapters scan: folder missing for '${series.name}', $verb $count entries" }
+      return ReconcileOutcome(true, count, DeletedChapterDetail(series.name, count, 0, 0))
+    }
+
+    val files = seriesDir.listFiles()
+    if (files == null) {
+      logger.info { "Deleted chapters scan: cannot list files for '${series.name}' (IO error/permission) — skipping (unverifiable)" }
+      return ReconcileOutcome(true, 0, null)
+    }
+    val cbzCount = files.count { it.isFile && it.extension.lowercase() == "cbz" }
+
+    if (cbzCount == 0) {
+      val count = chapterUrls.size
+      if (!dryRun) chapterUrlRepository.deleteBySeriesId(series.id)
+      logger.info { "Deleted chapters scan: no CBZ files in '${series.name}', $verb $count entries" }
+      return ReconcileOutcome(true, count, DeletedChapterDetail(series.name, count, 0, 0))
+    }
+
+    val perFileUrls = chapterMatcher.extractChapterUrlsPerCbzFile(seriesDir)
+    // Safety guard against false positives: only trust the "stale" verdict when EVERY CBZ carries at least
+    // one identifiable chapter URL. If any CBZ embeds no recognizable per-chapter URL (e.g. imported/non-
+    // MangaDex files whose ComicInfo carries only a manga-level <Web>), we CANNOT conclude the tracked URLs
+    // are orphaned, and deleting them would trigger mass false re-downloads. Skip such series (unverifiable).
+    // A per-file check is required: an aggregate URL-count vs file-count comparison lets one CBZ with two
+    // URLs mask another with none.
+    if (perFileUrls.size < cbzCount || perFileUrls.any { it.isEmpty() }) {
+      val identifiable = perFileUrls.count { it.isNotEmpty() }
+      logger.info { "Deleted chapters scan: skipping '${series.name}' — only $identifiable of $cbzCount CBZs carry identifiable chapter URLs (cannot verify)" }
+      return ReconcileOutcome(true, 0, null)
+    }
+    val existingUrls = perFileUrls.flatMapTo(mutableSetOf()) { it }
+    val staleEntries = chapterUrls.filter { it.url !in existingUrls }
+    if (staleEntries.isEmpty()) return ReconcileOutcome(true, 0, null)
+
+    // Failsafe: only remove a stale entry when its source chapter STILL EXISTS and can actually be
+    // re-downloaded. If the MangaDex chapter is gone (404), unverifiable (network error) or not a MangaDex
+    // URL, KEEP the tracking row — deleting it would trigger no successful re-download and only lose the
+    // "we had this" record. A chapter that still resolves but has no hosted pages (pages==0 && externalUrl
+    // != null, external redirect) is likewise NOT re-downloadable → keep it (consistent with the auto-
+    // blacklist rule). On a MangaDex outage every check returns null → nothing is deleted (safe by default).
+    val deletable =
+      staleEntries.filter { entry ->
+        val chapterId = entry.url.substringAfterLast("/chapter/", "")
+        val metadata = if (chapterId.isNotBlank()) mangaDexApiClient.fetchChapterMetadata(chapterId) else null
+        metadata != null && !(metadata.pages == 0 && metadata.externalUrl != null)
+      }
+    val kept = staleEntries.size - deletable.size
+    if (deletable.isEmpty()) {
+      if (kept > 0) {
+        logger.info { "Deleted chapters scan: '${series.name}' — $kept stale entries KEPT (source gone/unverifiable, not re-downloadable)" }
+      }
+      return ReconcileOutcome(true, 0, null)
+    }
+
+    if (!dryRun) deletable.forEach { chapterUrlRepository.delete(it.id) }
+    val remaining = chapterUrls.size - deletable.size
+    logger.info {
+      "Deleted chapters scan: '${series.name}' had ${chapterUrls.size} DB entries, $cbzCount files, $verb ${deletable.size} stale entries" +
+        if (kept > 0) " ($kept KEPT — source gone/unverifiable)" else ""
+    }
+    return ReconcileOutcome(true, deletable.size, DeletedChapterDetail(series.name, deletable.size, remaining, cbzCount))
   }
 
   companion object {

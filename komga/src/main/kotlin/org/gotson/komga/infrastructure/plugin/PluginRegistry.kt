@@ -27,6 +27,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
+import java.util.concurrent.ConcurrentHashMap
 
 private val logger = KotlinLogging.logger {}
 
@@ -41,7 +42,9 @@ class PluginRegistry(
   private val pluginRepository: PluginRepository,
   private val pluginConfigRepository: PluginConfigRepository,
 ) {
-  private val loaded = mutableMapOf<String, LoadedPlugin>()
+  // Concurrent: mutators are @Synchronized, but reads/iteration (notify, metadataProviderFor,
+  // isExternal) run without the lock — notify() is triggered by async download events.
+  private val loaded = ConcurrentHashMap<String, LoadedPlugin>()
 
   private val resourceResolver = PathMatchingResourcePatternResolver()
 
@@ -103,7 +106,12 @@ class PluginRegistry(
         Files.deleteIfExists(target)
         throw e
       }
-    loaded.remove(newPlugin.instance.id)?.let { closeQuietly(it) }
+    loaded.remove(newPlugin.instance.id)?.let { old ->
+      closeQuietly(old)
+      // Reinstall under a different filename would otherwise leave the old JAR on disk and load
+      // both (nondeterministic version) on next startup.
+      if (old.jarPath.fileName != target.fileName) Files.deleteIfExists(old.jarPath)
+    }
     register(newPlugin)
     return pluginRepository.findById(newPlugin.instance.id)
   }

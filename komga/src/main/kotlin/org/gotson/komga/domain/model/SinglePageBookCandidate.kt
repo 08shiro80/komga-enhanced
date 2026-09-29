@@ -8,4 +8,5 @@ data class SinglePageBookCandidate(
   val seriesTitle: String?,
   val fileSize: Long,
   val mediaType: String,
+  val numberSort: Float,
 )

@@ -83,10 +83,14 @@ class FollowLifecycle(
     id: String,
     title: String? = null,
     enabled: Boolean? = null,
+    libraryId: String? = null,
   ): Follow {
     val existing =
       followRepository.findById(id)
         ?: throw EntryNotFoundException("Follow entry not found: $id")
+    if (libraryId != null && existing.libraryId != libraryId) {
+      throw EntryNotFoundException("Follow entry not found: $id")
+    }
     val updated =
       existing.copy(
         title = title ?: existing.title,
@@ -96,7 +100,16 @@ class FollowLifecycle(
     return updated
   }
 
-  fun delete(id: String) {
+  fun delete(
+    id: String,
+    libraryId: String? = null,
+  ) {
+    if (libraryId != null) {
+      val existing = followRepository.findById(id)
+      if (existing == null || existing.libraryId != libraryId) {
+        throw EntryNotFoundException("Follow entry not found: $id")
+      }
+    }
     followRepository.delete(id)
     logger.info { "Deleted follow entry: $id" }
   }

@@ -8,6 +8,7 @@ import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.infrastructure.download.MangaDexApiClient
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -22,6 +23,7 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @Tag(name = "Health", description = "System health check endpoints")
 @RequestMapping("/api/v1/health", produces = [MediaType.APPLICATION_JSON_VALUE])
+@PreAuthorize("hasRole('ADMIN')")
 class HealthCheckController(
   private val galleryDlWrapper: GalleryDlWrapper,
   private val mangaDexApiClient: MangaDexApiClient,

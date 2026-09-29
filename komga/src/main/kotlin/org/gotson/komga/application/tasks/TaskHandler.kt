@@ -59,7 +59,7 @@ class TaskHandler(
         runTask(task)
         return
       } catch (e: Exception) {
-        if (isSqliteBusy(e) && attempt < MAX_DB_BUSY_RETRIES) {
+        if (isSqliteBusy(e) && attempt < MAX_DB_BUSY_RETRIES && isRetryableOnBusy(task)) {
           attempt++
           val backoffMs = DB_BUSY_BACKOFF_MS * attempt
           logger.warn { "Task $task hit SQLITE_BUSY, retry $attempt/$MAX_DB_BUSY_RETRIES after ${backoffMs}ms" }
@@ -87,6 +87,23 @@ class TaskHandler(
     }
     return false
   }
+
+  // File-mutating/rewrite tasks are NOT idempotent on re-run: retrying after a SQLITE_BUSY that
+  // occurred once the file op had already happened would copy/convert/rewrite a second time. For
+  // these, let the task fail on BUSY (rare, given the 30s busy_timeout) — Komga's next scan/analyze
+  // reconciles the file↔DB state. DB-only/analysis tasks stay retryable.
+  private fun isRetryableOnBusy(task: Task): Boolean =
+    when (task) {
+      is Task.ImportBook,
+      is Task.ConvertBook,
+      is Task.RepairExtension,
+      is Task.RemoveHashedPages,
+      is Task.DeleteBook,
+      is Task.DeleteSeries,
+      -> false
+
+      else -> true
+    }
 
   private fun runTask(task: Task) {
     measureTime {

@@ -91,6 +91,11 @@
       <h3 class="text-h6">Single-page chapters ({{ singlePageBooks.length }})</h3>
       <v-spacer></v-spacer>
       <template v-if="selectedSinglePage.length > 0">
+        <v-btn small color="primary" class="mr-2" :loading="singlePageBusy"
+               :disabled="repairableSelectedCount === 0" @click="repairSelectedSinglePage">
+          <v-icon left small>mdi-autorenew</v-icon>
+          Repair ({{ repairableSelectedCount }})
+        </v-btn>
         <v-btn small color="error" class="mr-2" :loading="singlePageBusy" @click="deleteSelectedSinglePage">
           <v-icon left small>mdi-delete-outline</v-icon>
           Delete ({{ selectedSinglePage.length }})
@@ -111,7 +116,9 @@
       </v-btn>
     </div>
     <p class="text-caption text--secondary mb-2">
-      Chapters whose archive contains only a single image. Check them; flip Ignore for the ones that are correct so they drop off the list.
+      Chapters whose archive contains only a single image. Repair re-downloads from the tracked chapter link and replaces the file only
+      if the fresh download succeeds (a dead link keeps the local file and reports an error). Flip Ignore for the ones that are genuinely
+      single-image so they drop off the list.
     </p>
     <v-data-table
       v-model="selectedSinglePage"
@@ -131,6 +138,10 @@
       </template>
       <template v-slot:item.fileSize="{ item }">
         {{ formatBytes(item.fileSize) }}
+      </template>
+      <template v-slot:item.sourceUrl="{ item }">
+        <v-icon v-if="item.sourceUrl" small color="success" :title="item.sourceUrl">mdi-link-variant</v-icon>
+        <v-icon v-else small color="grey" title="No tracked chapter URL — repair unavailable">mdi-link-variant-off</v-icon>
       </template>
       <template v-slot:item.ignored="{ item }">
         <v-switch
@@ -202,6 +213,7 @@ export default Vue.extend({
         {text: 'Chapter', value: 'bookName'},
         {text: 'Type', value: 'mediaType'},
         {text: 'Size', value: 'fileSize'},
+        {text: 'Source', value: 'sourceUrl', sortable: false},
         {text: 'Ignore', value: 'ignored', sortable: false},
       ] as object[],
     }
@@ -248,6 +260,9 @@ export default Vue.extend({
         {text: this.$i18n.t('media_analysis.size').toString(), value: 'size'},
         {text: '', value: 'deleted', groupable: false, sortable: false},
       ]
+    },
+    repairableSelectedCount(): number {
+      return this.selectedSinglePage.filter((x: any) => x.sourceUrl).length
     },
     booksData(): BookDto[] {
       return this.books.map((b: BookDto) => ({
@@ -413,6 +428,43 @@ export default Vue.extend({
       this.selectedSinglePage = []
       this.singlePageBusy = false
       this.rescanMsg = `Queued ${items.length - failed} book(s) for deletion` + (failed ? ` (${failed} failed)` : '')
+      this.rescanSnack = true
+    },
+    async repairSelectedSinglePage() {
+      const items = this.selectedSinglePage.filter((x: any) => x.sourceUrl)
+      if (items.length === 0) return
+      this.singlePageBusy = true
+      const counts = {repaired: 0, stillSingle: 0, sourceGone: 0, failed: 0}
+      const fixedIds = [] as string[]
+      for (const it of items) {
+        try {
+          const r = await this.$http.post(`/api/v1/media-management/single-page-books/${it.bookId}/repair`)
+          switch (r.data.outcome) {
+            case 'REPAIRED':
+              counts.repaired++
+              fixedIds.push(it.bookId)
+              break
+            case 'STILL_SINGLE_PAGE':
+              counts.stillSingle++
+              break
+            case 'SOURCE_GONE':
+            case 'NO_SOURCE_URL':
+              counts.sourceGone++
+              break
+            default:
+              counts.failed++
+          }
+        } catch (e: any) {
+          counts.failed++
+        }
+      }
+      if (fixedIds.length > 0) {
+        const ids = new Set(fixedIds)
+        this.singlePageBooks = this.singlePageBooks.filter((x: any) => !ids.has(x.bookId))
+      }
+      this.selectedSinglePage = []
+      this.singlePageBusy = false
+      this.rescanMsg = `Repair: ${counts.repaired} fixed · ${counts.stillSingle} still single-page · ${counts.sourceGone} source gone · ${counts.failed} failed`
       this.rescanSnack = true
     },
     async ignoreSelectedSinglePage() {

@@ -6,14 +6,14 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 
 data class AlternateTitleEntry(
-  val title: String,
+  val title: String = "",
   val language: String? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class TrackerLinkEntry(
-  val label: String,
-  val url: String,
+  val label: String = "",
+  val url: String = "",
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -21,7 +21,7 @@ data class MylarMetadata(
   val type: String = "comicSeries",
   val publisher: String = "",
   val imprint: String? = null,
-  val name: String,
+  val name: String = "",
   @field:JsonAlias("cid")
   val comicid: String = "",
   val year: Int? = null,

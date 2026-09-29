@@ -23,6 +23,7 @@ import org.gotson.komga.domain.model.BlacklistedChapter
 import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.Dimension
 import org.gotson.komga.domain.model.DomainEvent
+import org.gotson.komga.domain.model.EntityNotFoundException
 import org.gotson.komga.domain.model.KomgaUser
 import org.gotson.komga.domain.model.MarkSelectedPreference
 import org.gotson.komga.domain.model.Media
@@ -43,6 +44,8 @@ import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.persistence.ThumbnailSeriesRepository
 import org.gotson.komga.domain.service.BookLifecycle
+import org.gotson.komga.domain.service.ChapterChecker
+import org.gotson.komga.domain.service.DeletedChapterScanResult
 import org.gotson.komga.domain.service.SeriesLifecycle
 import org.gotson.komga.infrastructure.image.ImageAnalyzer
 import org.gotson.komga.infrastructure.jooq.UnpagedSorted
@@ -123,6 +126,7 @@ class SeriesController(
   private val thumbnailsSeriesRepository: ThumbnailSeriesRepository,
   private val contentRestrictionChecker: ContentRestrictionChecker,
   private val blacklistedChapterRepository: BlacklistedChapterRepository,
+  private val chapterChecker: ChapterChecker,
 ) {
   @Operation(summary = "List series", description = "Use POST /api/v1/series/list instead. Deprecated since 1.19.0.", tags = [OpenApiConfiguration.TagNames.SERIES, OpenApiConfiguration.TagNames.DEPRECATED])
   @Deprecated("use /v1/series/list instead")
@@ -466,14 +470,15 @@ class SeriesController(
 
   @Operation(summary = "Get series details", tags = [OpenApiConfiguration.TagNames.SERIES])
   @GetMapping("v1/series/{seriesId}")
+  @Throws(EntityNotFoundException::class)
   fun getSeriesById(
     @AuthenticationPrincipal principal: KomgaPrincipal,
     @PathVariable(name = "seriesId") id: String,
   ): SeriesDto =
     seriesDtoRepository.findByIdOrNull(id, principal.user.id)?.let {
-      contentRestrictionChecker.checkContentRestriction(principal.user, it)
+      contentRestrictionChecker.checkContentRestrictionSeries(principal.user, it)
       it.restrictUrl(!principal.user.isAdmin)
-    } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    } ?: throw EntityNotFoundException()
 
   @Operation(summary = "Get series' poster image", tags = [OpenApiConfiguration.TagNames.SERIES_POSTER])
   @ApiResponse(content = [Content(schema = Schema(type = "string", format = "binary"))])
@@ -497,6 +502,7 @@ class SeriesController(
     @PathVariable(name = "thumbnailId") thumbnailId: String,
   ): ByteArray {
     principal.user.checkContentRestriction(seriesId)
+    if (thumbnailsSeriesRepository.findByIdOrNull(thumbnailId)?.seriesId != seriesId) throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
     return seriesLifecycle.getThumbnailBytesByThumbnailId(thumbnailId)
       ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
@@ -552,10 +558,12 @@ class SeriesController(
     @PathVariable(name = "seriesId") seriesId: String,
     @PathVariable(name = "thumbnailId") thumbnailId: String,
   ) {
-    seriesRepository.findByIdOrNull(seriesId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-    thumbnailsSeriesRepository.findByIdOrNull(thumbnailId)?.let {
-      thumbnailsSeriesRepository.markSelected(it)
-      eventPublisher.publishEvent(DomainEvent.ThumbnailSeriesAdded(it.copy(selected = true)))
+    seriesRepository.findByIdOrNull(seriesId)?.let { series ->
+      thumbnailsSeriesRepository.findByIdOrNull(thumbnailId)?.let { poster ->
+        if (poster.seriesId != series.id) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        thumbnailsSeriesRepository.markSelected(poster)
+        eventPublisher.publishEvent(DomainEvent.ThumbnailSeriesAdded(poster.copy(selected = true)))
+      } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
   }
 
@@ -567,13 +575,15 @@ class SeriesController(
     @PathVariable(name = "seriesId") seriesId: String,
     @PathVariable(name = "thumbnailId") thumbnailId: String,
   ) {
-    seriesRepository.findByIdOrNull(seriesId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-    thumbnailsSeriesRepository.findByIdOrNull(thumbnailId)?.let {
-      try {
-        seriesLifecycle.deleteThumbnailForSeries(it)
-      } catch (e: IllegalArgumentException) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
-      }
+    seriesRepository.findByIdOrNull(seriesId)?.let { series ->
+      thumbnailsSeriesRepository.findByIdOrNull(thumbnailId)?.let { poster ->
+        if (poster.seriesId != series.id) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        try {
+          seriesLifecycle.deleteThumbnailForSeries(poster)
+        } catch (e: IllegalArgumentException) {
+          throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+        }
+      } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
   }
 
@@ -641,7 +651,7 @@ class SeriesController(
     principal.user.checkContentRestriction(seriesId)
 
     return collectionRepository
-      .findAllContainingSeriesId(seriesId, principal.user.getAuthorizedLibraryIds(null), principal.user.restrictions)
+      .findAllContainingSeriesId(seriesId, SearchContext(principal.user))
       .map { it.toDto() }
   }
 
@@ -654,6 +664,13 @@ class SeriesController(
   ) {
     taskEmitter.analyzeBook(bookRepository.findAllBySeriesId(seriesId), HIGH_PRIORITY)
   }
+
+  @Operation(summary = "Preview tracked chapter URLs that would be removed as deleted for this series (dry-run, no changes)", tags = [OpenApiConfiguration.TagNames.SERIES])
+  @PostMapping("v1/series/{seriesId}/scan-deleted-chapters/preview")
+  @PreAuthorize("hasRole('ADMIN')")
+  fun seriesScanDeletedChaptersPreview(
+    @PathVariable seriesId: String,
+  ): DeletedChapterScanResult = chapterChecker.scanDeletedChaptersForSeries(seriesId, dryRun = true)
 
   @Operation(summary = "Refresh series metadata", tags = [OpenApiConfiguration.TagNames.SERIES])
   @PostMapping("v1/series/{seriesId}/metadata/refresh")

@@ -11,6 +11,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Duration
 
 /**
  * External, dynamically-loaded AniList metadata provider (GraphQL). Ported from
@@ -40,7 +41,11 @@ class AniListMetadataPlugin : MetadataProviderPlugin {
     """.trimIndent()
 
   private val endpoint = "https://graphql.anilist.co"
-  private val httpClient = HttpClient.newHttpClient()
+  private val httpClient =
+    HttpClient
+      .newBuilder()
+      .connectTimeout(Duration.ofSeconds(15))
+      .build()
   private val mapper = ObjectMapper()
 
   private var context: PluginContext? = null
@@ -229,9 +234,30 @@ class AniListMetadataPlugin : MetadataProviderPlugin {
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(body))
+        .timeout(Duration.ofSeconds(30))
         .build()
-    val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-    return if (response.statusCode() in 200..299) response.body() else null
+    var attempt = 0
+    while (true) {
+      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      val code = response.statusCode()
+      if (code in 200..299) return response.body()
+      if ((code == 429 || code == 503) && attempt < 3) {
+        val waitSeconds =
+          response
+            .headers()
+            .firstValue("Retry-After")
+            .map { it.toLongOrNull() }
+            .orElse(null)
+            ?.coerceIn(1L, 60L)
+            ?: (1L shl attempt)
+        context?.warn("AniList rate limited (HTTP $code), retrying in ${waitSeconds}s")
+        Thread.sleep(waitSeconds * 1000)
+        attempt++
+      } else {
+        context?.warn("AniList returned HTTP $code")
+        return null
+      }
+    }
   }
 
   private fun buildReleaseDate(

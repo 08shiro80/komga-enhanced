@@ -71,7 +71,7 @@ class ChapterUrlImporter(
     val cbzFiles =
       dir.listFiles()?.filter { it.isFile && it.extension.lowercase() == "cbz" } ?: emptyList()
 
-    if (existingUrls.isNotEmpty() && existingUrls.size >= cbzFiles.size) {
+    if (cbzFiles.isEmpty()) {
       return ChapterUrlImportResult(
         seriesId = resolvedSeriesId,
         totalInFile = existingUrls.size,

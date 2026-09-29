@@ -40,16 +40,17 @@
         <v-select
           v-if="form.guestAccess"
           v-model="form.guestLibraries"
-          @change="$v.form.guestLibraries.$touch()"
+          @change="onGuestLibrariesChange"
           :items="availableLibraries"
           item-text="name"
           item-value="id"
           label="Libraries for guests"
+          :error-messages="guestLibrariesError"
           multiple
           chips
           small-chips
           deletable-chips
-          hide-details
+          hide-details="auto"
           class="mt-3"
         >
           <template v-slot:prepend-item>
@@ -134,6 +135,7 @@ export default Vue.extend({
       oauth2AutoLogin: false,
       seriesGroups: 'alpha',
     },
+    guestLibrariesError: '' as string,
   }),
   validations: {
     form: {
@@ -170,6 +172,11 @@ export default Vue.extend({
         this.form.guestLibraries = this.availableLibraries.map((l: any) => l.id)
       }
       this.$v.form.guestLibraries.$touch()
+      if (this.form.guestLibraries.length > 0) this.guestLibrariesError = ''
+    },
+    onGuestLibrariesChange() {
+      this.$v.form.guestLibraries.$touch()
+      if (this.form.guestLibraries.length > 0) this.guestLibrariesError = ''
     },
     async refreshSettings() {
       await this.$store.dispatch('getClientSettingsGlobal')
@@ -189,6 +196,14 @@ export default Vue.extend({
       this.$v.form.$reset()
     },
     async saveSettings() {
+      // Fail-closed guest access: enabling it without any library would grant nothing (backend) and
+      // is almost certainly a mistake, so block the save and tell the admin to pick libraries.
+      if (this.form.guestAccess && this.form.guestLibraries.length === 0) {
+        this.guestLibrariesError = 'Select at least one library (or all) to enable guest access'
+        return
+      }
+      this.guestLibrariesError = ''
+
       let newSettings = {} as Record<string, ClientSettingGlobalUpdateDto>
       if (this.$v.form?.guestAccess?.$dirty)
         newSettings[CLIENT_SETTING.WEBUI_GUEST_ACCESS] = {
@@ -196,7 +211,9 @@ export default Vue.extend({
           allowUnauthorized: true,
         }
 
-      if (this.$v.form?.guestLibraries?.$dirty)
+      // Always persist the library set when guest access is on, so the backend never falls back to
+      // an empty/absent value (guestLibraries may not be $dirty if only guestAccess was toggled).
+      if (this.$v.form?.guestLibraries?.$dirty || this.form.guestAccess)
         newSettings[CLIENT_SETTING.WEBUI_GUEST_LIBRARIES] = {
           value: JSON.stringify(this.form.guestLibraries),
           allowUnauthorized: true,

@@ -8,4 +8,5 @@ data class SinglePageBookDto(
   val fileSize: Long,
   val mediaType: String,
   val ignored: Boolean,
+  val sourceUrl: String? = null,
 )

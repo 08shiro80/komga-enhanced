@@ -181,7 +181,9 @@ class PageSplitter(
 
     logger.info { "Found ${pagesToSplit.size} pages to split in book: ${book.name}" }
 
-    val backupPath = book.path.parent.resolve("${book.path.nameWithoutExtension}_backup.${book.path.extension}")
+    // Dot-prefix so a leftover backup (crash between copy and cleanup) is ignored by the library
+    // scanner instead of being imported as a duplicate ghost book.
+    val backupPath = book.path.parent.resolve(".${book.path.nameWithoutExtension}_backup.${book.path.extension}")
 
     val originalComment =
       try {
@@ -205,7 +207,7 @@ class PageSplitter(
           media.pages.forEachIndexed { index, page ->
             val pageToSplit = pagesToSplit.find { it.pageIndex == index }
             if (pageToSplit != null) {
-              val splitImages =
+              val splitResult =
                 try {
                   val imageBytes = bookAnalyzer.getFileContent(BookWithMedia(book, media), page.fileName)
                   if (pageToSplit.mode == SplitMode.WIDE) {
@@ -217,15 +219,14 @@ class PageSplitter(
                   logger.warn(e) { "Failed to split page ${index + 1} (${page.fileName}, ${pageToSplit.width}x${pageToSplit.height}) in book: ${book.name}" }
                   throw e
                 }
-              splitImages.forEachIndexed { partIndex, partBytes ->
-                val extension = getExtensionFromMediaType(page.mediaType)
-                val newFileName = generateSplitPageName(page.fileName, partIndex + 1, splitImages.size, extension)
+              splitResult.parts.forEachIndexed { partIndex, partBytes ->
+                val newFileName = generateSplitPageName(page.fileName, partIndex + 1, splitResult.parts.size, splitResult.format)
                 zipStream.putArchiveEntry(ZipArchiveEntry(newFileName))
                 zipStream.write(partBytes)
                 zipStream.closeArchiveEntry()
                 if (partIndex > 0) newPagesCreated++
               }
-              logger.debug { "Split page ${index + 1} into ${splitImages.size} parts" }
+              logger.debug { "Split page ${index + 1} into ${splitResult.parts.size} parts" }
             } else {
               val content = bookAnalyzer.getFileContent(BookWithMedia(book, media), page.fileName)
               zipStream.putArchiveEntry(ZipArchiveEntry(page.fileName))
@@ -320,15 +321,6 @@ class PageSplitter(
       mediaType.contains("png") -> "png"
       mediaType.contains("webp") -> "webp"
       mediaType.contains("gif") -> "gif"
-      else -> "jpg"
-    }
-
-  private fun getExtensionFromMediaType(mediaType: String): String =
-    when {
-      mediaType.contains("png") -> "png"
-      mediaType.contains("webp") -> "webp"
-      mediaType.contains("gif") -> "gif"
-      mediaType.contains("jpeg") || mediaType.contains("jpg") -> "jpg"
       else -> "jpg"
     }
 }

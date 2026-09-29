@@ -30,6 +30,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.atomic.AtomicBoolean
 
 private val logger = KotlinLogging.logger {}
 
@@ -58,12 +59,19 @@ class MangaDexSubscriptionSyncer(
   private val chapterIdRegex = Regex("mangadex\\.org/chapter/([0-9a-f-]+)")
   private val mangaDexDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
+  @Volatile
   private var accessToken: String? = null
+
+  @Volatile
   private var refreshToken: String? = null
+
+  @Volatile
   private var expiresAt: Instant? = null
 
   @Volatile
   private var scheduledTask: ScheduledFuture<*>? = null
+
+  private val feedCheckRunning = AtomicBoolean(false)
 
   @EventListener(ApplicationReadyEvent::class)
   fun startIfEnabled() {
@@ -285,6 +293,10 @@ class MangaDexSubscriptionSyncer(
   }
 
   private fun runFeedCheck() {
+    if (!feedCheckRunning.compareAndSet(false, true)) {
+      logger.debug { "MangaDex feed check already running, skipping overlapping invocation" }
+      return
+    }
     try {
       val plugin = pluginRepository.findByIdOrNull(pluginId)
       if (plugin == null || !plugin.enabled) {
@@ -313,8 +325,13 @@ class MangaDexSubscriptionSyncer(
       }
       checkForNewManga(config, library)
       checkFeed(config, library)
-    } catch (e: MangaDexApiException) {
+    } catch (e: Exception) {
+      // Must catch everything: runFeedCheck runs via scheduleAtFixedRate, where an uncaught exception
+      // cancels the schedule permanently (sync dead until app restart). Non-MangaDexApiException paths
+      // (e.g. IllegalStateException from resolveLanguage, Jackson errors on a non-JSON 200 body) reach here.
       logger.error(e) { "MangaDex feed check failed: ${e.message}" }
+    } finally {
+      feedCheckRunning.set(false)
     }
   }
 
@@ -442,6 +459,7 @@ class MangaDexSubscriptionSyncer(
     var totalScanned = 0
     var totalSkippedByDate = 0
     var stopPaging = false
+    var feedComplete = true
 
     while (!stopPaging) {
       val url =
@@ -456,6 +474,7 @@ class MangaDexSubscriptionSyncer(
       val response = apiGet(url, token)
       if (response.statusCode() != 200) {
         logger.warn { "Subscription feed request failed (HTTP ${response.statusCode()}): ${response.body()}" }
+        feedComplete = false
         break
       }
 
@@ -537,10 +556,14 @@ class MangaDexSubscriptionSyncer(
       logger.info { "Subscription feed: queued $queued manga with new chapters" }
     }
 
-    saveConfigValue(
-      "last_check_time",
-      Instant.now().atOffset(ZoneOffset.UTC).format(mangaDexDateFormat),
-    )
+    if (feedComplete) {
+      saveConfigValue(
+        "last_check_time",
+        Instant.now().atOffset(ZoneOffset.UTC).format(mangaDexDateFormat),
+      )
+    } else {
+      logger.warn { "Subscription feed incomplete (API error), keeping previous last_check_time to avoid skipping chapters" }
+    }
   }
 
   private fun isChapterKnown(

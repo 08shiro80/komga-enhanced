@@ -5,6 +5,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
 import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
@@ -12,6 +14,24 @@ private val logger = KotlinLogging.logger {}
 @Component
 class GalleryDlProcess {
   private val objectMapper: ObjectMapper = jacksonObjectMapper()
+
+  // gallery-dl config temp files carry MangaDex credentials — restrict to owner read/write (0600) so they
+  // aren't world-readable via the default umask. POSIX where supported, best-effort File API otherwise.
+  private fun secureTempFile(prefix: String): File {
+    val file = File.createTempFile(prefix, ".json")
+    try {
+      Files.setPosixFilePermissions(
+        file.toPath(),
+        setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+      )
+    } catch (_: UnsupportedOperationException) {
+      file.setReadable(false, false)
+      file.setReadable(true, true)
+      file.setWritable(false, false)
+      file.setWritable(true, true)
+    }
+    return file
+  }
 
   fun isInstalled(galleryDlPath: String?): Boolean {
     return try {
@@ -82,7 +102,7 @@ class GalleryDlProcess {
     pluginConfig: Map<String, String>,
     defaultLanguage: String,
   ): File {
-    val tempFile = File.createTempFile("gallery-dl-", ".json")
+    val tempFile = secureTempFile("gallery-dl-")
     val mangadexUsername = pluginConfig["mangadex_username"]
     val mangadexPassword = pluginConfig["mangadex_password"]
     val chapterNaming = pluginConfig["chapter_naming"]?.takeIf { it.isNotBlank() }
@@ -125,7 +145,7 @@ class GalleryDlProcess {
               "condition" to "_scrambled",
             ),
             mapOf(
-              "name" to "zip",
+              "name" to "komgazip",
               "extension" to "cbz",
               "compression" to "store",
               "keep-files" to false,
@@ -150,7 +170,7 @@ class GalleryDlProcess {
     defaultLanguage: String,
     flaresolverrUrl: String? = null,
   ): File {
-    val tempFile = File.createTempFile("gallery-dl-info-", ".json")
+    val tempFile = secureTempFile("gallery-dl-info-")
     val config =
       mutableMapOf<String, Any>(
         "extractor" to
@@ -173,7 +193,7 @@ class GalleryDlProcess {
     mangadexUsername: String?,
     mangadexPassword: String?,
   ): File {
-    val tempFile = File.createTempFile("gallery-dl-cover-", ".json")
+    val tempFile = secureTempFile("gallery-dl-cover-")
     val config =
       mutableMapOf<String, Any>(
         "extractor" to

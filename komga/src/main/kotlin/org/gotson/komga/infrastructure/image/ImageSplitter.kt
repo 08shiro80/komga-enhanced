@@ -30,7 +30,7 @@ class ImageSplitter(
     imageBytes: ByteArray,
     targetHeight: Int,
     format: String = "png",
-  ): List<ByteArray> {
+  ): SplitResult {
     val image =
       ImageIO.read(imageBytes.inputStream())
         ?: throw IllegalArgumentException("Could not read image")
@@ -40,9 +40,10 @@ class ImageSplitter(
 
     if (height <= targetHeight) {
       logger.debug { "Image height ($height) <= target ($targetHeight), no split needed" }
-      return listOf(imageBytes)
+      return SplitResult(format, listOf(imageBytes))
     }
 
+    val outputFormat = resolveOutputFormat(format, image)
     val numParts = ceil(height.toDouble() / targetHeight).toInt()
     val evenHeight = ceil(height.toDouble() / numParts).toInt()
     logger.debug { "Splitting image ${width}x$height into $numParts parts (target: $targetHeight, even: $evenHeight)" }
@@ -56,24 +57,26 @@ class ImageSplitter(
       val subImage = image.getSubimage(0, startY, width, partHeight)
 
       ByteArrayOutputStream().use { baos ->
-        val outputImage = BufferedImage(width, partHeight, image.type)
+        val outputImage = BufferedImage(width, partHeight, outputImageType(outputFormat, image))
         outputImage.graphics.drawImage(subImage, 0, 0, null)
 
-        ImageIO.write(outputImage, format, baos)
+        if (!ImageIO.write(outputImage, outputFormat, baos)) {
+          throw IllegalArgumentException("No ImageIO writer available for format '$outputFormat'")
+        }
         result.add(baos.toByteArray())
       }
 
       logger.debug { "Created part ${i + 1}/$numParts: ${width}x$partHeight" }
     }
 
-    return result
+    return SplitResult(outputFormat, result)
   }
 
   fun splitWideImage(
     imageBytes: ByteArray,
     targetWidth: Int,
     format: String = "png",
-  ): List<ByteArray> {
+  ): SplitResult {
     val image =
       ImageIO.read(imageBytes.inputStream())
         ?: throw IllegalArgumentException("Could not read image")
@@ -83,9 +86,10 @@ class ImageSplitter(
 
     if (width <= targetWidth) {
       logger.debug { "Image width ($width) <= target ($targetWidth), no split needed" }
-      return listOf(imageBytes)
+      return SplitResult(format, listOf(imageBytes))
     }
 
+    val outputFormat = resolveOutputFormat(format, image)
     val halfWidth = ceil(width.toDouble() / 2).toInt()
     logger.debug { "Splitting double page ${width}x$height in half ($halfWidth + ${width - halfWidth})" }
 
@@ -98,18 +102,42 @@ class ImageSplitter(
       val subImage = image.getSubimage(startX, 0, partWidth, height)
 
       ByteArrayOutputStream().use { baos ->
-        val outputImage = BufferedImage(partWidth, height, image.type)
+        val outputImage = BufferedImage(partWidth, height, outputImageType(outputFormat, image))
         outputImage.graphics.drawImage(subImage, 0, 0, null)
 
-        ImageIO.write(outputImage, format, baos)
+        if (!ImageIO.write(outputImage, outputFormat, baos)) {
+          throw IllegalArgumentException("No ImageIO writer available for format '$outputFormat'")
+        }
         result.add(baos.toByteArray())
       }
 
       logger.debug { "Created part ${i + 1}/2: ${partWidth}x$height" }
     }
 
-    return result
+    return SplitResult(outputFormat, result)
   }
+
+  // Source formats webp/jxl are reader-only in this runtime (no ImageWriterSpi) — writing them back throws.
+  // Fall back to a writable format: PNG when the image carries alpha, otherwise JPEG (smaller, fine for the
+  // opaque webtoon pages that dominate tall-image splits). Formats with a writer (png/jpg/gif/…) pass through.
+  private fun resolveOutputFormat(
+    requested: String,
+    image: BufferedImage,
+  ): String {
+    if (ImageIO.getImageWritersByFormatName(requested).hasNext()) return requested
+    return if (image.colorModel.hasAlpha()) "png" else "jpg"
+  }
+
+  private fun outputImageType(
+    format: String,
+    image: BufferedImage,
+  ): Int =
+    when {
+      format == "jpg" || format == "jpeg" -> BufferedImage.TYPE_INT_RGB
+      image.type != BufferedImage.TYPE_CUSTOM -> image.type
+      image.colorModel.hasAlpha() -> BufferedImage.TYPE_INT_ARGB
+      else -> BufferedImage.TYPE_INT_RGB
+    }
 
   /**
    * Checks if an image should be split based on aspect ratio.
@@ -160,4 +188,9 @@ data class SplitInfo(
   val originalHeight: Int,
   val targetHeight: Int,
   val numberOfParts: Int,
+)
+
+data class SplitResult(
+  val format: String,
+  val parts: List<ByteArray>,
 )

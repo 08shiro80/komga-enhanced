@@ -152,6 +152,7 @@ class LibraryContentLifecycle(
           if (restored != null) {
             logger.info { "Restored series by mangaDexUuid: ${restored.id} (${restored.name}) → ${newSeries.url}" }
             seriesLifecycle.addBooks(restored, newBooks)
+            tryRestoreBooks(newBooks)
             seriesToSortAndRefresh.add(restored)
           } else {
             logger.info { "Adding new series: $newSeries" }
@@ -409,11 +410,6 @@ class LibraryContentLifecycle(
       )
     seriesRepository.update(restored)
 
-    val deletedBooks = bookRepository.findAllBySeriesId(existing.id)
-    if (deletedBooks.isNotEmpty()) {
-      bookLifecycle.softDeleteMany(deletedBooks)
-    }
-
     return seriesRepository.findByIdOrNull(existing.id)!!
   }
 
@@ -493,7 +489,7 @@ class LibraryContentLifecycle(
 
           // replace deleted series by new series in collections
           collectionRepository
-            .findAllContainingSeriesId(match.first.id, filterOnLibraryIds = null)
+            .findAllContainingSeriesId(match.first.id, SearchContext.empty())
             .forEach { col ->
               collectionRepository.update(
                 col.copy(
@@ -570,7 +566,7 @@ class LibraryContentLifecycle(
 
             // replace deleted book by new book in read lists
             readListRepository
-              .findAllContainingBookId(match.id, filterOnLibraryIds = null)
+              .findAllContainingBookId(match.id, SearchContext.empty())
               .forEach { rl ->
                 readListRepository.update(
                   rl.copy(

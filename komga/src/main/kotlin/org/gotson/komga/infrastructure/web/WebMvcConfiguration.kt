@@ -27,6 +27,7 @@ class WebMvcConfiguration : WebMvcConfigurer {
     registry
       .addResourceHandler(
         "/index.html",
+        "/index-next.html",
         "/favicon.ico",
         "/favicon-16x16.png",
         "/favicon-32x32.png",
@@ -36,10 +37,11 @@ class WebMvcConfiguration : WebMvcConfigurer {
         "/android-chrome-192x192.png",
         "/android-chrome-512x512.png",
         "/manifest.json",
+        "/layers.css",
       ).addResourceLocations("classpath:public/")
       .setCacheControl(CacheControl.noStore())
 
-    listOf("css", "fonts", "img", "js")
+    listOf("css", "fonts", "img", "js", "assets")
       .forEach {
         registry
           .addResourceHandler("/$it/**")

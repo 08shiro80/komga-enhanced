@@ -47,7 +47,11 @@ class MetronMetadataPlugin : MetadataProviderPlugin {
     """.trimIndent()
 
   private val baseUrl = "https://metron.cloud"
-  private val httpClient = HttpClient.newHttpClient()
+  private val httpClient =
+    HttpClient
+      .newBuilder()
+      .connectTimeout(Duration.ofSeconds(15))
+      .build()
   private val mapper = ObjectMapper()
 
   private var context: PluginContext? = null
@@ -152,7 +156,27 @@ class MetronMetadataPlugin : MetadataProviderPlugin {
         .timeout(Duration.ofSeconds(90))
         .GET()
         .build()
-    val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-    return if (response.statusCode() in 200..299) response.body() else null
+    var attempt = 0
+    while (true) {
+      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      val code = response.statusCode()
+      if (code in 200..299) return response.body()
+      if ((code == 429 || code == 503) && attempt < 3) {
+        val waitSeconds =
+          response
+            .headers()
+            .firstValue("Retry-After")
+            .map { it.toLongOrNull() }
+            .orElse(null)
+            ?.coerceIn(1L, 60L)
+            ?: (1L shl attempt)
+        context?.warn("Metron rate limited (HTTP $code), retrying in ${waitSeconds}s")
+        Thread.sleep(waitSeconds * 1000)
+        attempt++
+      } else {
+        context?.warn("Metron returned HTTP $code")
+        return null
+      }
+    }
   }
 }

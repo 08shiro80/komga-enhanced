@@ -1,0 +1,70 @@
+<template>
+  <v-app-bar>
+    <template #prepend>
+      <LibraryHeader
+        class="ms-4"
+        :library-id="book?.libraryId"
+        link
+      />
+    </template>
+  </v-app-bar>
+
+  <v-container
+    fluid
+    class="pa-0 pa-sm-4"
+  >
+    <div v-if="isPending">
+      <v-row>
+        <v-col cols="3">
+          <v-skeleton-loader type="image" />
+        </v-col>
+        <v-col>
+          <v-skeleton-loader type="article" />
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col>
+          <v-skeleton-loader type="table-heading@5" />
+        </v-col>
+      </v-row>
+    </div>
+
+    <EmptyStateNetworkError v-else-if="error" />
+
+    <template v-else-if="book">
+      <BookView
+        :book="book"
+        :one-shot-attributes="series?.metadata"
+      />
+    </template>
+  </v-container>
+</template>
+
+<script lang="ts" setup>
+import { useQuery } from '@pinia/colada'
+import { bookDetailQuery } from '@/colada/books'
+import EmptyStateNetworkError from '@/components/EmptyStateNetworkError.vue'
+import BookView from '../../components/book/view/BookView.vue'
+import { seriesDetailQuery } from '@/colada/series'
+
+const route = useRoute('/book/[id]')
+const bookId = computed(() => route.params.id)
+
+const {
+  data: book,
+  error,
+  isPending,
+} = useQuery(() => ({
+  ...bookDetailQuery({ bookId: bookId.value }),
+}))
+
+const { data: series } = useQuery(() => ({
+  ...seriesDetailQuery({ seriesId: book.value?.seriesId ?? '' }),
+  enabled: book.value && book.value.oneshot,
+}))
+</script>
+
+<route lang="yaml">
+meta:
+  requiresRole: USER
+</route>

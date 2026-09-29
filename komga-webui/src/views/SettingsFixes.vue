@@ -88,6 +88,84 @@
       </v-row>
       <!-- ── END FIX ─────────────────────────────────────────────────────── -->
 
+      <!-- ── FIX: Deleted-chapters scan (orphaned CHAPTER_URL reconciliation) ─ -->
+      <v-row>
+        <v-col cols="12" md="7">
+          <v-card outlined>
+            <v-card-title class="subtitle-1 font-weight-bold">
+              <v-icon left color="warning">mdi-database-search-outline</v-icon>
+              Deleted-Chapters Scan
+            </v-card-title>
+
+            <v-card-text>
+              <p class="body-2 mb-3">
+                Finds tracked chapter URLs whose CBZ file is gone (orphans). <strong>Preview</strong> (dry-run)
+                changes nothing. When Preview is off, orphaned entries whose source chapter still exists (so they
+                can be re-downloaded) are removed; entries whose source is gone are kept. Runs in the background —
+                you can leave this page and come back for the result.
+              </p>
+
+              <v-select
+                v-model="fixDeletedScan.libraryId"
+                :items="libraries"
+                item-text="name"
+                item-value="id"
+                label="Library"
+                outlined
+                dense
+                hide-details
+                class="mb-3"
+              />
+
+              <v-checkbox
+                v-model="fixDeletedScan.dryRun"
+                label="Preview (dry-run — no changes)"
+                hide-details
+                class="mt-0 mb-1"
+                dense
+              />
+            </v-card-text>
+
+            <v-card-actions class="pt-0">
+              <v-btn
+                color="warning"
+                :loading="fixDeletedScan.running"
+                :disabled="!fixDeletedScan.libraryId || fixDeletedScan.running"
+                @click="runDeletedScan"
+              >
+                <v-icon left>mdi-play</v-icon>
+                Run
+              </v-btn>
+              <span v-if="fixDeletedScan.running" class="caption text--secondary ml-3">
+                Running in background — you can leave this page and come back.
+              </span>
+            </v-card-actions>
+
+            <v-expand-transition>
+              <v-card-text v-if="fixDeletedScan.result || fixDeletedScan.error" class="pt-0">
+                <v-alert
+                  :type="fixDeletedScan.error ? 'error' : (fixDeletedScan.result && fixDeletedScan.result.entriesRemoved ? 'warning' : 'success')"
+                  dense
+                  text
+                  class="mb-0"
+                >
+                  <span v-if="fixDeletedScan.error">Error: {{ fixDeletedScan.error }}</span>
+                  <template v-else-if="fixDeletedScan.result">
+                    {{ fixDeletedScan.dryRun ? 'Would remove' : 'Removed' }}:
+                    <strong>{{ fixDeletedScan.result.entriesRemoved }}</strong> orphaned entries &nbsp;·&nbsp;
+                    Series scanned: <strong>{{ fixDeletedScan.result.seriesScanned }} / {{ fixDeletedScan.result.totalSeries }}</strong>
+                    <div v-for="(d, i) in fixDeletedScan.result.details" :key="i" class="caption">
+                      {{ d.seriesName }}: {{ d.removedCount }} of {{ d.cbzFileCount }} files
+                    </div>
+                  </template>
+                </v-alert>
+              </v-card-text>
+            </v-expand-transition>
+          </v-card>
+        </v-col>
+      </v-row>
+      <!-- ── END FIX ─────────────────────────────────────────────────────── -->
+
       <!-- ── Schema-driven fixes (FixRegistry on the backend) ─────────────── -->
       <v-row v-for="fix in dynamicFixes" :key="fix.id">
         <v-col cols="12" md="7">
@@ -193,6 +271,14 @@ export default {
         result: null,
       },
       polling: false,
+      fixDeletedScan: {
+        libraryId: null,
+        dryRun: true,
+        running: false,
+        result: null,
+        error: null,
+      },
+      deletedPolling: false,
       dynamicFixes: [],
       dynamicState: {},
       dynamicRunning: {},
@@ -211,10 +297,12 @@ export default {
       this.showSnack('Failed to load libraries: ' + (e.message || e), 'error')
     }
     await this.refreshRepairStatus()
+    await this.refreshDeletedScanStatus()
     await this.loadDynamicFixes()
   },
   beforeDestroy() {
     this.polling = false
+    this.deletedPolling = false
   },
   methods: {
     async runComicInfoFix() {
@@ -278,6 +366,62 @@ export default {
           errors: s.errors,
         }
       }
+    },
+    async runDeletedScan() {
+      this.fixDeletedScan.running = true
+      this.fixDeletedScan.result = null
+      this.fixDeletedScan.error = null
+      try {
+        await this.$http.post(`/api/v1/libraries/${this.fixDeletedScan.libraryId}/scan-deleted-chapters/run?dryRun=${this.fixDeletedScan.dryRun}`)
+        this.startDeletedPolling()
+      } catch (e) {
+        this.showSnack('Scan failed: ' + (e?.response?.data?.message || e.message || 'Unknown error'), 'error')
+        this.fixDeletedScan.running = false
+      }
+    },
+    async refreshDeletedScanStatus() {
+      try {
+        const r = await this.$http.get('/api/v1/libraries/scan-deleted-chapters/status')
+        const s = r.data
+        this.applyDeletedStatus(s)
+        if (s.running) {
+          if (s.libraryId) this.fixDeletedScan.libraryId = s.libraryId
+          this.fixDeletedScan.running = true
+          this.startDeletedPolling()
+        }
+      } catch (e) {
+        // status not available on mount — ignore silently
+      }
+    },
+    startDeletedPolling() {
+      if (this.deletedPolling) return
+      this.deletedPolling = true
+      this.pollDeletedStatus()
+    },
+    async pollDeletedStatus() {
+      while (this.deletedPolling) {
+        await new Promise(r => setTimeout(r, 2000))
+        if (!this.deletedPolling) return
+        try {
+          const r = await this.$http.get('/api/v1/libraries/scan-deleted-chapters/status')
+          const s = r.data
+          this.applyDeletedStatus(s)
+          if (!s.running) {
+            this.fixDeletedScan.running = false
+            this.deletedPolling = false
+            return
+          }
+        } catch (e) {
+          this.fixDeletedScan.running = false
+          this.deletedPolling = false
+          return
+        }
+      }
+    },
+    applyDeletedStatus(s) {
+      if (s.dryRun !== undefined && s.dryRun !== null) this.fixDeletedScan.dryRun = s.dryRun
+      this.fixDeletedScan.error = s.error || null
+      if (s.result) this.fixDeletedScan.result = s.result
     },
     showSnack(text, color = 'success') {
       this.snackbar.text = text

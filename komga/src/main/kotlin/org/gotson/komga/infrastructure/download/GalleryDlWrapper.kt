@@ -9,8 +9,10 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.net.URI
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -74,6 +76,58 @@ class GalleryDlWrapper(
     if (!file.delete()) {
       logger.debug { "Failed to delete: ${file.absolutePath}" }
     }
+  }
+
+  private fun moveIntoSeriesFolder(
+    source: File,
+    destDir: File,
+    incomingChapterId: String?,
+  ): File {
+    var target = File(destDir, source.name)
+    if (target.exists()) {
+      val existingChapterId = chapterMatcher.extractChapterId(target.toPath())
+      if (incomingChapterId != null && existingChapterId != null && existingChapterId != incomingChapterId) {
+        target = disambiguateTarget(destDir, source.nameWithoutExtension, source.extension, incomingChapterId)
+      }
+    }
+    try {
+      Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    } catch (e: AtomicMoveNotSupportedException) {
+      logger.debug(e) { "Atomic move unsupported, falling back to non-atomic replace for ${target.name}" }
+      Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+    return target
+  }
+
+  private fun disambiguateTarget(
+    destDir: File,
+    baseName: String,
+    extension: String,
+    chapterId: String,
+  ): File {
+    val shortId = chapterId.take(8)
+    var attempt = 0
+    while (true) {
+      val suffix = if (attempt == 0) " [$shortId]" else " [$shortId-${attempt + 1}]"
+      val candidate = buildBoundedName(destDir, baseName, suffix, extension)
+      if (!candidate.exists() || chapterMatcher.extractChapterId(candidate.toPath()) == chapterId) return candidate
+      attempt++
+    }
+  }
+
+  private fun buildBoundedName(
+    destDir: File,
+    baseName: String,
+    suffix: String,
+    extension: String,
+  ): File {
+    val maxFilenameBytes = 250
+    val extPart = if (extension.isEmpty()) "" else ".$extension"
+    var base = baseName
+    while (base.isNotEmpty() && "$base$suffix$extPart".toByteArray(Charsets.UTF_8).size > maxFilenameBytes) {
+      base = base.dropLast(1)
+    }
+    return File(destDir, "$base$suffix$extPart")
   }
 
   private fun appendBounded(
@@ -147,25 +201,41 @@ class GalleryDlWrapper(
           .command(command)
           .start()
 
-      BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-        reader.lines().forEach { line ->
-          appendJson(output, line)
-          logger.debug { "gallery-dl info: $line" }
+      val stdoutThread =
+        Thread {
+          BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+            reader.lines().forEach { line ->
+              appendJson(output, line)
+              logger.debug { "gallery-dl info: $line" }
+            }
+          }
         }
-      }
+      stdoutThread.start()
 
-      BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
-        reader.lines().forEach { line ->
-          appendBounded(errorOutput, line)
-          logger.debug { "gallery-dl error: $line" }
+      val stderrThread =
+        Thread {
+          BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
+            reader.lines().forEach { line ->
+              appendBounded(errorOutput, line)
+              logger.debug { "gallery-dl error: $line" }
+            }
+          }
         }
-      }
+      stderrThread.start()
 
       if (!process.waitFor(60, TimeUnit.SECONDS)) {
         process.destroyForcibly()
+        stdoutThread.join(5000)
+        if (stdoutThread.isAlive) stdoutThread.interrupt()
+        stderrThread.join(5000)
+        if (stderrThread.isAlive) stderrThread.interrupt()
         deleteQuietly(configFile)
         throw GalleryDlException("Timeout getting chapter info for $url")
       }
+      stdoutThread.join(5000)
+      if (stdoutThread.isAlive) stdoutThread.interrupt()
+      stderrThread.join(5000)
+      if (stderrThread.isAlive) stderrThread.interrupt()
 
       val exitValue = process.exitValue()
       deleteQuietly(configFile)
@@ -235,18 +305,35 @@ class GalleryDlWrapper(
           .command(command)
           .start()
 
-      BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-        reader.lines().forEach { line -> appendJson(output, line) }
-      }
-      BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
-        reader.lines().forEach { _ -> }
-      }
+      val stdoutThread =
+        Thread {
+          BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+            reader.lines().forEach { line -> appendJson(output, line) }
+          }
+        }
+      stdoutThread.start()
+
+      val stderrThread =
+        Thread {
+          BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
+            reader.lines().forEach { _ -> }
+          }
+        }
+      stderrThread.start()
 
       if (!process.waitFor(60, TimeUnit.SECONDS)) {
         process.destroyForcibly()
+        stdoutThread.join(5000)
+        if (stdoutThread.isAlive) stdoutThread.interrupt()
+        stderrThread.join(5000)
+        if (stderrThread.isAlive) stderrThread.interrupt()
         deleteQuietly(configFile)
         return emptyMap()
       }
+      stdoutThread.join(5000)
+      if (stdoutThread.isAlive) stdoutThread.interrupt()
+      stderrThread.join(5000)
+      if (stderrThread.isAlive) stderrThread.interrupt()
       deleteQuietly(configFile)
       if (process.exitValue() != 0) return emptyMap()
 
@@ -651,6 +738,7 @@ class GalleryDlWrapper(
         logToDatabase(org.gotson.komga.domain.model.LogLevel.INFO, "All chapters already downloaded, skipping: $url")
         deleteQuietly(configFile)
       } else {
+        destDir.mkdirs()
         val failuresFile = File(destDir, ".chapter-failures.json")
         val chapterFailures = loadChapterFailures(failuresFile)
         val currentMangaDexId = extractMangaDexId(url)
@@ -670,11 +758,11 @@ class GalleryDlWrapper(
             logger.debug { "Download cancelled before chapter ${downloadIndex + 1}/$totalChapters, stopping" }
             deleteQuietly(configFile)
             return DownloadResult(
-              success = true,
+              success = false,
               filesDownloaded = filesDownloaded.get(),
               downloadedFiles = emptyList(),
               totalChapters = totalChapters,
-              errorMessage = null,
+              errorMessage = "Cancelled",
               mangaTitle = mangaInfo.title,
             )
           }
@@ -735,11 +823,16 @@ class GalleryDlWrapper(
           downloadIndex++
           logger.debug { "Downloading chapter $chapterNum ($downloadIndex/$totalChapters): ${chapter.chapterUrl}" }
 
+          val stagingDir =
+            Files
+              .createTempDirectory(destDir.toPath(), ".dlstg_")
+              .toFile()
+
           val chapterCommand =
             galleryDlProcess.getCommand(gdlPath).toMutableList().apply {
               add(chapter.chapterUrl)
               add("-d")
-              add(destinationPath.toString())
+              add(stagingDir.absolutePath)
               add("--config")
               add(configFile.absolutePath)
             }
@@ -788,43 +881,29 @@ class GalleryDlWrapper(
             if (chStderrThread.isAlive) chStderrThread.interrupt()
             if (!completed) {
               chapterProcess.destroyForcibly()
-              logger.warn { "Chapter $chapterNum download timed out" }
+              chapterFailures[chapter.chapterUrl] = failCount + 1
+              logger.warn { "Chapter $chapterNum download timed out (attempt ${failCount + 1}/3)" }
             } else if (chapterProcess.exitValue() == 0) {
-              filesDownloaded.incrementAndGet()
-
-              val chapterStr = chapter.chapterNumber ?: "${index + 1}"
-              val paddedChapter = chapterMatcher.padChapterNumber(chapterStr)
-              val cbzFiles =
-                destDir
+              // Identity is the embedded chapter UUID, never the filename or chapter number.
+              // gallery-dl downloads into an isolated staging dir; we then move the produced CBZ
+              // into the series folder, disambiguating on a real UUID collision instead of letting
+              // a renumbered chapter silently overwrite an unrelated one that shares its number.
+              val producedCbzFiles =
+                stagingDir
                   .listFiles()
                   ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
                   ?: emptyList()
+              val producedCbz =
+                producedCbzFiles.firstOrNull { chapterMatcher.extractChapterId(it.toPath()) == chapter.chapterId }
+                  ?: producedCbzFiles.singleOrNull()
 
-              val recentCbzFiles =
-                cbzFiles
-                  .filter { System.currentTimeMillis() - it.lastModified() < 120_000 }
-                  .sortedByDescending { it.lastModified() }
-
-              val groupName = chapter.scanlationGroup?.lowercase()
-
-              val targetCbz =
-                recentCbzFiles.find { chapterMatcher.matchesChapterAndGroup(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr, groupName) }
-                  ?: cbzFiles.find { chapterMatcher.matchesChapterAndGroup(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr, groupName) }
-                  ?: recentCbzFiles.find { chapterMatcher.matchesChapterNumber(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr) }
-                  ?: cbzFiles.find { chapterMatcher.matchesChapterNumber(it.nameWithoutExtension.lowercase(), paddedChapter, chapterStr) }
-
-              if (targetCbz == null) {
-                val expected =
-                  if (paddedChapter == chapterStr) "c$paddedChapter" else "c$paddedChapter or c$chapterStr"
-                logger.warn { "Could not find CBZ file for chapter $chapterNum (expected $expected)" }
+              if (producedCbz == null) {
+                chapterFailures[chapter.chapterUrl] = failCount + 1
+                logger.warn { "Chapter $chapterNum: gallery-dl exited 0 but produced no matching CBZ (attempt ${failCount + 1}/3)" }
               } else {
+                val movedCbz = moveIntoSeriesFolder(producedCbz, destDir, chapter.chapterId)
+                filesDownloaded.incrementAndGet()
                 try {
-                  // ComicInfo.xml is written by gallery-dl's `komga` postprocessor during the
-                  // download. Komga no longer injects it here: this fallback only ever fired for
-                  // files gallery-dl had not produced (pre-existing chapters) and, due to number-only
-                  // file matching, could rewrite an unrelated older chapter of a different scanlation
-                  // group with the wrong metadata. The manual "Re-inject ComicInfo" maintenance
-                  // action remains for deliberate backfills.
                   if (komgaSeriesId != null && !chapterUrlRepository.existsByUrl(chapter.chapterUrl)) {
                     val chapterNumVal =
                       chapter.chapterNumber
@@ -849,22 +928,22 @@ class GalleryDlWrapper(
                     )
                     logger.debug { "Registered chapter URL in DB: ch.$chapterNumVal ${chapter.chapterUrl}" }
                   }
-                  logger.debug { "Processed ${targetCbz.name}" }
+                  logger.debug { "Placed ${movedCbz.name}" }
                 } catch (e: Exception) {
-                  logger.warn(e) { "Failed to process CBZ ${targetCbz.name}" }
+                  logger.warn(e) { "Failed to register chapter URL for ${movedCbz.name}" }
                 }
-              }
 
-              val progressPercent = if (totalChapters > 0) (downloadIndex * 100) / totalChapters else 100
-              onProgress(
-                DownloadProgress(
-                  currentChapter = filesDownloaded.get(),
-                  totalChapters = totalChapters,
-                  percent = progressPercent,
-                  message = "Downloaded chapter $chapterNum",
-                  chapterTitle = chapter.chapterTitle,
-                ),
-              )
+                val progressPercent = if (totalChapters > 0) (downloadIndex * 100) / totalChapters else 100
+                onProgress(
+                  DownloadProgress(
+                    currentChapter = filesDownloaded.get(),
+                    totalChapters = totalChapters,
+                    percent = progressPercent,
+                    message = "Downloaded chapter $chapterNum",
+                    chapterTitle = chapter.chapterTitle,
+                  ),
+                )
+              }
             } else {
               val exitCode = chapterProcess.exitValue()
               chapterFailures[chapter.chapterUrl] = failCount + 1
@@ -873,12 +952,26 @@ class GalleryDlWrapper(
           } catch (e: Exception) {
             chapterFailures[chapter.chapterUrl] = failCount + 1
             logger.warn(e) { "Error downloading chapter $chapterNum" }
+          } finally {
+            stagingDir.deleteRecursively()
           }
         }
 
         saveChapterFailures(failuresFile, chapterFailures)
         chapterMatcher.normalizeDoubleBracketFilenames(destDir)
         deleteQuietly(configFile)
+
+        if (downloadIndex > 0 && filesDownloaded.get() == 0) {
+          logger.warn { "All $downloadIndex attempted chapter(s) failed for $url" }
+          return DownloadResult(
+            success = false,
+            filesDownloaded = 0,
+            downloadedFiles = emptyList(),
+            totalChapters = totalChapters,
+            errorMessage = "All $downloadIndex chapter download(s) failed",
+            mangaTitle = mangaInfo.title,
+          )
+        }
       }
 
       val downloadedFiles =
@@ -1585,6 +1678,7 @@ data class ChapterInfo(
   val scanlationGroup: String?,
   val publishDate: String?,
   val language: String?,
+  val externalUrl: String? = null,
 )
 
 data class DownloadProgress(

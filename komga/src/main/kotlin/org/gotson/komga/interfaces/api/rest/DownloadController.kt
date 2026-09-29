@@ -427,6 +427,7 @@ class DownloadController(
           id = id,
           title = update.title,
           enabled = update.enabled,
+          libraryId = libraryId,
         ).toDto()
     } catch (e: EntryNotFoundException) {
       throw ResponseStatusException(HttpStatus.NOT_FOUND, e.message)
@@ -449,7 +450,11 @@ class DownloadController(
     @PathVariable libraryId: String,
     @PathVariable id: String,
   ) {
-    followService.delete(id)
+    try {
+      followService.delete(id, libraryId)
+    } catch (e: EntryNotFoundException) {
+      throw ResponseStatusException(HttpStatus.NOT_FOUND, e.message)
+    }
   }
 
   @PostMapping("follows/{libraryId}/check-now")

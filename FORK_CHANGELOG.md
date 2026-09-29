@@ -6,6 +6,122 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.6] - 2026-09-29
+
+**Upstream merge — base 1.25.0 → 1.27.1** (`baseVersion` → 1.27.1): adopts upstream Komga 1.25.0 → 1.27.1 in full (Unicode-aware sorting/collation, content-restriction and Referential v2 APIs, book projection, Kobo updates — see the upstream CHANGELOG for the complete list). **junrar 7.6.0 → 8.1.0.** Requires `./gradlew jooq-codegen-primary` on build.
+
+### 2026-09-29
+
+**Features**
+- **New Vue 3 web UI (preview) at `/next`:** a second, modern frontend served alongside the classic UI (`/` stays the Vue 2 UI). It re-implements every fork feature — Downloads (dashboard / queue / followed / discover / blacklisted), Media tools (oversized pages, integrity, duplicate pages), Server tools (fixes, logs, plugins, backup, updates) and Tachiyomi import — with faster caching, virtual scrolling and inline confirms. Both UIs run in parallel until the Vue 3 UI is fully adopted; feedback welcome.
+- **Guest browsing:** when enabled, visitors can browse the shared libraries **read-only without logging in** via a "Browse as guest" button on the login page. Admin login stays the default and is unaffected.
+- **View settings stick:** sort order, active filters, view mode and page size are remembered per view and apply **across libraries**, so switching pages or libraries keeps your setup.
+- **Update gallery-dl from the UI:** admins can update the bundled gallery-dl to any upstream release from **Server → Updates** (Official / Fork presets or a custom URL), with progress and rollback — the fork's Komga integration is re-applied automatically.
+- **Discover on MangaDex — detail preview:** in **Downloads → Discover**, clicking a result opens a detail dialog with the cover, description, tags, status and year before you download or follow.
+- **Duplicate pages (unknown) as a card gallery:** the unknown-duplicates page is now a visual **card gallery** (large page thumbnail, affected series, potential space saved, per-card actions) with adjustable poster size, multi-select bulk actions, and sorting by matches / space saved / size.
+- **Scrobbler — limit sync by content rating:** the manga scrobbler gains a `mangadex_max_content_rating` setting so read progress is only pushed for manga up to the chosen rating.
+
+**Fixes** (behavior from earlier released fork versions)
+
+_Security:_
+- **The chapter-URL dedup endpoints are now admin-only** — previously any logged-in user could wipe the downloaded-chapter-URL database (triggering mass re-downloads) or read the download history.
+- **Backup restore / download / delete no longer allow path traversal** — a crafted filename could read, delete or overwrite arbitrary files (including the database) outside the backup folder.
+- **Health-check, maintenance and gallery-dl diagnostics endpoints are now admin-only** — they leaked config / disk / DB details or triggered outbound requests for any authenticated user.
+- **Guest access is fail-closed** — a guest with no configured shared libraries no longer fell back to seeing every library.
+- **Plugin cover downloads restrict the source host by exact domain** — a look-alike domain no longer passed the allowlist.
+
+_Reliability:_
+- **Cancelling a download no longer leaves an orphaned gallery-dl subprocess** running in the background (previously up to ~2h).
+- **A plugin reinstalled under a different filename no longer leaves the old JAR loaded** — startup could otherwise pick a non-deterministic plugin version.
+- **A `series.json` missing optional fields no longer fails the whole Mylar import silently** — absent fields now default instead of throwing.
+- **Upgrades no longer misfile new upstream migrations into the fork history** — the migration mover uses an explicit fork-version list.
+- **The media-integrity repair no longer leaks a background thread**, and the MangaDex subscription feed check can no longer run twice concurrently (with race-safe token refresh).
+
+_Other:_
+- **MangaDex read-progress scrobbling now actually reaches MangaDex** — it was silently a no-op (wrong API request); AniList / MAL / Kitsu were unaffected.
+- **MangaDex subscription sync no longer stops until the next restart after a transient error** — a single failed feed check (e.g. a non-JSON response) could permanently cancel the scheduled sync.
+- **Tracker → Komga progress pull** now marks every chapter up to the tracked position and always records progress, instead of only matching an exact chapter number (which could retry hourly without advancing).
+- **A cancelled download can no longer flip back to "Completed"** through a race between finishing and cancelling.
+- **The Deleted-chapters scan is guarded against unavailable libraries** — a temporarily detached or unreadable library folder no longer clears all tracked chapter URLs (which would otherwise trigger mass false re-downloads).
+- **Splitting oversized WebP / JXL pages now works** — it failed for these formats; the split parts are re-encoded to a writable format (PNG/JPEG), preserving transparency.
+- **Archive repair now runs on badly corrupted CBZ** — `zip -FF` is no longer skipped for exactly the archives it is meant to fix.
+- **The live log view no longer leaks a background thread / file handle** when a client disconnects abnormally on an idle log.
+- **gallery-dl temp config files holding MangaDex credentials are now owner-only (0600).**
+- **Editing or deleting a follow is now scoped to the library** it is addressed under (a mismatched library returns not-found).
+- **A follow schedule is saved atomically** — no lost schedule row if the write is interrupted.
+- **Mylar `series.json` import** — a single malformed link no longer discards the whole series' metadata.
+- **Deleted-chapters detection** keeps a tracking row when the source chapter has no downloadable pages (external redirect) instead of wrongly deleting it; the metadata tracker-link lookup cache is now bounded.
+- **Chapter-URL import no longer stops once a series is fully downloaded** — the importer skipped the ZIP-comment scan as soon as the tracked-URL count reached the CBZ count, so new or re-numbered chapters in an existing series were never tracked. It now scans whenever the folder holds any CBZ.
+- **`series.json` is no longer corrupted when two writers touch the same series folder at once** — auto-match and plugin metadata-apply shared a fixed temp filename; each write now uses a unique temp file, so a partial file can no longer be read or overwritten.
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `next-ui/` (new module) · `komga/build.gradle.kts` | New Vue 3 (Vite) frontend + serve-both tasks (`/` = webui, `/next` = next-ui). |
+| `interfaces/api/rest/GuestAccessFilter.kt` | Guest read-only access (fail-closed, scoped to shared libraries; runs after RememberMe). |
+| `interfaces/api/rest/GalleryDlController.kt` · `infrastructure/download/GalleryDlUpdateExecutor.kt` | Update gallery-dl from a URL (pip + re-overlay fork integration + atomic swap / rollback). |
+| `interfaces/api/rest/BlacklistController.kt` | `GET/DELETE /api/v1/blacklist` for the blacklisted series/chapters view. |
+| `application/startup/PluginInitializer.kt` | Manga-scrobbler `mangadex_max_content_rating` setting. |
+| Backend (base merge 1.25.0 → 1.27.1) | Full upstream adoption incl. book-projection DB migration + jOOQ codegen; junrar 8.1.0. |
+| `infrastructure/scrobbler/MangaScrobblerPlugin.kt` · `MangaSyncPullerPlugin.kt` · `infrastructure/download/MangaDexSubscriptionSyncer.kt` | Scrobbler/subscription fixes: correct MangaDex read API (`chapterIdsRead`), scheduler survives non-API errors, progress pull marks ≤ position + records state. |
+| `domain/service/DownloadExecutor.kt` · `ChapterChecker.kt` · `infrastructure/download/ChapterMatcher.kt` · `MangaDexApiClient.kt` | Cancel→Completed race guard; deleted-scan library-availability + per-file verifiability guard + re-downloadable failsafe. |
+| `infrastructure/image/ImageSplitter.kt` · `domain/service/PageSplitter.kt` · `interfaces/api/rest/IntegrityController.kt` | WebP/JXL split re-encodes to a writable format; repair runs on corrupt archives. |
+| `interfaces/api/rest/LogController.kt` · `DownloadController.kt` · `infrastructure/download/GalleryDlProcess.kt` · `domain/service/FollowLifecycle.kt` · `infrastructure/jooq/main/FollowScheduleDao.kt` | Log-stream keepalive; follow edit/delete library-scoped; credential temp files 0600; atomic follow-schedule save. |
+| `infrastructure/metadata/mylar/MylarSeriesProvider.kt` · `infrastructure/metadata/tracker/TrackerLinkEnricher.kt` | Per-link metadata resilience; bounded tracker-link cache. |
+| `domain/service/ChapterUrlImporter.kt` | Import skip-guard fixed (`existingUrls.size >= cbzFiles.size` → `cbzFiles.isEmpty()`) — fully-downloaded series are scanned again. |
+| `infrastructure/automatch/SeriesJsonWriter.kt` · `interfaces/api/rest/PluginController.kt` | `series.json` write uses a unique temp file + `finally` cleanup instead of a shared `.series.json.tmp` — no partial-file race between concurrent writers. |
+| `interfaces/scheduler/HistoricalEventCleanupController.kt` | Retention cutoff switched from UTC to local wall-clock (matches stored `HistoricalEvent` timestamps). |
+
+### 2026-09-01
+
+**Features**
+- **Deleted-Chapters Scan** (Settings → Fixes): finds tracked chapter URLs whose CBZ file is gone (orphans — e.g. after a source re-numbered a chapter). It runs **in the background** and its result survives leaving the page. **Preview** (dry-run) lists what would be removed without changing anything; a real run removes only orphans whose source chapter still exists (so the follow-check re-downloads them) and **keeps** entries whose source is gone (deleting those would only lose the record). A whole-library preview is also available via the API with `limit`/`offset` paging, plus a per-series preview.
+
+**Fixes**
+- **A re-numbered chapter could overwrite another chapter and be lost:** when a source re-numbered a chapter, two different chapters could resolve to the same filename (`v2 c018 …`), so the newer one silently overwrote the older on disk while both stayed tracked as "downloaded" — the overwritten chapter was gone and never re-fetched. Chapters are now placed via a collision-safe move keyed on the embedded chapter UUID (a genuine collision keeps both files with a short-id suffix), and a chapter counts as downloaded only once its own file is present. Existing orphaned tracking is recovered by the Deleted-Chapters Scan above.
+- **Log spam `already assigned to series …, skipping …` on every MangaDex download:** a series' MangaDex id was not read back from the database, so the de-duplication guard misfired on every download. Silenced, and the guard works again.
+- **Restricted users could fetch posters of restricted content:** a series/book thumbnail could be retrieved via an accessible id combined with a foreign thumbnail id. Thumbnail requests now verify the thumbnail belongs to the requested series/book (Kobo covers likewise).
+- **Download reliability:** a cancelled download is no longer reported as Completed; a timed-out or failed chapter now counts as a failed attempt (auto-blacklisted after 3) instead of being silently skipped; a download in which every chapter failed is no longer reported as Completed.
+- **Scrobbler:** the Metron comic scrobbler no longer re-sends duplicate read events after a restart; scheduled follow-checks are no longer skipped for a full interval after a server restart; tracker HTTP calls now have connect/read timeouts and back off on rate-limit (429); auth failures are detected by HTTP status instead of string matching.
+- **Webtoons downloads route into the correct series** (issue #40): a download now matches an existing series by its linked URLs via the stable `title_no`, so chapters land in that series regardless of locale/slug differences.
+- **Deleted-chapters detection no longer false-flags imported chapters:** it now reads multi-URL ComicInfo `<Web>` fields and zip-comment UUIDs correctly (previously a manga-level URL next to the chapter URL, or a differing comment UUID, made valid files look missing).
+- **Splitting tall images no longer crashes** on webp / certain PNG formats.
+- **Single-page Repair** now replaces the file atomically (verify + rollback) and offers a dry-run.
+- Restoring a soft-deleted MangaDex series on re-add now keeps its read progress and locked metadata; auto-match is slightly stricter for very short titles (fewer wrong matches).
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `infrastructure/download/GalleryDlWrapper.kt` | Per-chapter staging + UUID-keyed collision-safe move (`moveIntoSeriesFolder`); tracking/`filesDownloaded` bound to a matched file; timeout counts as failure; cancel returns non-success; all-failed → not-success. |
+| `infrastructure/download/ChapterMatcher.kt` | Extract each MangaDex `/chapter/` URL from multi-URL `<Web>`; collect zip-comment UUID **and** `<Web>`; removed dead number/group matchers. |
+| `domain/service/ChapterChecker.kt` · `DeletedChapterScanRunner.kt` (new) | Reconciliation split into per-series helper with a verifiability guard + source-exists failsafe (keep if MangaDex chapter gone/unverifiable); background runner + status for the scan. |
+| `interfaces/api/rest/LibraryController.kt` · `SeriesController.kt` | Scan preview (`limit`/`offset`), per-series preview, background `run` + `status` endpoints. |
+| `infrastructure/jooq/main/SeriesDao.kt` · `SeriesMetadataDao.kt` | `toDomain` maps `mangaDexUuid`; `findSeriesIdByLinkQueryParam` (precise `title_no` match) for webtoons routing. |
+| `domain/service/DownloadExecutor.kt` | Keeps CANCELLED status; webtoons `title_no` link routing. |
+| `interfaces/api/rest/BookController.kt` · `SeriesController.kt` · `kobo/KoboController.kt` | Thumbnail ownership / content-restriction checks. |
+| `infrastructure/scrobbler/MangaScrobblerPlugin.kt` · `MangaSyncPullerPlugin.kt` · `comicscrobbler/ComicScrobblerPlugin.kt` | Typed HTTP-status auth/404 checks; race-safe `sync_state` write; persistent Metron dedup; rate-limiter fix. |
+| `domain/service/FollowScheduleLifecycle.kt` · `application/tasks/TaskHandler.kt` · `domain/service/LibraryContentLifecycle.kt` | Missed-run first-run from `lastCheckTime`; SQLITE_BUSY retry excludes non-idempotent file tasks; restore keeps media/metadata/progress. |
+| `infrastructure/image/ImageSplitter.kt` · `infrastructure/automatch/TitleNormalizer.kt` | TYPE_CUSTOM split guard + writer check; short-title match guard. |
+| `interfaces/api/rest/SinglePageBooksController.kt` | Atomic repair via `CbzSafeWriter` + `dryRun`. |
+| `plugins/{anilist,kitsu,metron}-plugin/…MetadataPlugin.kt` | HTTP connect/request timeouts + 429/503 backoff. |
+| `views/SettingsFixes.vue` | Deleted-Chapters Scan card (Preview/Run, background, status polling). |
+
+### 2026-08-15
+
+**Features**
+- **Self-repair for single-page chapters** on `/media-management/analysis`: alongside Ignore/Delete, flagged chapters now have a **Repair** action. It resolves the chapter's tracked source link (from the `CHAPTER_URL` table, matched by series + chapter number), re-downloads that one chapter via gallery-dl into a temp folder, and **only replaces the local file if the fresh download actually succeeds** — a dead link (e.g. a chapter deleted at the source) keeps the existing file untouched and reports "source gone" instead. A Source column shows which rows are repairable; the bulk button reports how many were fixed, still single-page (a genuinely one-image chapter you can then Ignore), or had a gone/failed source.
+
+#### Modified / new files
+| File | Change |
+|------|--------|
+| `interfaces/api/rest/SinglePageBooksController.kt` | New `POST {bookId}/repair`; resolves chapter URL by series + `numberSort`, temp-downloads, verifies image count, atomic replace only on success (else keeps file, returns `SOURCE_GONE`/`NO_SOURCE_URL`/`FAILED`). List now returns `sourceUrl`. |
+| `interfaces/api/rest/dto/SinglePageBookDto.kt` | Added `sourceUrl`. |
+| `domain/model/SinglePageBookCandidate.kt` | Added `numberSort`. |
+| `infrastructure/jooq/main/MediaDao.kt` | Candidate query joins `BOOK_METADATA` for `NUMBER_SORT`. |
+| `views/MediaAnalysis.vue` | Repair button + bulk repair, Source column/icon, result summary. |
+
+---
+
 ## [0.1.5.1] - 2026-06-06
 
 ### 2026-08-09

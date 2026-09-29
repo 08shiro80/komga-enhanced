@@ -54,7 +54,6 @@ class MangaDexApiClient(
     mangaId: String,
     language: String,
   ): List<ChapterDownloadInfo> {
-    evictExpiredCacheEntries()
     val cacheKey = "$mangaId:$language"
     val cached = chapterCache[cacheKey]
     if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
@@ -67,7 +66,6 @@ class MangaDexApiClient(
   }
 
   fun getMangaMetadata(mangaId: String): MangaInfo? {
-    evictExpiredCacheEntries()
     val cached = mangaInfoCache[mangaId]
     if (cached != null && System.currentTimeMillis() - cached.second < CACHE_TTL_MS) {
       logger.debug { "Using cached manga metadata for $mangaId" }
@@ -282,6 +280,7 @@ class MangaDexApiClient(
       val pages = attributes["pages"] as? Int ?: 0
       val publishDate = attributes["publishAt"] as? String
       val language = attributes["translatedLanguage"] as? String
+      val externalUrl = (attributes["externalUrl"] as? String)?.takeIf { it.isNotBlank() }
 
       val relationships = data["relationships"] as? List<*> ?: emptyList<Map<String, Any>>()
       var scanlationGroup: String? = null
@@ -306,6 +305,7 @@ class MangaDexApiClient(
         scanlationGroup = scanlationGroup,
         publishDate = publishDate,
         language = language,
+        externalUrl = externalUrl,
       )
     } catch (e: Exception) {
       logger.warn(e) { "Failed to fetch chapter metadata for $chapterId" }

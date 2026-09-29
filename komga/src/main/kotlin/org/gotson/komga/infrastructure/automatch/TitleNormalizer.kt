@@ -81,8 +81,11 @@ object TitleNormalizer {
     // Token containment: small bonus when one is a strict superset of the other
     // (common when query has extra noise we couldn't strip, or candidate has
     // an episode/year suffix like "Lookism (2024)").
+    // Only grant the containment bonus when the smaller token set is substantial
+    // (>= 3 tokens). For 1-2 token titles a single shared token yields containment 1.0
+    // and would push unrelated short titles (e.g. spin-offs) over the match threshold.
     val containment =
-      if (a.isNotEmpty() && b.isNotEmpty()) {
+      if (minOf(a.size, b.size) >= 3) {
         maxOf(inter / a.size.toDouble(), inter / b.size.toDouble())
       } else {
         0.0

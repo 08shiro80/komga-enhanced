@@ -1,0 +1,299 @@
+<template>
+  <v-container fluid>
+    <v-row>
+      <v-col cols="auto">
+        <div
+          v-ktooltip:bottom="{
+            text: $formatMessage(commonMessages.resourceIntensive),
+            openOnClick: true,
+            clickFade: 2500,
+          }"
+          class="text-label-large d-flex ga-2 align-center"
+        >
+          <div>
+            {{
+              $formatMessage({
+                description: 'Form add/edit library: Options - section header for analysis',
+                defaultMessage: 'Analysis',
+                id: 'O/3awV',
+              })
+            }}
+          </div>
+          <v-icon
+            size="small"
+            color="warning"
+            icon="i-mdi:alert-circle-outline"
+          />
+        </div>
+
+        <v-checkbox
+          v-model="model.hashFiles"
+          :label="
+            $formatMessage({
+              description: 'Form add/edit library: Options - hash files',
+              defaultMessage: 'Compute hash for files',
+              id: 'wJaip6',
+            })
+          "
+          hide-details
+        >
+          <template #append>
+            <v-icon
+              v-ktooltip:bottom="{
+                text: $formatMessage({
+                  description: 'Form add/edit library: Options - hash files - information tooltip',
+                  defaultMessage: 'Required to restore from trash and detect duplicate files',
+                  id: '/8sSxS',
+                }),
+                openOnClick: true,
+                clickFade: 2500,
+              }"
+              icon="i-mdi:information-outline"
+            ></v-icon>
+          </template>
+        </v-checkbox>
+
+        <v-checkbox
+          v-model="model.hashPages"
+          :label="
+            $formatMessage({
+              description: 'Form add/edit library: Options - hash pages',
+              defaultMessage: 'Compute hash for pages',
+              id: '0qntYX',
+            })
+          "
+          hide-details
+        >
+          <template #append>
+            <v-icon
+              v-ktooltip:bottom="{
+                text: $formatMessage({
+                  description: 'Form add/edit library: Options - hash pages - information tooltip',
+                  defaultMessage: 'Required for detecting duplicate pages',
+                  id: 'Pj29A+',
+                }),
+                openOnClick: true,
+                clickFade: 2500,
+              }"
+              icon="i-mdi:information-outline"
+            ></v-icon>
+          </template>
+        </v-checkbox>
+
+        <v-checkbox
+          v-model="model.hashKoreader"
+          :label="
+            $formatMessage({
+              description: 'Form add/edit library: Options - koreader hash',
+              defaultMessage: 'Compute hash for KOReader',
+              id: 'nXFVsQ',
+            })
+          "
+          hide-details
+        >
+          <template #append>
+            <v-icon
+              v-ktooltip:bottom="{
+                text: $formatMessage({
+                  description:
+                    'Form add/edit library: Options - koreader hash - information tooltip',
+                  defaultMessage: 'Enable this if you use KOReader Sync',
+                  id: 'DNmepU',
+                }),
+                openOnClick: true,
+                clickFade: 2500,
+              }"
+              icon="i-mdi:information-outline"
+            ></v-icon>
+          </template>
+        </v-checkbox>
+
+        <v-checkbox
+          v-model="model.analyzeDimensions"
+          :label="
+            $formatMessage({
+              description: 'Form add/edit library: Options - analyze page dimensions',
+              defaultMessage: 'Analyze pages dimensions',
+              id: 'STdfYg',
+            })
+          "
+          hide-details
+        >
+          <template #append>
+            <v-icon
+              v-ktooltip:bottom="{
+                text: $formatMessage({
+                  description:
+                    'Form add/edit library: Options - analyze page dimensions - information tooltip',
+                  defaultMessage: 'Required for the WebReader to detect landscape pages',
+                  id: 'ByRsV9',
+                }),
+                openOnClick: true,
+                clickFade: 2500,
+              }"
+              icon="i-mdi:information-outline"
+            ></v-icon>
+          </template>
+        </v-checkbox>
+      </v-col>
+    </v-row>
+
+    <v-divider class="mb-4" />
+
+    <v-row>
+      <v-col>
+        <div class="text-label-large">
+          {{
+            $formatMessage({
+              description: 'Form add/edit library: Options - section header for file management',
+              defaultMessage: 'File management',
+              id: 'rks1H9',
+            })
+          }}
+        </div>
+        <v-checkbox
+          v-model="model.repairExtensions"
+          :label="
+            $formatMessage({
+              description: 'Form add/edit library: Options - repair extensions',
+              defaultMessage: 'Automatically repair incorrect file extensions',
+              id: 'RwuMl5',
+            })
+          "
+          hide-details
+        />
+
+        <v-checkbox
+          v-model="model.convertToCbz"
+          :label="
+            $formatMessage({
+              description: 'Form add/edit library: Options - convert to cbz',
+              defaultMessage: 'Automatically convert CBR to CBZ',
+              id: 'b1hvh9',
+            })
+          "
+          hide-details
+        />
+      </v-col>
+    </v-row>
+
+    <v-divider class="mb-4" />
+
+    <v-row>
+      <v-col>
+        <div class="text-label-large">
+          {{
+            $formatMessage({
+              description: 'Form add/edit library: Options - section header for series cover',
+              defaultMessage: 'Series cover',
+              id: 'Bewgy6',
+            })
+          }}
+        </div>
+      </v-col>
+    </v-row>
+    <v-row>
+      <v-col>
+        <v-select
+          v-model="model.seriesCover"
+          :items="seriesCoverOptions"
+        />
+      </v-col>
+    </v-row>
+
+    <v-divider class="mb-4" />
+
+    <v-row>
+      <v-col>
+        <div class="text-label-large mb-2">
+          {{
+            $formatMessage({
+              description: 'Form add/edit library: Options - default book sort header',
+              defaultMessage: 'Default book sort (fork)',
+              id: 'fork/library/sort/header',
+            })
+          }}
+        </div>
+        <div class="d-flex ga-2 flex-wrap">
+          <v-select
+            v-model="model.defaultBookSortField"
+            :items="sortFieldOptions"
+            :label="
+              $formatMessage({
+                description: 'Form add/edit library: default book sort field',
+                defaultMessage: 'Sort by',
+                id: 'fork/library/sort/field',
+              })
+            "
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="flex-grow-1"
+          />
+          <v-select
+            v-model="model.defaultBookSortOrder"
+            :items="sortOrderOptions"
+            :label="
+              $formatMessage({
+                description: 'Form add/edit library: default book sort order',
+                defaultMessage: 'Order',
+                id: 'fork/library/sort/order',
+              })
+            "
+            variant="outlined"
+            density="compact"
+            hide-details
+            style="max-width: 180px"
+          />
+        </div>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script setup lang="ts">
+import { useIntl } from 'vue-intl'
+import { SeriesCoverValues, seriesCoverMessages } from '@/types/SeriesCover'
+import { commonMessages } from '@/utils/i18n/common-messages'
+import type {
+  DefaultBookSortFieldEnum,
+  DefaultBookSortOrderEnum,
+  LibraryCreationDto,
+} from '@/generated/openapi'
+
+type LibraryCreationOptions = Pick<
+  LibraryCreationDto,
+  | 'hashFiles'
+  | 'hashPages'
+  | 'hashKoreader'
+  | 'analyzeDimensions'
+  | 'repairExtensions'
+  | 'convertToCbz'
+  | 'seriesCover'
+  | 'defaultBookSortField'
+  | 'defaultBookSortOrder'
+>
+
+const model = defineModel<LibraryCreationOptions>({ required: true })
+
+const intl = useIntl()
+
+const seriesCoverOptions = SeriesCoverValues.map((x) => ({
+  title: intl.formatMessage(seriesCoverMessages[x]),
+  value: x,
+}))
+
+const sortFieldOptions: { title: string; value: DefaultBookSortFieldEnum }[] = [
+  { title: intl.formatMessage({ description: 'Library sort field: number', defaultMessage: 'Number', id: 'fork/library/sort/number' }), value: 'NUMBER' },
+  { title: intl.formatMessage({ description: 'Library sort field: date added', defaultMessage: 'Date added', id: 'fork/library/sort/dateAdded' }), value: 'DATE_ADDED' },
+  { title: intl.formatMessage({ description: 'Library sort field: date updated', defaultMessage: 'Date updated', id: 'fork/library/sort/dateUpdated' }), value: 'DATE_UPDATED' },
+  { title: intl.formatMessage({ description: 'Library sort field: release date', defaultMessage: 'Release date', id: 'fork/library/sort/releaseDate' }), value: 'RELEASE_DATE' },
+  { title: intl.formatMessage({ description: 'Library sort field: file size', defaultMessage: 'File size', id: 'fork/library/sort/fileSize' }), value: 'FILE_SIZE' },
+  { title: intl.formatMessage({ description: 'Library sort field: file name', defaultMessage: 'File name', id: 'fork/library/sort/fileName' }), value: 'FILE_NAME' },
+  { title: intl.formatMessage({ description: 'Library sort field: page count', defaultMessage: 'Page count', id: 'fork/library/sort/pageCount' }), value: 'PAGE_COUNT' },
+]
+const sortOrderOptions: { title: string; value: DefaultBookSortOrderEnum }[] = [
+  { title: intl.formatMessage({ description: 'Library sort order: ascending', defaultMessage: 'Ascending', id: 'fork/library/sort/asc' }), value: 'ASC' },
+  { title: intl.formatMessage({ description: 'Library sort order: descending', defaultMessage: 'Descending', id: 'fork/library/sort/desc' }), value: 'DESC' },
+]
+</script>

@@ -1,0 +1,67 @@
+<template>
+  <v-dialog
+    v-model="showDialog"
+    :activator="activator"
+    :max-width="maxWidth"
+    :max-height="fullscreen ? undefined : maxHeight"
+    :min-height="fullscreen ? undefined : minHeight"
+    :fullscreen="fullscreen"
+    :transition="fullscreen ? 'dialog-bottom-transition' : undefined"
+    :scrollable="scrollable"
+    :aria-label="title"
+  >
+    <template #default="{ isActive }">
+      <v-card
+        :title="title"
+        :subtitle="subtitle"
+        :loading="loading"
+      >
+        <v-card-text v-bind="cardTextProps">
+          <slot name="text" />
+        </v-card-text>
+
+        <template #actions>
+          <v-spacer />
+          <v-btn
+            :text="
+              $formatMessage({
+                description: 'Simple dialog: Close button',
+                defaultMessage: 'Close',
+                id: 'Wivz5J',
+              })
+            "
+            @click="
+              () => {
+                emit('cancel')
+                isActive.value = false
+              }
+            "
+          />
+        </template>
+      </v-card>
+    </template>
+  </v-dialog>
+</template>
+
+<script setup lang="ts">
+import type { DialogSimpleProps } from '@/types/dialog'
+
+const showDialog = defineModel<boolean>('dialog', { required: false, default: false })
+
+const emit = defineEmits<{
+  cancel: []
+}>()
+
+const {
+  title = undefined,
+  subtitle = undefined,
+  maxWidth = undefined,
+  maxHeight = undefined,
+  minHeight = undefined,
+  activator = undefined,
+  loading = false,
+  fullscreen = undefined,
+  scrollable = undefined,
+  cardTextProps = undefined,
+} = defineProps<DialogSimpleProps>()
+</script>

@@ -49,7 +49,6 @@ dependencies {
 
   api("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
-  implementation("org.springframework.boot:spring-boot-starter-websocket")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-security")
@@ -89,7 +88,7 @@ dependencies {
 
   implementation("org.apache.tika:tika-core:3.2.3")
   implementation("org.apache.commons:commons-compress:1.27.1")
-  implementation("com.github.junrar:junrar:7.6.0")
+  implementation("com.github.junrar:junrar:8.1.0")
   implementation("com.github.gotson.nightcompress:nightcompress:1.1.1")
   implementation("org.apache.pdfbox:pdfbox:3.0.5")
   implementation("net.grey-panther:natural-comparator:1.1")
@@ -154,6 +153,7 @@ kotlin {
 }
 
 val webui = "$rootDir/komga-webui"
+val nextui = "$rootDir/next-ui"
 tasks {
   withType<JavaCompile> {
     sourceCompatibility = "17"
@@ -236,6 +236,69 @@ tasks {
     }
   }
 
+  register<Exec>("nextuiNpmInstall") {
+    group = "web"
+    workingDir(nextui)
+    inputs.file("$nextui/package.json").withPropertyName("packageJson").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("$nextui/package-lock.json").withPropertyName("packageLock").withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir("$nextui/node_modules").withPropertyName("nodeModules")
+    outputs.cacheIf { false }
+    commandLine(
+      if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        "npm.cmd"
+      } else {
+        "npm"
+      },
+      "ci",
+    )
+  }
+
+  register<Exec>("nextuiNpmBuild") {
+    group = "web"
+    dependsOn("nextuiNpmInstall")
+    workingDir(nextui)
+    inputs.dir("$nextui/src").withPropertyName("nextuiSrc").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("$nextui/public").withPropertyName("nextuiPublic").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("$nextui/i18n").withPropertyName("nextuiI18n").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("$nextui/package.json").withPropertyName("packageJson").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("$nextui/package-lock.json").withPropertyName("packageLock").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("$nextui/vite.config.mts").withPropertyName("viteConfig").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("$nextui/index.html").withPropertyName("nextuiIndexHtml").withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir("$nextui/dist").withPropertyName("nextuiDist")
+    outputs.cacheIf { true }
+    commandLine(
+      if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        "npm.cmd"
+      } else {
+        "npm"
+      },
+      "run",
+      "build:with-i18n",
+    )
+  }
+
+  register<Copy>("nextuiCopyDist") {
+    group = "web"
+    dependsOn("nextuiNpmBuild")
+    mustRunAfter("copyWebDist")
+    from("$nextui/dist/")
+    into(layout.buildDirectory.dir("processedResources/public"))
+    exclude("index.html")
+  }
+
+  register<Copy>("nextuiCopyIndex") {
+    group = "web"
+    dependsOn("nextuiCopyDist")
+    from("$nextui/dist/index.html")
+    into(layout.buildDirectory.dir("processedResources/public"))
+    filter { line ->
+      line.replace("((?:src|content|href)=\")([\\w]*/.*?)(\")".toRegex()) {
+        it.groups[0]?.value + " th:" + it.groups[1]?.value + "@{" + it.groups[2]?.value?.prefixIfNot("/") + "}" + it.groups[3]?.value
+      }
+    }
+    rename("index.html", "index-next.html")
+  }
+
   register<Copy>("copyDefaultPlugins") {
     group = "build"
     defaultPluginProjects.forEach { from(it.tasks.named("jar")) }
@@ -243,7 +306,7 @@ tasks {
   }
 
   withType<ProcessResources> {
-    dependsOn("copyDefaultPlugins", "prepareThymeLeaf")
+    dependsOn("copyDefaultPlugins", "prepareThymeLeaf", "nextuiCopyIndex")
     filesMatching("application*.yml") {
       expand(
         mapOf(

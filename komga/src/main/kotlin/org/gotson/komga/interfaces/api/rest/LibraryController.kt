@@ -17,6 +17,10 @@ import org.gotson.komga.domain.model.SearchOperator
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
+import org.gotson.komga.domain.service.ChapterChecker
+import org.gotson.komga.domain.service.DeletedChapterScanProgress
+import org.gotson.komga.domain.service.DeletedChapterScanResult
+import org.gotson.komga.domain.service.DeletedChapterScanRunner
 import org.gotson.komga.domain.service.LibraryLifecycle
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
@@ -54,6 +58,8 @@ class LibraryController(
   private val libraryRepository: LibraryRepository,
   private val bookRepository: BookRepository,
   private val seriesRepository: SeriesRepository,
+  private val chapterChecker: ChapterChecker,
+  private val deletedChapterScanRunner: DeletedChapterScanRunner,
 ) {
   @GetMapping
   @Operation(
@@ -301,4 +307,40 @@ class LibraryController(
       taskEmitter.scanDeletedChapters(library.id, HIGH_PRIORITY)
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
   }
+
+  @PostMapping("{libraryId}/scan-deleted-chapters/preview")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(summary = "Preview which tracked chapter URLs would be removed as deleted (dry-run, no changes). Scans a window of `limit` series from `offset` to stay within request time on large libraries; page through with offset.")
+  fun libraryScanDeletedChaptersPreview(
+    @PathVariable libraryId: String,
+    @RequestParam(defaultValue = "50") limit: Int,
+    @RequestParam(defaultValue = "0") offset: Int,
+  ): DeletedChapterScanResult {
+    val library = libraryRepository.findByIdOrNull(libraryId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    return chapterChecker.scanDeletedChaptersForLibrary(library.id, dryRun = true, limit = limit, offset = offset)
+  }
+
+  @PostMapping("{libraryId}/scan-deleted-chapters/run")
+  @PreAuthorize("hasRole('ADMIN')")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  @Operation(summary = "Run the deleted-chapters scan in the background. dryRun=true = preview (no changes). Poll .../scan-deleted-chapters/status for the result; it survives navigating away.")
+  fun libraryScanDeletedChaptersRun(
+    @PathVariable libraryId: String,
+    @RequestParam(defaultValue = "true") dryRun: Boolean,
+  ): Map<String, Any> {
+    val library = libraryRepository.findByIdOrNull(libraryId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    if (!deletedChapterScanRunner.start(library.id, dryRun)) {
+      throw ResponseStatusException(HttpStatus.CONFLICT, "A deleted-chapters scan is already running")
+    }
+    return mapOf(
+      "status" to "started",
+      "dryRun" to dryRun,
+      "message" to (if (dryRun) "Preview scan started in background — results appear when done" else "Scan started in background"),
+    )
+  }
+
+  @GetMapping("scan-deleted-chapters/status")
+  @PreAuthorize("hasRole('ADMIN')")
+  @Operation(summary = "Status/result of the running or last deleted-chapters background scan")
+  fun deletedChaptersScanStatus(): DeletedChapterScanProgress = deletedChapterScanRunner.status()
 }

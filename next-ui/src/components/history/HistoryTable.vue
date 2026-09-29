@@ -1,0 +1,219 @@
+<template>
+  <v-data-table-server
+    v-model:sort-by="sortBy"
+    :loading="isLoading"
+    :items="data?.content"
+    :items-length="data?.totalElements || 0"
+    :items-per-page="appStore.dataTablePageSize"
+    :items-per-page-options="[10, 20, 25, 50, 100]"
+    :headers="headers"
+    fixed-header
+    fixed-footer
+    multi-sort
+    mobile-breakpoint="md"
+    show-expand
+    style="height: 100%"
+    @update:options="updateOptions"
+  >
+    <template #top>
+      <v-toolbar flat>
+        <v-toolbar-title>
+          <v-icon
+            color="medium-emphasis"
+            icon="i-mdi:history"
+            size="x-small"
+            start
+          />
+          {{
+            $formatMessage({
+              description: 'History table global header',
+              defaultMessage: 'History',
+              id: '7z91nm',
+            })
+          }}
+        </v-toolbar-title>
+      </v-toolbar>
+    </template>
+
+    <template #no-data>
+      <EmptyStateNetworkError v-if="error" />
+      <template v-else>
+        {{
+          $formatMessage({
+            description: 'History table: shown when table has no data',
+            defaultMessage: 'No recent events',
+            id: 'Ym48fa',
+          })
+        }}
+      </template>
+    </template>
+
+    <template #[`item.type`]="{ value }">
+      <div class="d-flex flex-row-reverse flex-md-row ga-2">
+        <v-icon :icon="getIcon(value)" />
+        <span>{{ $formatMessage(getEventMessage(value)) }}</span>
+      </div>
+    </template>
+
+    <template #[`item.seriesId`]="{ value: seriesId }">
+      <SeriesFetchDetails :series-id="seriesId">
+        <template #default="{ details }">
+          <RouterLink
+            v-if="seriesId && details"
+            :to="{ name: '/series/[id]', params: { id: seriesId } }"
+            class="link-underline"
+            >{{ details?.metadata.title }}</RouterLink
+          >
+          <span v-else>{{ seriesId }}</span>
+        </template>
+      </SeriesFetchDetails>
+    </template>
+
+    <template #[`item.bookId`]="{ value: bookId }">
+      <BookFetchDetails :book-id="bookId">
+        <template #default="{ details }">
+          <RouterLink
+            v-if="bookId && details"
+            :to="{ name: '/book/[id]', params: { id: bookId } }"
+            class="link-underline"
+            >{{ details?.metadata.title }}</RouterLink
+          >
+          <span v-else>{{ bookId }}</span>
+        </template>
+      </BookFetchDetails>
+    </template>
+
+    <template #[`item.timestamp`]="{ value }">
+      {{ $formatDate(value, { dateStyle: 'medium', timeStyle: 'short' }) }}
+    </template>
+
+    <template #expanded-row="{ columns, item }">
+      <tr>
+        <td
+          :colspan="columns.length"
+          class="py-2 px-1 px-md-4"
+        >
+          <component
+            :is="getExpandedComponent(item.type)"
+            :event="item"
+          />
+        </td>
+      </tr>
+    </template>
+  </v-data-table-server>
+</template>
+
+<script setup lang="ts">
+import { type MessageDescriptor, useIntl } from 'vue-intl'
+import { PageRequest, type VSortItem } from '@/types/PageRequest'
+import { useQuery } from '@pinia/colada'
+import { historyQuery } from '@/colada/history'
+import HistoryExpandBookFileDeleted from '@/components/history/expand/BookFileDeleted.vue'
+import HistoryExpandBookImported from '@/components/history/expand/BookImported.vue'
+import HistoryExpandBookConverted from '@/components/history/expand/BookConverted.vue'
+import HistoryExpandDuplicatePageDeleted from '@/components/history/expand/DuplicatePageDeleted.vue'
+import HistoryExpandSeriesDirectoryDeleted from '@/components/history/expand/SeriesDirectoryDeleted.vue'
+import { historicalEventMessages } from '@/utils/i18n/enum/historical-event'
+import { useAppStore } from '@/stores/app'
+
+const intl = useIntl()
+const appStore = useAppStore()
+
+const sortBy = ref<VSortItem[]>([{ key: 'timestamp', order: 'desc' }])
+
+const headers = [
+  {
+    title: intl.formatMessage({
+      description: 'History Table table header: Event type',
+      defaultMessage: 'Type',
+      id: '6nCIPn',
+    }),
+    key: 'type',
+  },
+  {
+    title: intl.formatMessage({
+      description: 'History Table table header: Series',
+      defaultMessage: 'Series',
+      id: 'pR3VdQ',
+    }),
+    key: 'seriesId',
+  },
+  {
+    title: intl.formatMessage({
+      description: 'History Table table header: Book',
+      defaultMessage: 'Book',
+      id: 'zqAxRE',
+    }),
+    key: 'bookId',
+  },
+  {
+    title: intl.formatMessage({
+      description: 'History Table table header: Date Time',
+      defaultMessage: 'Date Time',
+      id: 'HMbMJF',
+    }),
+    key: 'timestamp',
+  },
+]
+
+const pageRequest = ref<PageRequest>(new PageRequest())
+
+const { data, isLoading, error } = useQuery(() => historyQuery({ ...pageRequest.value }))
+
+function updateOptions({
+  page,
+  itemsPerPage,
+  sortBy,
+}: {
+  page: number
+  itemsPerPage: number
+  sortBy: VSortItem[]
+}) {
+  // Persist the chosen page size across sessions/tables (matches the Vue2 fork's dataTablePageSize).
+  if (itemsPerPage > 0) appStore.dataTablePageSize = itemsPerPage
+  pageRequest.value = PageRequest.FromVuetify(page - 1, itemsPerPage, sortBy)
+}
+
+function getIcon(eventType: string): string {
+  switch (eventType) {
+    case 'BookFileDeleted':
+      return 'i-mdi:file-remove'
+    case 'SeriesFolderDeleted':
+      return 'i-mdi:folder-remove'
+    case 'DuplicatePageDeleted':
+      return 'i-mdi:book-minus'
+    case 'BookConverted':
+      return 'i-mdi:archive-refresh'
+    case 'BookImported':
+      return 'i-mdi:import'
+    default:
+      return ''
+  }
+}
+
+function getEventMessage(eventType: string): MessageDescriptor {
+  return (
+    historicalEventMessages[eventType] || {
+      id: eventType,
+      defaultMessage: eventType,
+    }
+  )
+}
+
+function getExpandedComponent(eventType: string): Component | null {
+  switch (eventType) {
+    case 'BookFileDeleted':
+      return markRaw(HistoryExpandBookFileDeleted)
+    case 'SeriesFolderDeleted':
+      return markRaw(HistoryExpandSeriesDirectoryDeleted)
+    case 'DuplicatePageDeleted':
+      return markRaw(HistoryExpandDuplicatePageDeleted)
+    case 'BookConverted':
+      return markRaw(HistoryExpandBookConverted)
+    case 'BookImported':
+      return markRaw(HistoryExpandBookImported)
+    default:
+      return null
+  }
+}
+</script>

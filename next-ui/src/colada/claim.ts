@@ -1,0 +1,28 @@
+import { defineMutation, defineQueryOptions, useMutation, useQueryCache } from '@pinia/colada'
+import { komgaClaimServer, komgaGetClaimStatus } from '@/generated/openapi'
+import { STALE_TIME } from '@/types/time'
+
+export const QUERY_KEYS_CLAIM = {
+  root: ['claim'] as const,
+}
+
+export const claimStatusQuery = defineQueryOptions({
+  key: QUERY_KEYS_CLAIM.root,
+  query: () => komgaGetClaimStatus(),
+  staleTime: STALE_TIME.STATIC,
+  gcTime: false,
+})
+
+export const useClaimServer = defineMutation(() => {
+  const queryCache = useQueryCache()
+  return useMutation({
+    mutation: ({ username, password }: { username: string; password: string }) =>
+      komgaClaimServer({
+        headers: {
+          'X-Komga-Email': username,
+          'X-Komga-Password': password,
+        },
+      }),
+    onSuccess: () => void queryCache.invalidateQueries({ key: QUERY_KEYS_CLAIM.root }),
+  })
+})

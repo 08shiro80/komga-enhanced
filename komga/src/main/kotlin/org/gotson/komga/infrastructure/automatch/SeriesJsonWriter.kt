@@ -143,12 +143,18 @@ class SeriesJsonWriter(
 
     val seriesJson = mapOf("metadata" to metadata)
     val target = seriesPath.resolve("series.json").toFile()
-    val tmp = File(target.parent, ".series.json.tmp")
-    tmp.writeText(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(seriesJson))
+    // Unique temp name so a concurrent writer (PluginController.applyMetadata) on the same folder
+    // cannot pick up this writer's partial file. Dot-prefix keeps it invisible to the scanner.
+    val tmp = Files.createTempFile(seriesPath, ".series.json", ".tmp").toFile()
     try {
-      Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-    } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-      Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+      tmp.writeText(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(seriesJson))
+      try {
+        Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+      } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+        Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+      }
+    } finally {
+      tmp.delete()
     }
     logger.info { "Wrote series.json: ${target.absolutePath} (provider=$provider, externalId=$externalId)" }
     return target.toPath()

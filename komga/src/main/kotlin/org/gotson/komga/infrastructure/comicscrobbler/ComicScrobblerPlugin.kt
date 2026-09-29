@@ -1,9 +1,11 @@
 package org.gotson.komga.infrastructure.comicscrobbler
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.github.f4b6a3.tsid.TsidCreator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.LogLevel
+import org.gotson.komga.domain.model.SyncState
 import org.gotson.komga.domain.model.WebLink
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
@@ -11,6 +13,7 @@ import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.persistence.PluginLogRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
+import org.gotson.komga.domain.persistence.SyncStateRepository
 import org.gotson.komga.infrastructure.metadata.metron.MetronHttp
 import org.gotson.komga.infrastructure.rate.MetronRateLimiter
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -34,6 +37,7 @@ class ComicScrobblerPlugin(
   private val bookRepository: BookRepository,
   private val bookMetadataRepository: BookMetadataRepository,
   private val seriesMetadataRepository: SeriesMetadataRepository,
+  private val syncStateRepository: SyncStateRepository,
   private val objectMapper: ObjectMapper,
   private val rateLimiter: MetronRateLimiter,
 ) {
@@ -58,7 +62,8 @@ class ComicScrobblerPlugin(
       logger.debug { "ComicScrobbler plugin not yet installed" }
       return
     }
-    logger.info { "ComicScrobbler plugin loaded (enabled=${plugin.enabled})" }
+    syncStateRepository.findByTracker("metron").forEach { lastSyncedIssue[it.seriesId] = it.progress }
+    logger.info { "ComicScrobbler plugin loaded (enabled=${plugin.enabled}), hydrated ${lastSyncedIssue.size} synced series" }
   }
 
   @EventListener
@@ -129,6 +134,41 @@ class ComicScrobblerPlugin(
 
     if (scrobble(issueId, mUser, mPass, seriesMeta.title)) {
       lastSyncedIssue[book.seriesId] = issueNumber
+      recordMetronSync(book.seriesId, issueNumber, book.id)
+    }
+  }
+
+  private fun recordMetronSync(
+    seriesId: String,
+    issue: Int,
+    bookId: String,
+  ) {
+    try {
+      val now = LocalDateTime.now()
+      val existing = syncStateRepository.findBySeriesIdAndTracker(seriesId, "metron")
+      if (existing != null) {
+        syncStateRepository.update(
+          existing.copy(
+            bookId = bookId,
+            progress = issue,
+            lastSyncTimestamp = now,
+            lastModifiedDate = now,
+          ),
+        )
+      } else {
+        syncStateRepository.insert(
+          SyncState(
+            id = TsidCreator.getTsid256().toString(),
+            bookId = bookId,
+            seriesId = seriesId,
+            tracker = "metron",
+            progress = issue,
+            lastSyncTimestamp = now,
+          ),
+        )
+      }
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to record Metron sync state for series $seriesId" }
     }
   }
 
@@ -263,13 +303,11 @@ class ComicScrobblerPlugin(
     }
 
   private fun waitForMetronSlot() {
-    var backoff = rateLimiter.suggestedBackoffMs()
-    while (backoff > 0) {
+    while (!rateLimiter.tryAcquire()) {
+      val backoff = rateLimiter.suggestedBackoffMs().coerceAtLeast(50)
       logger.debug { "Metron rate limit: waiting ${backoff}ms" }
       Thread.sleep(backoff)
-      backoff = rateLimiter.suggestedBackoffMs()
     }
-    rateLimiter.tryAcquire()
   }
 
   private fun basicAuth(

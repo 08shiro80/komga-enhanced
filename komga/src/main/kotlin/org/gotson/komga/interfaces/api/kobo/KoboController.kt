@@ -11,6 +11,7 @@ import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.RandomStringUtils
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookWithMedia
+import org.gotson.komga.domain.model.KEPUB_DEFAULT
 import org.gotson.komga.domain.model.KomgaSyncToken
 import org.gotson.komga.domain.model.MediaExtensionEpub
 import org.gotson.komga.domain.model.MediaType.EPUB
@@ -515,13 +516,17 @@ class KoboController(
    */
   @GetMapping("/v1/library/{bookId}/metadata")
   fun getBookMetadata(
+    @AuthenticationPrincipal principal: KomgaPrincipal,
     @PathVariable authToken: String,
     @PathVariable bookId: String,
   ): ResponseEntity<*> =
-    if (!bookRepository.existsById(bookId) && koboProxy.isEnabled())
+    if (!bookRepository.existsById(bookId) && koboProxy.isEnabled()) {
       koboProxy.proxyCurrentRequest()
-    else
+    } else {
+      contentRestrictionChecker.checkContentRestrictionBook(principal.user, bookId)
+
       ResponseEntity.ok(koboDtoRepository.findBookMetadataByIds(listOf(bookId)).map { it.withDownloadUrls(getDownloadUrlBuilder(authToken)) })
+    }
 
   /**
    * @return an array of [ReadingStateDto]
@@ -537,6 +542,8 @@ class KoboController(
           return koboProxy.proxyCurrentRequest()
         else
           throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    contentRestrictionChecker.checkContentRestrictionBook(principal.user, book)
 
     val response = readProgressRepository.findByBookIdAndUserIdOrNull(bookId, principal.user.id)?.toDto() ?: getEmptyReadProgressForBook(book)
     return ResponseEntity.ok(listOf(response))
@@ -560,6 +567,8 @@ class KoboController(
           return koboProxy.proxyCurrentRequest(rawBody)
         else
           throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    contentRestrictionChecker.checkContentRestrictionBook(principal.user, book)
 
     val koboUpdate = body.readingStates.firstOrNull() ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST)
     if (koboUpdate.currentBookmark.location == null || koboUpdate.currentBookmark.contentSourceProgressPercent == null) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
@@ -649,7 +658,7 @@ class KoboController(
   ): ResponseEntity<StreamingResponseBody> {
     if (convertToKepub) {
       bookRepository.findByIdOrNull(bookId)?.let { book ->
-        contentRestrictionChecker.checkContentRestriction(principal.user, book)
+        contentRestrictionChecker.checkContentRestrictionBook(principal.user, book)
 
         // check cache
         val cacheKey = book.computeCacheKey()
@@ -724,6 +733,8 @@ class KoboController(
         .location(UriComponentsBuilder.fromUriString(koboProxy.imageHostUrl).buildAndExpand(thumbnailId, width, height).toUri())
         .build()
     } else {
+      val bookId = thumbnailBookRepository.findByIdOrNull(thumbnailId)?.bookId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+      contentRestrictionChecker.checkContentRestrictionBook(principal.user, bookId)
       val poster = bookLifecycle.getThumbnailBytesByThumbnailId(thumbnailId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
       val posterBytes =
         if (poster.mediaType != ImageType.JPEG.mediaType)
@@ -767,7 +778,7 @@ class KoboController(
           add(
             DownloadUrlDto(
               format = format,
-              size = fileSize,
+              size = if (format === FormatDto.KEPUB) extraFileSizes[KEPUB_DEFAULT] ?: fileSize else fileSize,
               url = downloadUriBuilder.build(entitlementId, convert).toURL().toString(),
             ),
           )

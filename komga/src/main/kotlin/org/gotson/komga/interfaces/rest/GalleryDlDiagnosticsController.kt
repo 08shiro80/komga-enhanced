@@ -3,6 +3,7 @@ package org.gotson.komga.interfaces.rest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -12,6 +13,7 @@ private val logger = KotlinLogging.logger {}
 
 @RestController
 @RequestMapping("/api/v1/plugins/gallery-dl-downloader")
+@PreAuthorize("hasRole('ADMIN')")
 class GalleryDlDiagnosticsController(
   private val galleryDlWrapper: GalleryDlWrapper,
 ) {
@@ -45,7 +47,6 @@ class GalleryDlDiagnosticsController(
         mapOf(
           "success" to false,
           "error" to e.message,
-          "stackTrace" to e.stackTraceToString(),
         ),
       )
     }

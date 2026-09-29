@@ -63,11 +63,12 @@ class LogController(
   @GetMapping("/level", produces = [MediaType.APPLICATION_JSON_VALUE])
   fun getLogLevel(): Map<String, String> {
     val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
-    val rootLevel =
-      loggerContext
-        .getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)
-        .level
-    return mapOf("level" to (rootLevel?.toString() ?: "INFO"))
+    // Report the org.gotson.komga level (what setLogLevel actually controls and the user cares about);
+    // it may differ from ROOT at startup (application.yml sets org.gotson.komga=WARN while ROOT=INFO).
+    val level =
+      loggerContext.getLogger("org.gotson.komga").level
+        ?: loggerContext.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME).level
+    return mapOf("level" to (level?.toString() ?: "INFO"))
   }
 
   @PostMapping("/level")
@@ -100,6 +101,7 @@ class LogController(
           if (raf.filePointer > 0) raf.readLine()
 
           val batch = mutableListOf<String>()
+          var lastSend = System.currentTimeMillis()
           while (!Thread.currentThread().isInterrupted) {
             val line = raf.readLine()
             if (line != null) {
@@ -111,6 +113,7 @@ class LogController(
                     .data(batch.joinToString("\n")),
                 )
                 batch.clear()
+                lastSend = System.currentTimeMillis()
               }
             } else {
               if (batch.isNotEmpty()) {
@@ -120,6 +123,12 @@ class LogController(
                     .data(batch.joinToString("\n")),
                 )
                 batch.clear()
+                lastSend = System.currentTimeMillis()
+              } else if (System.currentTimeMillis() - lastSend >= 15_000) {
+                // Heartbeat on an idle log so a broken pipe (dead client) surfaces as a send failure and
+                // tears down the emitter/executor, instead of leaking the polling thread + file handle.
+                emitter.send(SseEmitter.event().comment("keepalive"))
+                lastSend = System.currentTimeMillis()
               }
               Thread.sleep(200)
             }

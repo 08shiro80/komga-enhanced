@@ -22,6 +22,8 @@ import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import org.springframework.web.client.RestClientResponseException
+import java.net.URI
 import java.net.URLEncoder
 import java.time.Duration
 import java.time.Instant
@@ -454,17 +456,19 @@ class MangaScrobblerPlugin(
       log(LogLevel.WARN, "MangaDex auth failed for '$title'")
       return false
     }
-    return try {
-      mangadexClient
-        .post()
-        .uri("/manga/$mangaId/read")
-        .header("Authorization", "Bearer $token")
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(mapOf("lastChapterRead" to progress.toString()))
-        .retrieve()
-        .body(String::class.java)
 
-      log(LogLevel.INFO, "MangaDex: '$title' → chapter $progress")
+    // MangaDex has no "read up to chapter N" concept: POST /manga/{id}/read takes chapterIdsRead (UUID
+    // arrays). Resolve the chapter UUIDs up to the read chapter number from the manga feed, then mark them.
+    // The feed is filtered by the configured max content rating, so higher-rated manga return no chapters.
+    val chapterIds = fetchMangaDexReadChapterIds(mangaId, progress, allowedContentRatings(config))
+    if (chapterIds.isEmpty()) {
+      log(LogLevel.WARN, "MangaDex: no EN chapters up to $progress within content rating for '$title' (id=$mangaId) — nothing marked read")
+      return false
+    }
+
+    return try {
+      postMangaDexRead(mangaId, chapterIds, token)
+      log(LogLevel.INFO, "MangaDex: '$title' → ${chapterIds.size} chapters up to $progress marked read")
       true
     } catch (e: RestClientException) {
       if (isUnauthorized(e)) {
@@ -474,15 +478,8 @@ class MangaScrobblerPlugin(
         val retryToken = getValidMangaDexToken(config)
         if (retryToken != null) {
           try {
-            mangadexClient
-              .post()
-              .uri("/manga/$mangaId/read")
-              .header("Authorization", "Bearer $retryToken")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(mapOf("lastChapterRead" to progress.toString()))
-              .retrieve()
-              .body(String::class.java)
-            log(LogLevel.INFO, "MangaDex: '$title' → chapter $progress (after re-auth)")
+            postMangaDexRead(mangaId, chapterIds, retryToken)
+            log(LogLevel.INFO, "MangaDex: '$title' → ${chapterIds.size} chapters up to $progress marked read (after re-auth)")
             return true
           } catch (e2: RestClientException) {
             log(LogLevel.ERROR, "MangaDex request failed after re-auth for '$title': ${e2.message}", e2)
@@ -493,6 +490,70 @@ class MangaScrobblerPlugin(
       }
       false
     }
+  }
+
+  private fun postMangaDexRead(
+    mangaId: String,
+    chapterIds: List<String>,
+    token: String,
+  ) {
+    mangadexClient
+      .post()
+      .uri("/manga/$mangaId/read")
+      .header("Authorization", "Bearer $token")
+      .contentType(MediaType.APPLICATION_JSON)
+      .body(mapOf("chapterIdsRead" to chapterIds))
+      .retrieve()
+      .body(String::class.java)
+  }
+
+  private fun allowedContentRatings(config: Map<String, String?>): List<String> {
+    val order = listOf("safe", "suggestive", "erotica", "pornographic")
+    val max = config["mangadex_max_content_rating"]?.takeIf { it.isNotBlank() } ?: "pornographic"
+    val maxIndex = order.indexOf(max).takeIf { it >= 0 } ?: order.lastIndex
+    return order.take(maxIndex + 1)
+  }
+
+  private fun fetchMangaDexReadChapterIds(
+    mangaId: String,
+    upToChapter: Int,
+    contentRatings: List<String>,
+  ): List<String> {
+    val ids = mutableListOf<String>()
+    val limit = 500
+    var offset = 0
+    val contentRatingQuery = contentRatings.joinToString("") { "&contentRating[]=$it" }
+    while (true) {
+      val url =
+        "https://api.mangadex.org/manga/$mangaId/feed" +
+          "?translatedLanguage[]=en" +
+          contentRatingQuery +
+          "&order[chapter]=asc" +
+          "&limit=$limit&offset=$offset"
+      val body =
+        mangadexClient
+          .get()
+          .uri(URI.create(url))
+          .retrieve()
+          .body(String::class.java)
+          ?: break
+      val root = objectMapper.readTree(body)
+      val data = root.path("data")
+      data.forEach { chapter ->
+        val chapterNum =
+          chapter
+            .path("attributes")
+            .path("chapter")
+            .asText("")
+            .toDoubleOrNull()
+        if (chapterNum != null && chapterNum <= upToChapter) {
+          ids.add(chapter.path("id").asText())
+        }
+      }
+      offset += limit
+      if (data.isEmpty || offset >= root.path("total").asInt(0)) break
+    }
+    return ids
   }
 
   private fun getValidMangaDexToken(config: Map<String, String?>): String? {
@@ -643,16 +704,32 @@ class MangaScrobblerPlugin(
           ),
         )
       } else {
-        syncStateRepository.insert(
-          SyncState(
-            id = TsidCreator.getTsid256().toString(),
-            bookId = bookId,
-            seriesId = seriesId,
-            tracker = tracker,
-            progress = progress,
-            lastSyncTimestamp = now,
-          ),
-        )
+        try {
+          syncStateRepository.insert(
+            SyncState(
+              id = TsidCreator.getTsid256().toString(),
+              bookId = bookId,
+              seriesId = seriesId,
+              tracker = tracker,
+              progress = progress,
+              lastSyncTimestamp = now,
+            ),
+          )
+        } catch (e: Exception) {
+          // A concurrent insert won the unique(series_id, tracker) race — update the existing row
+          // instead of losing this sync. Preserves pull-side fields (status/score/lastUpdate) via copy.
+          val raced =
+            syncStateRepository.findBySeriesIdAndTracker(seriesId, tracker)
+              ?: throw e
+          syncStateRepository.update(
+            raced.copy(
+              bookId = bookId,
+              progress = progress,
+              lastSyncTimestamp = now,
+              lastModifiedDate = now,
+            ),
+          )
+        }
       }
     } catch (e: Exception) {
       logger.warn(e) { "Failed to record sync state for series $seriesId tracker $tracker" }
@@ -783,8 +860,10 @@ class MangaScrobblerPlugin(
   }
 
   private fun isUnauthorized(e: RestClientException): Boolean {
-    val message = e.message ?: ""
-    return message.contains("401") || message.contains("403")
+    if (e is RestClientResponseException) {
+      return e.statusCode.value() == 401 || e.statusCode.value() == 403
+    }
+    return false
   }
 
   private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")

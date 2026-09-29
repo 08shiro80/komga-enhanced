@@ -13,6 +13,7 @@ import org.gotson.komga.infrastructure.download.MangaDexApiClient
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -35,6 +36,7 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @RequestMapping("api/v1", produces = [MediaType.APPLICATION_JSON_VALUE])
 @Tag(name = "Chapter URLs", description = "Chapter URL tracking for duplicate prevention")
+@PreAuthorize("hasRole('ADMIN')")
 class ChapterUrlController(
   private val chapterUrlRepository: ChapterUrlRepository,
   private val mangaDexApiClient: MangaDexApiClient,
@@ -157,7 +159,7 @@ class ChapterUrlController(
 
     val mangaId =
       MangaDexApiClient.extractMangaDexId(mangaUrl)
-        ?: if (mangaUrl.matches(Regex("[a-f0-9-]{36}"))) mangaUrl else null
+        ?: if (mangaUrl.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))) mangaUrl else null
 
     val availableChapters =
       if (mangaId != null) {

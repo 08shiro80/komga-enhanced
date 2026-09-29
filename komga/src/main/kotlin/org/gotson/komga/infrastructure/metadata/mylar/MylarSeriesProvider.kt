@@ -87,8 +87,11 @@ class MylarSeriesProvider(
           ) {
             val u = urlStr.trim().ifBlank { return }
             if (!out.containsKey(u)) {
+              // Skip only the malformed link instead of letting URISyntaxException abort the whole patch
+              // (title/status/genres/alt-titles would otherwise be lost for a hand-edited series.json).
+              val uri = runCatching { URI(u) }.getOrNull() ?: return
               val label = preferredLabel?.takeIf { it.isNotBlank() } ?: labelForUrl(u)
-              out[u] = WebLink(label, URI(u))
+              out[u] = WebLink(label, uri)
             }
           }
 

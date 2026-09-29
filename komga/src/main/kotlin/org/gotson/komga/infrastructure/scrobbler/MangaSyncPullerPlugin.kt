@@ -19,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import org.springframework.web.client.RestClientResponseException
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
@@ -159,7 +160,8 @@ class MangaSyncPullerPlugin(
           applyRemoteProgress(state, remoteProgress, Instant.now().epochSecond, userId, "MAL", excludedLibs)
         }
       } catch (e: RestClientException) {
-        if (e.message?.contains("404") != true) {
+        val is404 = e is RestClientResponseException && e.statusCode.value() == 404
+        if (!is404) {
           logger.debug(e) { "MAL pull failed for series ${state.seriesId}" }
         }
       }
@@ -228,37 +230,54 @@ class MangaSyncPullerPlugin(
       if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) return
 
       val books = bookRepository.findAllBySeriesId(state.seriesId)
-      val bookMetaMap = books.associate { it.id to bookMetadataRepository.findByIdOrNull(it.id) }
-      val targetBook =
-        bookMetaMap
-          .filterValues { it != null }
-          .entries
-          .firstOrNull { (_, meta) -> meta!!.numberSort.toInt() == remoteProgress }
-          ?.let { (bookId, _) -> bookRepository.findByIdOrNull(bookId) }
-          ?: return
+      val metaById =
+        bookMetadataRepository
+          .findAllByIds(books.map { it.id })
+          .associateBy { it.bookId }
 
-      readProgressRepository.save(
-        ReadProgress(
-          bookId = targetBook.id,
-          userId = userId,
-          page = 1,
-          completed = true,
-          readDate = LocalDateTime.now(),
-          deviceId = "manga-sync-puller",
-          deviceName = "Manga Sync Puller ($trackerName)",
-        ),
-      )
+      // Mark every chapter up to the remote progress as read, not only the exact match — decimal or gapped
+      // numbering would otherwise never resolve and retry hourly without progress.
+      val targetBooks =
+        books.filter { book ->
+          val number = metaById[book.id]?.numberSort?.toInt()
+          number != null && number <= remoteProgress
+        }
 
+      val alreadyRead =
+        readProgressRepository
+          .findAllByBookIdsAndUserId(targetBooks.map { it.id }, userId)
+          .filter { it.completed }
+          .map { it.bookId }
+          .toSet()
+
+      val newProgress =
+        targetBooks
+          .filterNot { it.id in alreadyRead }
+          .map { book ->
+            ReadProgress(
+              bookId = book.id,
+              userId = userId,
+              page = 1,
+              completed = true,
+              readDate = LocalDateTime.now(),
+              deviceId = "manga-sync-puller",
+              deviceName = "Manga Sync Puller ($trackerName)",
+            )
+          }
+      if (newProgress.isNotEmpty()) readProgressRepository.save(newProgress)
+
+      // Always advance syncState (even when no book matches the exact number) to avoid an hourly retry loop.
+      val latestBook = targetBooks.maxByOrNull { metaById[it.id]?.numberSort ?: 0f }
       syncStateRepository.update(
         state.copy(
           progress = remoteProgress,
-          bookId = targetBook.id,
+          bookId = latestBook?.id ?: state.bookId,
           lastSyncTimestamp = LocalDateTime.now(ZoneId.of("Z")),
           lastUpdateTimestamp = LocalDateTime.now(ZoneId.of("Z")),
           lastModifiedDate = LocalDateTime.now(ZoneId.of("Z")),
         ),
       )
-      log(LogLevel.INFO, "$trackerName pull: komga series ${state.seriesId} → chapter $remoteProgress")
+      log(LogLevel.INFO, "$trackerName pull: komga series ${state.seriesId} → chapter $remoteProgress (${newProgress.size} newly marked)")
     } catch (e: Exception) {
       logger.warn(e) { "Failed to apply remote progress for series ${state.seriesId}" }
     }

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Locale
 
 private val logger = KotlinLogging.logger {}
 
@@ -17,8 +18,8 @@ class ChapterMatcher {
     private val chapterNumChapterRegex = Regex("""^chapter[\s_]+(\d+(?:\.\d+)?[a-z]?)""")
     private val zipCommentUuidRegex = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
     private val comicInfoWebRegex = Regex("<Web>(.+?)</Web>")
+    private val mangadexChapterUrlRegex = Regex("https://mangadex\\.org/chapter/[0-9a-f-]+")
     private val volumePrefixRegex = Regex("^v\\d+ .+")
-    private val bracketGroupRegex = Regex("\\[(.+?)]$")
     private val scanlationGroupRegex = """\[([^\]]+)\]\s*$""".toRegex()
     private val chapterNumericSplitRegex = Regex("""^(\d+(?:\.\d+)?)([^\d.].*)?$""")
   }
@@ -86,11 +87,11 @@ class ChapterMatcher {
       val num = numericPart.toDouble()
       val paddedNumeric =
         if (num == num.toLong().toDouble()) {
-          String.format("%03d", num.toLong())
+          String.format(Locale.ROOT, "%03d", num.toLong())
         } else {
           val intPart = num.toLong()
           val decimalPart = numericPart.substringAfter(".", "")
-          String.format("%03d.%s", intPart, decimalPart)
+          String.format(Locale.ROOT, "%03d.%s", intPart, decimalPart)
         }
       paddedNumeric + suffix
     } catch (e: NumberFormatException) {
@@ -139,47 +140,56 @@ class ChapterMatcher {
       null
     }
 
-  fun extractChapterUrlsFromCbzFiles(destDir: File): Set<String> {
-    val urls = mutableSetOf<String>()
+  fun extractChapterUrlsFromCbzFiles(destDir: File): Set<String> =
+    extractChapterUrlsPerCbzFile(destDir)
+      .flatten()
+      .toSet()
+
+  // Per-CBZ chapter URLs (one entry per file, in directory order). Callers that need the aggregate use
+  // extractChapterUrlsFromCbzFiles; the deleted-chapters guard needs the per-file view to tell "every CBZ
+  // carries an identifiable URL" from "the aggregate count happens to match" (one CBZ with two URLs would
+  // otherwise mask one with none, allowing a false "stale" deletion).
+  fun extractChapterUrlsPerCbzFile(destDir: File): List<Set<String>> {
     val cbzFiles =
       destDir
         .listFiles()
         ?.filter { it.isFile && it.extension.lowercase() == "cbz" }
-        ?: return urls
+        ?: return emptyList()
+    return cbzFiles.map { extractUrlsFromCbz(it) }
+  }
 
-    for (cbzFile in cbzFiles) {
-      try {
-        val urlFromComment = extractUrlFromZipComment(cbzFile)
-        if (urlFromComment != null) {
-          urls.add(urlFromComment)
-          continue
-        }
-        java.util.zip.ZipFile(cbzFile).use { zip ->
-          val entry = zip.getEntry("ComicInfo.xml")
-          if (entry != null) {
-            val xml =
-              zip
-                .getInputStream(entry)
-                .use { it.readBytes() }
-                .toString(Charsets.UTF_8)
-            val match = comicInfoWebRegex.find(xml)
-            if (match != null) {
-              val url =
-                match.groupValues[1]
-                  .replace("&amp;", "&")
-                  .replace("&lt;", "<")
-                  .replace("&gt;", ">")
-                  .replace("&quot;", "\"")
-                  .replace("&apos;", "'")
-              if (url.contains("mangadex.org/chapter/")) {
-                urls.add(url)
-              }
-            }
+  private fun extractUrlsFromCbz(cbzFile: File): Set<String> {
+    val urls = mutableSetOf<String>()
+    try {
+      // Collect BOTH the zip-comment UUID and the ComicInfo <Web> chapter URLs: a CBZ can carry a
+      // different UUID in each (e.g. re-downloaded from another group), and the tracked CHAPTER_URL
+      // may match either. Extracting only one (and skipping the other) causes false "stale" verdicts.
+      extractUrlFromZipComment(cbzFile)?.let { urls.add(it) }
+      java.util.zip.ZipFile(cbzFile).use { zip ->
+        val entry = zip.getEntry("ComicInfo.xml")
+        if (entry != null) {
+          val xml =
+            zip
+              .getInputStream(entry)
+              .use { it.readBytes() }
+              .toString(Charsets.UTF_8)
+          val match = comicInfoWebRegex.find(xml)
+          if (match != null) {
+            val url =
+              match.groupValues[1]
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'")
+            // <Web> may hold several space-separated URLs (manga-level + one or more chapter URLs);
+            // extract each MangaDex chapter URL individually so it matches the tracked chapter URLs.
+            mangadexChapterUrlRegex.findAll(url).forEach { urls.add(it.value) }
           }
         }
-      } catch (e: Exception) {
-        logger.warn(e) { "Failed to read chapter URL from ${cbzFile.name}" }
       }
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to read chapter URL from ${cbzFile.name}" }
     }
     return urls
   }
@@ -196,38 +206,6 @@ class ChapterMatcher {
         group.filter { it !== newest }.forEach { duplicates.add(it) }
       }
     return duplicates
-  }
-
-  fun matchesChapterNumber(
-    name: String,
-    paddedChapter: String,
-    chapterStr: String,
-  ): Boolean {
-    val chapterPart =
-      if (volumePrefixRegex.matches(name)) name.substringAfter(" ") else name
-    return chapterPart.startsWith("c$paddedChapter ") || chapterPart == "c$paddedChapter" ||
-      chapterPart.startsWith("c$chapterStr ") || chapterPart == "c$chapterStr" ||
-      chapterPart.startsWith("ch. $paddedChapter ") || chapterPart.startsWith("ch. $paddedChapter-") || chapterPart == "ch. $paddedChapter" ||
-      chapterPart.startsWith("chapter $paddedChapter ") || chapterPart == "chapter $paddedChapter" ||
-      chapterPart.startsWith("chapter $chapterStr ") || chapterPart == "chapter $chapterStr" ||
-      chapterPart.startsWith("chapter_$paddedChapter") || chapterPart.startsWith("chapter_$chapterStr")
-  }
-
-  fun matchesChapterAndGroup(
-    name: String,
-    paddedChapter: String,
-    chapterStr: String,
-    groupName: String?,
-  ): Boolean {
-    if (!matchesChapterNumber(name, paddedChapter, chapterStr)) return false
-    if (groupName == null) return true
-    val bracketGroup =
-      bracketGroupRegex
-        .find(name)
-        ?.groupValues
-        ?.get(1)
-        ?.lowercase()
-    return bracketGroup != null && bracketGroup == groupName
   }
 
   fun extractScanlationGroup(fileName: String): String? =

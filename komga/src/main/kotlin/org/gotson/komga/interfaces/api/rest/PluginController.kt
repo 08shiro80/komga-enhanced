@@ -445,17 +445,23 @@ class PluginController(
     val newContent = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(seriesJson)
 
     logger.info { "Writing series.json to ${seriesJsonFile.absolutePath}" }
-    val tempFile = File(seriesJsonFile.parent, ".series.json.tmp")
-    tempFile.writeText(newContent)
+    // Unique temp name so a concurrent writer (SeriesJsonWriter) on the same folder cannot pick up
+    // this writer's partial file. Dot-prefix keeps it invisible to the scanner.
+    val tempFile = Files.createTempFile(seriesPath, ".series.json", ".tmp").toFile()
     try {
-      Files.move(
-        tempFile.toPath(),
-        seriesJsonFile.toPath(),
-        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-        java.nio.file.StandardCopyOption.ATOMIC_MOVE,
-      )
-    } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-      Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+      tempFile.writeText(newContent)
+      try {
+        Files.move(
+          tempFile.toPath(),
+          seriesJsonFile.toPath(),
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+          java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+        )
+      } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+        Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+      }
+    } finally {
+      tempFile.delete()
     }
     logger.info { "series.json written successfully" }
   }
@@ -467,7 +473,7 @@ class PluginController(
   ) {
     val uri = URI.create(coverUrl)
     val host = uri.host ?: return
-    if (allowedCoverHosts.none { host.endsWith(it) }) {
+    if (allowedCoverHosts.none { host == it || host.endsWith(".$it") }) {
       logger.warn { "Cover URL host not allowed: $host" }
       return
     }
@@ -503,7 +509,7 @@ class PluginController(
         else -> "jpg"
       }
     val coverFile = seriesPath.resolve("cover.$ext").toFile()
-    val tempCover = File(coverFile.parent, ".cover.$ext.tmp")
+    val tempCover = Files.createTempFile(seriesPath, ".cover", ".tmp").toFile()
     try {
       tempCover.writeBytes(imageBytes)
       Files.move(

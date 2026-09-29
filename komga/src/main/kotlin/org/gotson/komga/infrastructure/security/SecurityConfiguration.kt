@@ -36,6 +36,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
+import org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter
 import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
@@ -165,7 +166,9 @@ class SecurityConfiguration(
       }
 
     http.addFilterAfter(restAuthenticationFilter(), BasicAuthenticationFilter::class.java)
-    http.addFilterBefore(GuestAccessFilter(clientSettingsDtoDao), UsernamePasswordAuthenticationFilter::class.java)
+    // Must run AFTER remember-me/session auth: otherwise a logged-in user's request to a guest-listed
+    // path (e.g. /api/v2/users/me) would be seen as anonymous and downgraded to the guest identity.
+    http.addFilterAfter(GuestAccessFilter(clientSettingsDtoDao), RememberMeAuthenticationFilter::class.java)
 
     return http.build()
   }

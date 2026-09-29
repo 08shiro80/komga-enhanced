@@ -149,6 +149,7 @@ class MediaDao(
   override fun findAllSinglePageBookCandidates(): Collection<SinglePageBookCandidate> {
     val s = Tables.SERIES
     val sm = Tables.SERIES_METADATA
+    val bm = Tables.BOOK_METADATA
     return dslRO
       .select(
         b.ID,
@@ -158,6 +159,7 @@ class MediaDao(
         sm.TITLE,
         b.FILE_SIZE,
         m.MEDIA_TYPE,
+        bm.NUMBER_SORT,
       ).from(m)
       .join(b)
       .on(m.BOOK_ID.eq(b.ID))
@@ -165,6 +167,8 @@ class MediaDao(
       .on(b.SERIES_ID.eq(s.ID))
       .leftJoin(sm)
       .on(b.SERIES_ID.eq(sm.SERIES_ID))
+      .leftJoin(bm)
+      .on(b.ID.eq(bm.BOOK_ID))
       .where(m.PAGE_COUNT.eq(1))
       .and(m.STATUS.eq(Media.Status.READY.name))
       .and(b.DELETED_DATE.isNull)
@@ -178,6 +182,7 @@ class MediaDao(
           seriesTitle = r[sm.TITLE],
           fileSize = r[b.FILE_SIZE] ?: 0L,
           mediaType = r[m.MEDIA_TYPE] ?: "",
+          numberSort = r[bm.NUMBER_SORT] ?: 0f,
         )
       }
   }

@@ -131,6 +131,13 @@ class TrackerLinkEnricher(
     return plugin.enabled
   }
 
+  private fun markSearched(cacheKey: String) {
+    // Bounded negative-result cache: reset once large so it can't grow unbounded. A series that later
+    // gains a tracker entry upstream is simply re-searched after the reset — acceptable for a negative cache.
+    if (searchCache.size >= 10_000) searchCache.clear()
+    searchCache[cacheKey] = true
+  }
+
   private fun searchAnilist(title: String): String? {
     val cacheKey = "$title:anilist"
     if (searchCache.getOrDefault(cacheKey, false)) return null
@@ -154,14 +161,14 @@ class TrackerLinkEnricher(
       val json = objectMapper.readTree(resp)
       val id = json.at("/data/Page/media/0/id").asText(null)?.takeIf { it != "null" }
       if (id == null) {
-        searchCache[cacheKey] = true
+        markSearched(cacheKey)
         null
       } else {
         id
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: anilist error for '$title': ${e.message}" }
-      searchCache[cacheKey] = true
+      markSearched(cacheKey)
       null
     }
   }
@@ -190,14 +197,14 @@ class TrackerLinkEnricher(
       val json = objectMapper.readTree(resp)
       val id = json.at("/data/0/node/id").asText(null)?.takeIf { it != "null" }
       if (id == null) {
-        searchCache[cacheKey] = true
+        markSearched(cacheKey)
         null
       } else {
         id
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: mal error for '$title': ${e.message}" }
-      searchCache[cacheKey] = true
+      markSearched(cacheKey)
       null
     }
   }
@@ -221,14 +228,14 @@ class TrackerLinkEnricher(
       val json = objectMapper.readTree(resp)
       val id = json.at("/data/0/id").asText(null)?.takeIf { it != "null" }
       if (id == null) {
-        searchCache[cacheKey] = true
+        markSearched(cacheKey)
         null
       } else {
         id
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: kitsu error for '$title': ${e.message}" }
-      searchCache[cacheKey] = true
+      markSearched(cacheKey)
       null
     }
   }
@@ -255,14 +262,14 @@ class TrackerLinkEnricher(
       val json = objectMapper.readTree(resp)
       val id = json.at("/data/0/id").asText(null)?.takeIf { it != "null" }
       if (id == null) {
-        searchCache[cacheKey] = true
+        markSearched(cacheKey)
         null
       } else {
         id
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: mangadex error for '$title': ${e.message}" }
-      searchCache[cacheKey] = true
+      markSearched(cacheKey)
       null
     }
   }

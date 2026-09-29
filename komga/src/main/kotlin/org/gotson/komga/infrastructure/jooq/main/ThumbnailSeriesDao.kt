@@ -22,6 +22,23 @@ class ThumbnailSeriesDao(
 ) : SplitDslDaoBase(dslRW, dslRO),
   ThumbnailSeriesRepository {
   private val ts = Tables.THUMBNAIL_SERIES
+  private val s = Tables.SERIES
+
+  override fun getLibraryIdOrNull(thumbnailId: String): String? =
+    dslRO
+      .select(s.LIBRARY_ID)
+      .from(ts)
+      .leftJoin(s)
+      .on(ts.SERIES_ID.eq(s.ID))
+      .where(ts.ID.eq(thumbnailId))
+      .fetchOne(s.LIBRARY_ID)
+
+  override fun getSeriesIdOrNull(thumbnailId: String): String? =
+    dslRO
+      .select(ts.SERIES_ID)
+      .from(ts)
+      .where(ts.ID.eq(thumbnailId))
+      .fetchOne(ts.SERIES_ID)
 
   override fun findByIdOrNull(thumbnailId: String): ThumbnailSeries? =
     dslRO

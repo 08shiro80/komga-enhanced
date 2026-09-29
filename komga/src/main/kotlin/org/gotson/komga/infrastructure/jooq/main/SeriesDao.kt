@@ -234,6 +234,7 @@ class SeriesDao(
       bookCount = bookCount,
       deletedDate = deletedDate,
       oneshot = oneshot,
+      mangaDexUuid = mangadexUuid,
       createdDate = createdDate.toCurrentTimeZone(),
       lastModifiedDate = lastModifiedDate.toCurrentTimeZone(),
     )

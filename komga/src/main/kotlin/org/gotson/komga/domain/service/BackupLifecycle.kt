@@ -37,6 +37,18 @@ class BackupLifecycle(
     }
   }
 
+  // Resolve a caller-supplied file name strictly inside the backup directory. Normalizes both
+  // sides so `..` segments cannot escape (plain Path.startsWith is lexical and would let
+  // "../../etc/passwd" pass). Rejects before any filesystem access.
+  private fun resolveInsideBackupDir(fileName: String): Path {
+    val base = backupDir.normalize()
+    val resolved = base.resolve(fileName).normalize()
+    if (resolved == base || !resolved.startsWith(base)) {
+      throw SecurityException("Attempted to access path outside backup directory: $fileName")
+    }
+    return resolved
+  }
+
   /**
    * Create a backup of the main database
    */
@@ -170,16 +182,11 @@ class BackupLifecycle(
    * Delete a backup file
    */
   fun deleteBackup(fileName: String): Boolean {
-    val backupFile = backupDir.resolve(fileName)
+    val backupFile = resolveInsideBackupDir(fileName)
 
     if (!backupFile.exists() || !backupFile.isRegularFile()) {
       logger.warn { "Backup file not found: $backupFile" }
       return false
-    }
-
-    // Security check: ensure file is in backup directory
-    if (!backupFile.startsWith(backupDir)) {
-      throw SecurityException("Attempted to delete file outside backup directory")
     }
 
     return try {
@@ -196,15 +203,10 @@ class BackupLifecycle(
    * Get backup file for download
    */
   fun getBackupFile(fileName: String): File {
-    val backupFile = backupDir.resolve(fileName)
+    val backupFile = resolveInsideBackupDir(fileName)
 
     if (!backupFile.exists() || !backupFile.isRegularFile()) {
       throw IllegalArgumentException("Backup file not found: $fileName")
-    }
-
-    // Security check: ensure file is in backup directory
-    if (!backupFile.startsWith(backupDir)) {
-      throw SecurityException("Attempted to access file outside backup directory")
     }
 
     return backupFile.toFile()
@@ -292,15 +294,10 @@ class BackupLifecycle(
    * Restore from backup (requires application restart)
    */
   fun restoreBackup(fileName: String): RestoreInfo {
-    val backupFile = backupDir.resolve(fileName)
+    val backupFile = resolveInsideBackupDir(fileName)
 
     if (!backupFile.exists() || !backupFile.isRegularFile()) {
       throw IllegalArgumentException("Backup file not found: $fileName")
-    }
-
-    // Security check
-    if (!backupFile.startsWith(backupDir)) {
-      throw SecurityException("Attempted to access file outside backup directory")
     }
 
     val targetDb = Paths.get(komgaProperties.configDir.toString(), "database.sqlite")

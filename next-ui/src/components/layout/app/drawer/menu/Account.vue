@@ -1,0 +1,70 @@
+<template>
+  <v-list-group value=" My Account">
+    <template #activator="{ props }">
+      <v-list-item
+        v-bind="props"
+        :title="
+          $formatMessage({
+            description: 'Drawer menu for My Account',
+            defaultMessage: 'My Account',
+            id: 'od545m',
+          })
+        "
+        prepend-icon="i-mdi:account"
+      />
+    </template>
+
+    <v-list-item
+      v-if="!isGuest"
+      to="/account/details"
+      :title="
+        $formatMessage({
+          description: 'Drawer menu for My Account > Details',
+          defaultMessage: 'Details',
+          id: 'xYGXuU',
+        })
+      "
+    />
+    <v-list-item
+      v-if="!isGuest"
+      to="/account/api-keys"
+      :title="
+        $formatMessage({
+          description: 'Drawer menu for My Account > API Keys',
+          defaultMessage: 'API Keys',
+          id: 'oFOkWZ',
+        })
+      "
+    />
+    <v-list-item
+      to="/account/ui"
+      :title="
+        $formatMessage({
+          description: 'Drawer menu for My Account > User Interface',
+          defaultMessage: 'User Interface',
+          id: 'rw/Dkw',
+        })
+      "
+    />
+    <v-list-item
+      to="/account/activity"
+      :title="
+        $formatMessage({
+          description: 'Drawer menu for My Account > Activity',
+          defaultMessage: 'My activity',
+          id: 'Xx+ITC',
+        })
+      "
+    />
+  </v-list-group>
+</template>
+
+<script setup lang="ts">
+import { useCurrentUser } from '@/colada/users'
+
+const { data } = useCurrentUser()
+// A guest has no real account, so account-management tabs (details, API keys) are hidden.
+const isGuest = computed(() => data.value?.id === 'guest')
+</script>
+
+<style scoped></style>

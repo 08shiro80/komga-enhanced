@@ -205,6 +205,13 @@ class PluginInitializer(
                   "format": "password",
                   "description": "Optional override — leave blank to use gallery-dl Downloader / Subscription Sync as fallback."
                 },
+                "mangadex_max_content_rating": {
+                  "type": "string",
+                  "title": "MangaDex: max content rating to sync",
+                  "default": "pornographic",
+                  "enum": ["safe", "suggestive", "erotica", "pornographic"],
+                  "description": "Only push read progress to MangaDex for manga up to this content rating (inclusive). Manga rated higher are skipped. Ordering: safe < suggestive < erotica < pornographic."
+                },
                 "auto_detect_links": {
                   "type": "string",
                   "title": "Auto-detect tracker IDs from series links",

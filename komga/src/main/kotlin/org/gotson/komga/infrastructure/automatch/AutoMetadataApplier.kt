@@ -8,6 +8,7 @@ import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.springframework.stereotype.Service
 import java.nio.file.Files
+import java.util.Locale
 
 private val logger = KotlinLogging.logger {}
 
@@ -106,7 +107,7 @@ class AutoMetadataApplier(
     }
 
     logger.info {
-      "Auto-match: applied plugin='${match.pluginId}' id=${match.externalId} score=${"%.2f".format(match.score)} for series='${series.name}'"
+      "Auto-match: applied plugin='${match.pluginId}' id=${match.externalId} score=${String.format(Locale.ROOT, "%.2f", match.score)} for series='${series.name}'"
     }
     return ApplyOutcome(
       matched = true,

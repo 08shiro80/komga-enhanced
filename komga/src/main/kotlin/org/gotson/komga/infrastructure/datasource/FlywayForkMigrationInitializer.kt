@@ -16,6 +16,31 @@ class FlywayForkMigrationInitializer(
   @Qualifier("sqliteDataSourceRW")
   private val dataSource: DataSource,
 ) : InitializingBean {
+  // Exact fork migration versions (db/migration/fork/sqlite). A bare version-range cutoff cannot be
+  // used: base migrations (e.g. V20260225 tags_view, V20260921 book_projection) sit between fork
+  // versions and would be wrongly relocated into fork history, breaking base Flyway on next startup.
+  private val forkMigrationVersions =
+    listOf(
+      "20250930120000",
+      "20251201000000",
+      "20251201000001",
+      "20251201000002",
+      "20251201000003",
+      "20251204000000",
+      "20251211000000",
+      "20260301000000",
+      "20260315000000",
+      "20260315000001",
+      "20260401000000",
+      "20260412000000",
+      "20260502000000",
+      "20260511000000",
+      "20260529000000",
+      "20260608000000",
+      "20260615000000",
+      "20260809000000",
+    )
+
   override fun afterPropertiesSet() {
     migrateFromMainHistory()
 
@@ -50,9 +75,11 @@ class FlywayForkMigrationInitializer(
       if (tableExists(conn, "flyway_fork_history")) return
       if (!tableExists(conn, "flyway_schema_history")) return
 
+      val versionInClause = forkMigrationVersions.joinToString(",") { "'$it'" }
+
       val countStmt =
         conn.prepareStatement(
-          "SELECT COUNT(*) FROM flyway_schema_history WHERE version > '20250730173126'",
+          "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ($versionInClause)",
         )
       val count =
         countStmt.use { s ->
@@ -87,13 +114,13 @@ class FlywayForkMigrationInitializer(
       val copyStmt =
         conn.prepareStatement(
           """INSERT INTO flyway_fork_history
-          SELECT * FROM flyway_schema_history WHERE version > '20250730173126'""",
+          SELECT * FROM flyway_schema_history WHERE version IN ($versionInClause)""",
         )
       copyStmt.use { it.execute() }
 
       val deleteStmt =
         conn.prepareStatement(
-          "DELETE FROM flyway_schema_history WHERE version > '20250730173126'",
+          "DELETE FROM flyway_schema_history WHERE version IN ($versionInClause)",
         )
       deleteStmt.use { it.execute() }
 

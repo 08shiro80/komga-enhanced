@@ -9,6 +9,20 @@
 
 > Built on [Komga](https://github.com/gotson/komga) — extends the excellent upstream media server with manga downloading, automation, multi-tracker sync, and reliability features.
 
+> [!IMPORTANT]
+> **New Vue 3 UI available at `/next` — feedback wanted!**
+>
+> A completely rebuilt web interface (Vue 3) is now bundled **alongside** the classic UI. Open it at
+> **`https://<your-komga-address>/next`**. The classic Vue 2 UI stays the default at `/` and both run in
+> parallel — the classic UI (and the fork's Vue 2 code) can only be removed once upstream Komga finishes
+> its own Vue 3 migration.
+>
+> This early phase is exactly when your input matters most: if nobody knows `/next` exists, there can be no
+> feedback. Please try it and [open an issue](../../issues) for anything missing, broken, or worth improving —
+> all fork features (Downloads, Discover, Followed, Blacklisted chapters, Media Integrity, Oversized Pages,
+> Fixes, Logs, Plugins, Backups, Updates, Tachiyomi import, plus the series/book/library menus and edit
+> dialogs) are ported.
+
 ---
 
 ## Contents

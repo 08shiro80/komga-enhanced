@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledFuture
 
@@ -84,9 +85,19 @@ class FollowScheduleLifecycle(
       logger.warn { "Invalid checkTime '${schedule.checkTime}' for library ${schedule.libraryId}, using interval" }
     }
     val intervalMillis = schedule.intervalHours.coerceAtLeast(1) * 60 * 60 * 1000L
+    // Base the first run on the last recorded check so a check missed while the server was down
+    // fires shortly after startup instead of being delayed a full interval (or skipped forever
+    // when reboots happen more often than the interval).
+    val firstRun =
+      schedule.lastCheckTime
+        ?.atZone(ZoneId.systemDefault())
+        ?.toInstant()
+        ?.plusMillis(intervalMillis)
+        ?.coerceAtLeast(Instant.now().plusMillis(60_000L))
+        ?: Instant.now().plusMillis(intervalMillis)
     return taskScheduler.scheduleAtFixedRate(
       runnable,
-      Instant.now().plusMillis(intervalMillis),
+      firstRun,
       Duration.ofMillis(intervalMillis),
     )
   }

@@ -13,6 +13,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 
 /**
  * External, dynamically-loaded Kitsu metadata provider. Ported from the former
@@ -27,7 +28,11 @@ class KitsuMetadataPlugin : MetadataProviderPlugin {
   override val description = "Fetches manga metadata from kitsu.app. Loaded as an external plugin."
 
   private val baseUrl = "https://kitsu.app/api/edge"
-  private val httpClient = HttpClient.newHttpClient()
+  private val httpClient =
+    HttpClient
+      .newBuilder()
+      .connectTimeout(Duration.ofSeconds(15))
+      .build()
   private val mapper = ObjectMapper()
 
   private var context: PluginContext? = null
@@ -145,9 +150,30 @@ class KitsuMetadataPlugin : MetadataProviderPlugin {
         .uri(URI.create(url))
         .header("Accept", "application/vnd.api+json")
         .GET()
+        .timeout(Duration.ofSeconds(30))
         .build()
-    val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-    return if (response.statusCode() in 200..299) response.body() else null
+    var attempt = 0
+    while (true) {
+      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      val code = response.statusCode()
+      if (code in 200..299) return response.body()
+      if ((code == 429 || code == 503) && attempt < 3) {
+        val waitSeconds =
+          response
+            .headers()
+            .firstValue("Retry-After")
+            .map { it.toLongOrNull() }
+            .orElse(null)
+            ?.coerceIn(1L, 60L)
+            ?: (1L shl attempt)
+        context?.warn("Kitsu rate limited (HTTP $code), retrying in ${waitSeconds}s")
+        Thread.sleep(waitSeconds * 1000)
+        attempt++
+      } else {
+        context?.warn("Kitsu returned HTTP $code")
+        return null
+      }
+    }
   }
 
   private fun posterImageOf(attrs: JsonNode): String? =

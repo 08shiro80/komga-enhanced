@@ -1,0 +1,399 @@
+import { commonMessages } from '@/utils/i18n/common-messages'
+import { type DialogResult, useDialogsStore } from '@/stores/dialogs'
+import { storeToRefs } from 'pinia'
+import { useIntl } from 'vue-intl'
+import { useDisplay } from 'vuetify'
+import { useMessagesStore } from '@/stores/messages'
+import {
+  useAnalyzeSeries,
+  useDeleteSeries,
+  useMarkSeriesRead,
+  useMarkSeriesUnread,
+  useRefreshMetadataSeries,
+} from '@/colada/series'
+import { useCurrentUser } from '@/colada/users'
+import SeriesDeletionWarning from '@/components/series/DeletionWarning.vue'
+import { useEditSeriesMetadataDialog } from '@/composables/series/useEditSeriesMetadataDialog'
+import { seriesFileUrl } from '@/api/files'
+import { type Action, actionDetails, ActionName } from '@/types/action/action'
+import { useBooks } from '@/composables/book/useBooks'
+import { useSeries } from '@/composables/series/useSeries'
+import type { SeriesDto } from '@/generated/openapi'
+import { useAddToReadListDialog } from '@/composables/book/useAddToReadListDialog'
+import { useAddToCollectionDialog } from '@/composables/series/useAddToCollectionDialog'
+import { useBlacklistDialog } from '@/composables/series/useBlacklistDialog'
+import { useMetadataSearchDialog } from '@/composables/series/useMetadataSearchDialog'
+import { useAddChapterDownloadDialog } from '@/composables/series/useAddChapterDownloadDialog'
+import { useDownloadSourcesDialog } from '@/composables/series/useDownloadSourcesDialog'
+
+export function useSeriesActions(
+  series: MaybeRefOrGetter<SeriesDto>,
+  callback: (action: ActionName) => void = () => {},
+) {
+  const { isAdmin, hasRole } = useCurrentUser()
+  const intl = useIntl()
+  const { confirm: dialogConfirm } = storeToRefs(useDialogsStore())
+  const messagesStore = useMessagesStore()
+  const display = useDisplay()
+  const { readFirstBook } = useBooks(series)
+  const { canRead, inProgress } = useSeries(series)
+
+  const actions = computed<Action<ActionName>[]>(() => [
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.AddToCollection].message),
+            action: ActionName.AddToCollection,
+            onMouseenter: (event: Event) =>
+              (addToCollectionActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              addToCollection(() => callback(ActionName.AddToCollection))
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.AddToReadList].message),
+            action: ActionName.AddToReadList,
+            onMouseenter: (event: Event) =>
+              (addToReadListActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              addToReadList(() => callback(ActionName.AddToReadList))
+            },
+          },
+        ]
+      : []),
+    ...(toValue(series).booksReadCount === toValue(series).booksCount
+      ? []
+      : [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.MarkRead].message),
+            icon: actionDetails[ActionName.MarkRead].icon,
+            action: ActionName.MarkRead,
+            onClick: () => {
+              markRead()
+            },
+          },
+        ]),
+    ...(toValue(series).booksUnreadCount === toValue(series).booksCount
+      ? []
+      : [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.MarkUnread].message),
+            icon: actionDetails[ActionName.MarkUnread].icon,
+            action: ActionName.MarkUnread,
+            onClick: () => {
+              markUnread()
+            },
+          },
+        ]),
+    ...(hasRole('FILE_DOWNLOAD')
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.Download].message),
+            action: ActionName.Download,
+            href: seriesFileUrl(toValue(series).id),
+            onClick: () => {
+              callback(ActionName.Download)
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.ManageBlacklist].message),
+            icon: actionDetails[ActionName.ManageBlacklist].icon,
+            action: ActionName.ManageBlacklist,
+            onMouseenter: (event: Event) =>
+              (blacklistActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              manageBlacklist(() => callback(ActionName.ManageBlacklist))
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.SearchMetadata].message),
+            icon: actionDetails[ActionName.SearchMetadata].icon,
+            action: ActionName.SearchMetadata,
+            onMouseenter: (event: Event) =>
+              (metadataSearchActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              searchMetadataOnline(() => callback(ActionName.SearchMetadata))
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.AddChapterDownload].message),
+            icon: actionDetails[ActionName.AddChapterDownload].icon,
+            action: ActionName.AddChapterDownload,
+            onMouseenter: (event: Event) =>
+              (addChapterDownloadActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              addChapterDownload(() => callback(ActionName.AddChapterDownload))
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.DownloadSources].message),
+            icon: actionDetails[ActionName.DownloadSources].icon,
+            action: ActionName.DownloadSources,
+            onMouseenter: (event: Event) =>
+              (downloadSourcesActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              downloadSources(() => callback(ActionName.DownloadSources))
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.EditSeries].message),
+            icon: actionDetails[ActionName.EditSeries].icon,
+            action: ActionName.EditSeries,
+            onMouseenter: (event: Event) =>
+              (editMetadataActivator.value = event.currentTarget as Element),
+            onClick: () => {
+              updateSeriesMetadata(() => callback(ActionName.EditSeries))
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.RefreshMetadata].message),
+            action: ActionName.RefreshMetadata,
+            onClick: () => {
+              refreshMetadata()
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage(actionDetails[ActionName.Analyze].message),
+            action: ActionName.Analyze,
+            onClick: () => {
+              analyzeSeries()
+            },
+          },
+        ]
+      : []),
+    ...(isAdmin.value
+      ? [
+          {
+            title: intl.formatMessage({
+              description: 'Series menu: manage > delete file',
+              defaultMessage: 'Delete files',
+              id: 'J+H9cC',
+            }),
+            action: ActionName.Delete,
+            onMouseenter: (event: Event) =>
+              (dialogConfirm.value.activator = event.currentTarget as Element),
+            onClick: () => {
+              deleteSeries()
+            },
+          },
+        ]
+      : []),
+    {
+      title: inProgress.value
+        ? intl.formatMessage({
+            description: 'Series menu: resume reading button',
+            defaultMessage: 'Resume',
+            id: 'wXGljO',
+          })
+        : intl.formatMessage({
+            description: 'Series menu: read button',
+            defaultMessage: 'Read',
+            id: 'Y7Y2T0',
+          }),
+      icon: actionDetails[ActionName.OpenReader].icon,
+      action: ActionName.OpenReader,
+      disabled: !canRead.value,
+      onClick: () => {
+        void readFirstBook()
+        callback(ActionName.OpenReader)
+      },
+    },
+    {
+      title: intl.formatMessage(actionDetails[ActionName.OpenReaderIncognito].message),
+      icon: actionDetails[ActionName.OpenReaderIncognito].icon,
+      action: ActionName.OpenReaderIncognito,
+      disabled: !canRead.value,
+      onClick: () => {
+        void readFirstBook(true)
+        callback(ActionName.OpenReaderIncognito)
+      },
+    },
+  ])
+
+  //region Add to collection
+  const { prepareDialog: showAddToCollectionDialog, activator: addToCollectionActivator } =
+    useAddToCollectionDialog()
+
+  function addToCollection(callback: () => void) {
+    showAddToCollectionDialog([toValue(series).id], callback)
+  }
+  //endregion
+
+  //region Add to read list
+  const { prepareDialog: showAddToReadListDialog, activator: addToReadListActivator } =
+    useAddToReadListDialog()
+
+  function addToReadList(callback: () => void) {
+    showAddToReadListDialog([toValue(series)], callback)
+  }
+  //endregion
+
+  //region Update Series metadata
+  const { prepareDialog: showEditSeriesMetadataDialog, activator: editMetadataActivator } =
+    useEditSeriesMetadataDialog()
+
+  function updateSeriesMetadata(callback: () => void) {
+    showEditSeriesMetadataDialog(toValue(series), callback)
+  }
+  //endregion
+
+  //region Manage blacklist
+  const { prepareDialog: showBlacklistDialog, activator: blacklistActivator } = useBlacklistDialog()
+
+  function manageBlacklist(callback: () => void) {
+    showBlacklistDialog(toValue(series).id, callback)
+  }
+  //endregion
+
+  //region Search metadata online
+  const { prepareDialog: showMetadataSearchDialog, activator: metadataSearchActivator } =
+    useMetadataSearchDialog()
+
+  function searchMetadataOnline(callback: () => void) {
+    showMetadataSearchDialog(toValue(series).id, toValue(series).metadata.title, callback)
+  }
+  //endregion
+
+  //region Add chapter download
+  const { prepareDialog: showAddChapterDownloadDialog, activator: addChapterDownloadActivator } =
+    useAddChapterDownloadDialog()
+
+  function addChapterDownload(callback: () => void) {
+    showAddChapterDownloadDialog(toValue(series), callback)
+  }
+  //endregion
+
+  //region Download sources
+  const { prepareDialog: showDownloadSourcesDialog, activator: downloadSourcesActivator } =
+    useDownloadSourcesDialog()
+
+  function downloadSources(callback: () => void) {
+    showDownloadSourcesDialog(toValue(series).id, callback)
+  }
+  //endregion
+
+  //region Refresh Metadata
+  const { mutate: mutateRefreshMetadata } = useRefreshMetadataSeries()
+
+  function refreshMetadata() {
+    mutateRefreshMetadata(toValue(series).id)
+    callback(ActionName.RefreshMetadata)
+  }
+  //endregion
+
+  //region Analyze
+  const { mutate: mutateAnalyze } = useAnalyzeSeries()
+
+  function analyzeSeries() {
+    mutateAnalyze(toValue(series).id)
+    callback(ActionName.Analyze)
+  }
+  //endregion
+
+  //region Mark read
+  const { mutate: mutateMarkRead } = useMarkSeriesRead()
+
+  function markRead() {
+    mutateMarkRead(toValue(series).id)
+    callback(ActionName.MarkRead)
+  }
+  //endregion
+
+  //region Mark unread
+  const { mutate: mutateMarkUnread } = useMarkSeriesUnread()
+
+  function markUnread() {
+    mutateMarkUnread(toValue(series).id)
+    callback(ActionName.MarkUnread)
+  }
+  //endregion
+
+  //region Delete
+  const { mutateAsync: mutateDelete } = useDeleteSeries()
+
+  function deleteSeries() {
+    dialogConfirm.value.dialogProps = {
+      title: intl.formatMessage({
+        description: 'Series delete dialog: title',
+        defaultMessage: 'Delete series files',
+        id: 'Xxu514',
+      }),
+      subtitle: toValue(series).metadata.title,
+      maxWidth: 600,
+      mode: 'checkbox',
+      color: 'error',
+      okText: intl.formatMessage({
+        description: 'Series delete dialog: confirm button',
+        defaultMessage: 'Delete files',
+        id: 'DfakWW',
+      }),
+      closeOnSave: true,
+      fullscreen: display.xs.value,
+    }
+    dialogConfirm.value.slotWarning = {
+      component: markRaw(SeriesDeletionWarning),
+      props: {},
+    }
+    dialogConfirm.value.callback = (result: DialogResult) => {
+      if (result === 'confirm') {
+        mutateDelete(toValue(series).id)
+          .then(() => {
+            messagesStore.messages.push({
+              message: intl.formatMessage(
+                {
+                  description: 'Snackbar notification shown upon successful series files deletion',
+                  defaultMessage: 'Series files deleted: {series}',
+                  id: 'aSDxrt',
+                },
+                {
+                  series: toValue(series).metadata.title,
+                },
+              ),
+            })
+          })
+          .catch((error) => {
+            messagesStore.messages.push(error?.cause?.message ?? commonMessages.networkError)
+          })
+      }
+
+      callback(ActionName.Delete)
+    }
+  }
+  //endregion
+
+  return {
+    actions: actions,
+  }
+}

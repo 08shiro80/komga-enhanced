@@ -36,6 +36,15 @@ class SeriesMetadataDao(
 
   override fun findByIdOrNull(seriesId: String): SeriesMetadata? = dslRO.findOne(seriesId)?.toDomain(dslRO.findGenres(seriesId), dslRO.findTags(seriesId), dslRO.findSharingLabels(seriesId), dslRO.findLinks(seriesId), dslRO.findAlternateTitles(seriesId))
 
+  override fun findTitlesByIds(seriesIds: Collection<String>): Map<String, String> {
+    if (seriesIds.isEmpty()) return emptyMap()
+    return dslRO
+      .select(d.SERIES_ID, d.TITLE)
+      .from(d)
+      .where(d.SERIES_ID.`in`(seriesIds))
+      .fetchMap(d.SERIES_ID, d.TITLE)
+  }
+
   private val s = Tables.SERIES
 
   override fun findSeriesIdByLinkUrlContaining(
@@ -52,6 +61,31 @@ class SeriesMetadataDao(
       .and(slk.URL.contains(urlPart))
       .limit(1)
       .fetchOneInto(String::class.java)
+
+  override fun findSeriesIdByLinkQueryParam(
+    libraryId: String,
+    param: String,
+    value: String,
+  ): String? {
+    // Bound the match to the exact query-param value: a link URL either ends with `param=value`
+    // or is followed by `&`. This prevents `title_no=83` from matching `title_no=830`. LIKE
+    // metacharacters in the literal (`_` in `title_no`) are escaped with `\`.
+    val core =
+      "$param=$value"
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    return dslRO
+      .select(slk.SERIES_ID)
+      .from(slk)
+      .join(s)
+      .on(s.ID.eq(slk.SERIES_ID))
+      .where(s.LIBRARY_ID.eq(libraryId))
+      .and(s.DELETED_DATE.isNull)
+      .and(slk.URL.like("%$core", '\\').or(slk.URL.like("%$core&%", '\\')))
+      .limit(1)
+      .fetchOneInto(String::class.java)
+  }
 
   private fun DSLContext.findOne(seriesId: String) =
     this

@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 private val logger = KotlinLogging.logger {}
 
@@ -17,8 +16,10 @@ class HistoricalEventCleanupController(
 ) {
   @Scheduled(fixedRate = 86_400_000)
   fun cleanup() {
-    val olderThan = LocalDateTime.now(ZoneId.of("Z")).minusDays(30)
-    logger.info { "Remove historical events older than $olderThan (UTC)" }
+    // HistoricalEvent timestamps are stored in local wall-clock (LocalDateTime.now()), so the cutoff must
+    // be local too — a UTC cutoff would keep events ~offset hours longer than the intended 30-day window.
+    val olderThan = LocalDateTime.now().minusDays(30)
+    logger.info { "Remove historical events older than $olderThan" }
     historicalEventRepository.deleteOlderThan(olderThan)
   }
 }

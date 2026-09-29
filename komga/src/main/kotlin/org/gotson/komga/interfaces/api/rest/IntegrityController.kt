@@ -2,6 +2,7 @@ package org.gotson.komga.interfaces.api.rest
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
+import jakarta.annotation.PreDestroy
 import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.Media
 import org.gotson.komga.domain.persistence.BookRepository
@@ -49,7 +50,15 @@ class IntegrityController(
   private val repairPartial = AtomicInteger(0)
   private val repairFailed = AtomicInteger(0)
 
-  private val executor = Executors.newSingleThreadExecutor()
+  private val executor =
+    Executors.newSingleThreadExecutor { r ->
+      Thread(r, "integrity-repair").apply { isDaemon = true }
+    }
+
+  @PreDestroy
+  fun shutdown() {
+    executor.shutdownNow()
+  }
 
   @GetMapping("status")
   fun status(): Map<String, Any> {
@@ -229,7 +238,9 @@ class IntegrityController(
   }
 
   private fun repairCbz(srcPath: Path): RepairOutcome {
-    val originalCount = countEntries(srcPath)
+    // Best-effort baseline: if the central directory is so corrupt that ZipFile throws, that is exactly the
+    // case zip -FF exists to repair — proceed with an unknown (-1) count instead of aborting the repair.
+    val originalCount = runCatching { countEntries(srcPath) }.getOrDefault(-1)
     val tmpFixed = Files.createTempFile(srcPath.parent, ".repair_", ".cbz")
     Files.deleteIfExists(tmpFixed)
     val process =
@@ -251,7 +262,7 @@ class IntegrityController(
         Files.deleteIfExists(tmpFixed)
         return RepairOutcome.Failed("fixed file unreadable: ${it.message}")
       }
-    if (recoveredCount >= originalCount && originalCount > 0) {
+    if (recoveredCount > 0 && (originalCount < 0 || recoveredCount >= originalCount)) {
       Files.move(tmpFixed, srcPath, StandardCopyOption.REPLACE_EXISTING)
       return RepairOutcome.Fixed(recoveredCount)
     }
