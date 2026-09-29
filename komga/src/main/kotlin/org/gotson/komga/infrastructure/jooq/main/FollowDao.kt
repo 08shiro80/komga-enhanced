@@ -136,7 +136,7 @@ class FollowDao(
       title = get(titleField),
       seriesId = get(seriesIdField),
       enabled =
-        when (val raw = get(enabledField)) {
+        when (val raw = get(enabledField.name)) {
           is Boolean -> raw
           is Number -> raw.toInt() != 0
           else -> true

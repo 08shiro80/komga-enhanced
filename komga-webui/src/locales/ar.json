@@ -513,11 +513,13 @@
       "field_name": "الاسم",
       "field_summary": "ملخص",
       "tab_general": "عام",
-      "tab_poster": "ملصق"
+      "tab_poster": "ملصق",
+      "label_ordering": "بالاعدادات الافتراضية، الكتب في قائمة القراءة تُطلب يدوياً. يمكنك إلغاء الطلب اليدوي لفرز الكتب بحلول موعد النشر."
     },
     "edit_recommended": {
       "button_confirm": "حفظ التعديلات",
-      "button_reset": "الإعادة إلى التعديلات الأصلية"
+      "button_reset": "الإعادة إلى التعديلات الأصلية",
+      "dialog_title": "تحرير قائمة الموصى بها"
     },
     "edit_series": {
       "button_cancel": "إلغاء",
@@ -588,7 +590,8 @@
       "title": "اسم الوجهة"
     },
     "force_kobo_sync": {
-      "dialog_title": "إجبار مزامنة Kobo"
+      "dialog_title": "إجبار مزامنة Kobo",
+      "warning_html": "سيحذف هذا تاريخ المزامنة لمفتاح ال API. ال Kobo الخاص بك سيُزامن كل شيء في المزامنة التالية."
     },
     "password_change": {
       "button_cancel": "إلغاء",
@@ -744,13 +747,21 @@
     },
     "series_cover": {
       "FIRST": "أول",
-      "LAST": "أخير"
+      "LAST": "أخير",
+      "FIRST_UNREAD_OR_FIRST": "الأول غير المقروء بعده الأول",
+      "FIRST_UNREAD_OR_LAST": "الأول غير المقروء بعده الأخير"
     },
     "series_status": {
       "ABANDONED": "مهجور",
       "ENDED": "مكتمل",
       "HIATUS": "متوقف",
       "ONGOING": "مستمر"
+    },
+    "thumbnail_size": {
+      "DEFAULT": "الافتراضي (300px)",
+      "LARGE": "كبير (900px)",
+      "MEDIUM": "وسط (600px)",
+      "XLARGE": "كبير جداً (1200px)"
     }
   },
   "epubreader": {
@@ -768,7 +779,9 @@
         "buttons": "أزرار",
         "click": "نقر/ضغط"
       },
-      "page_margins": "هوامش الصفحة"
+      "page_margins": "هوامش الصفحة",
+      "layout_paginated": "صفحات مرقمة",
+      "viewing_theme": "تصميم العرض"
     },
     "shortcuts": {
       "cycle_pagination": "تغيير عدد الأعمدة",
@@ -778,7 +791,10 @@
       "next": "أمام",
       "previous": "خلف",
       "settings": "الإعدادات",
-      "show_hide_toc": "إظهار/إخفاء الفهرس"
+      "show_hide_toc": "إظهار/إخفاء الفهرس",
+      "cycle_viewing_theme": "التنقل بين تصاميم العرض",
+      "reader_navigation": "اختصارات تنقل القارئ",
+      "scroll": "تغيير التصميم للتمرير"
     }
   },
   "error_codes": {
@@ -798,7 +814,9 @@
     "ERR_1018": "لم يتمّ العثور على الملف",
     "ERR_1019": "لا يمكن استيراد المجلد الذي هو جزء من مكتبة موجودة",
     "ERR_1022": "لا يمكن مسح الكتاب حديث الاستيراد",
-    "ERR_1023": "الكتاب موجود سابقًا في قائمة القراءة"
+    "ERR_1023": "الكتاب موجود سابقًا في قائمة القراءة",
+    "ERR_1027": "خطأ في تسجيل دخول OpenID Connect: لا يوجد بريد الكتروني مصدق عليه",
+    "ERR_1028": "خطأ في تسجيل دخول OpenID Connect: لا يوجد عنوان بريد إلكتروني"
   },
   "filter": {
     "age_rating": "التصنيف العمري",
@@ -928,7 +946,8 @@
       "button_shutdown": "إيقاف التشغيل",
       "download_log": "تحميل ملف السجل",
       "notification_tasks_cancelled": "لا يوجد مهام لإلغائها | تمّ إلغاء 1 مهمة | تمّ إلغاء {count} مهمة",
-      "section_title": "إدارة الخادم"
+      "section_title": "إدارة الخادم",
+      "button_scan_libraries_deep": "ابحث في جميع المكتبات (بشكل مكثف/عميق)"
     },
     "tab_title": "خادم",
     "updates": "تحديثات"
@@ -964,7 +983,8 @@
     "number": "رقم",
     "page_count": "عدد الصفحات",
     "random": "عشوائي",
-    "release_date": "تاريخ الإصدار"
+    "release_date": "تاريخ الإصدار",
+    "series": "سلسلة"
   },
   "theme": {
     "dark": "قاتم",

@@ -346,6 +346,15 @@
             </v-list-item-content>
           </v-list-item>
 
+          <v-list-item :href="nextUrl" target="_blank">
+            <v-list-item-icon>
+              <v-icon>mdi-ab-testing</v-icon>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title>{{ $t('navigation.try_new_ui') }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
           <v-list-item v-if="isGuest" @click="goToLogin">
             <v-list-item-icon>
               <v-icon>mdi-login</v-icon>
@@ -421,6 +430,7 @@ import LibraryActionsMenu from '@/components/menus/LibraryActionsMenu.vue'
 import SearchBox from '@/components/SearchBox.vue'
 import {Theme} from '@/types/themes'
 import Vue from 'vue'
+import urls from '@/functions/urls'
 import {LIBRARIES_ALL} from '@/types/library'
 import ToasterNotification from '@/components/ToasterNotification.vue'
 import {MediaStatus} from '@/types/enum-books'
@@ -444,6 +454,7 @@ export default Vue.extend({
   data: function () {
     return {
       LIBRARIES_ALL,
+      nextUrl: `${urls.originNoSlash}/next`,
       drawerVisible: this.$vuetify.breakpoint.lgAndUp,
       locales: this.$i18n.availableLocales.map((x: any) => ({text: this.$i18n.t('common.locale_name', x), value: x})),
       expandSettings: false,

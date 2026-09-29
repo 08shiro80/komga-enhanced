@@ -17,6 +17,7 @@ import org.gotson.komga.domain.model.KomgaUser
 import org.gotson.komga.domain.model.MarkSelectedPreference
 import org.gotson.komga.domain.model.Media
 import org.gotson.komga.domain.model.ReadList
+import org.gotson.komga.domain.model.SearchContext
 import org.gotson.komga.domain.model.Series
 import org.gotson.komga.domain.model.SeriesCollection
 import org.gotson.komga.domain.model.ThumbnailBook
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -833,7 +835,7 @@ class LibraryContentLifecycleTest(
       with(allBooks.last()) {
         assertThat(name).isEqualTo("book3")
 
-        readListRepository.findAllContainingBookId(id, null).let { readLists ->
+        readListRepository.findAllContainingBookId(id, SearchContext.empty()).let { readLists ->
           assertThat(readLists).hasSize(1)
           assertThat(readLists.first().name).isEqualTo("read list")
         }
@@ -1038,7 +1040,8 @@ class LibraryContentLifecycleTest(
   @Nested
   inner class FileMoveToAnotherFolder {
     @Test
-    fun `given 2 series when moving 1 file from 1 series to another and scanning then moved book's media is kept`() {
+    @DisplayName("given 2 series when moving 1 file from 1 series to another and scanning then moved book's media is kept")
+    fun `file moved media kept`() {
       // given
       val library = makeLibrary()
       libraryRepository.insert(library)
@@ -1193,7 +1196,7 @@ class LibraryContentLifecycleTest(
         assertThat(books).hasSize(2)
 
         books.first { it.name == "book2" }.let {
-          readListRepository.findAllContainingBookId(it.id, null).let { readLists ->
+          readListRepository.findAllContainingBookId(it.id, SearchContext.empty()).let { readLists ->
             assertThat(readLists).hasSize(1)
             assertThat(readLists.first().name).isEqualTo("read list")
           }
@@ -1269,7 +1272,8 @@ class LibraryContentLifecycleTest(
     }
 
     @Test
-    fun `given 2 series when moving 1 file from 1 series to another and scanning then moved book's title matches the filename and book metadata is refreshed for title only`() {
+    @DisplayName("given 2 series when moving 1 file from 1 series to another and scanning then moved book's title matches the filename and book metadata is refreshed for title only")
+    fun `file moved title refreshed`() {
       // given
       val library = makeLibrary()
       libraryRepository.insert(library)
@@ -1458,7 +1462,7 @@ class LibraryContentLifecycleTest(
         assertThat(series2.name).isEqualTo("series2")
         assertThat(bookRepository.findAllBySeriesId(series2.id)).hasSize(2)
 
-        collectionRepository.findAllContainingSeriesId(series2.id, null).let { collections ->
+        collectionRepository.findAllContainingSeriesId(series2.id, SearchContext.empty()).let { collections ->
           assertThat(collections).hasSize(1)
           assertThat(collections.first().name).isEqualTo("collection")
         }
@@ -1646,8 +1650,8 @@ class LibraryContentLifecycleTest(
       libraryContentLifecycle.emptyTrash(library)
 
       // then
-      val collections = collectionRepository.findAll(pageable = Pageable.unpaged())
-      val readLists = readListRepository.findAll(pageable = Pageable.unpaged())
+      val collections = collectionRepository.findAll(SearchContext.empty(), Pageable.unpaged())
+      val readLists = readListRepository.findAll(SearchContext.empty(), Pageable.unpaged())
 
       assertThat(collections.content).isEmpty()
       assertThat(readLists.content).isEmpty()

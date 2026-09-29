@@ -277,7 +277,9 @@
     "unlock_all": "Hepsini aç",
     "url": "URL",
     "use_filter_panel_to_change_filter": "Etkin filtreyi değiştirmek için filtre panelini kullanın",
-    "year": "yıl"
+    "year": "yıl",
+    "settings": "Ayarlar",
+    "ui": "Kullanıcı Arayüzü"
   },
   "dashboard": {
     "keep_reading": "Okumaya Devam Edin",
@@ -632,6 +634,10 @@
       "page_of_pages": "{page} / {pages}",
       "title": "Kitabı İncele",
       "title_comparison": "Kitap Karşılaştırma"
+    },
+    "edit_recommended": {
+      "button_confirm": "Değişiklikleri kaydet",
+      "button_reset": "Varsayılana sıfırla"
     }
   },
   "duplicate_pages": {
@@ -897,7 +903,8 @@
   "navigation": {
     "home": "Anasayfa",
     "libraries": "Kütüphaneler",
-    "logout": "Çıkış Yap"
+    "logout": "Çıkış Yap",
+    "try_new_ui": "Yeni arayüzü dene"
   },
   "page_not_found": {
     "go_back_to_home_page": "Ana sayfaya geri dön",
@@ -1174,5 +1181,13 @@
     "snack_download_failed": "Failed to download backup",
     "snack_delete_failed": "Failed to delete backup",
     "snack_restore_failed": "Failed to restore backup"
+  },
+  "missing_posters": {
+    "title": "Eksik Posterler"
+  },
+  "ui_settings": {
+    "series_groups": {
+      "alpha": "Alfabetik"
+    }
   }
 }

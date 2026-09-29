@@ -7,15 +7,15 @@ import kotlin.io.path.exists
 
 plugins {
   run {
-    val kotlinVersion = "2.2.21"
+    val kotlinVersion = "2.4.10"
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.spring") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
     kotlin("kapt") version kotlinVersion
   }
-  id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
+  id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
   id("com.github.ben-manes.versions") version "0.53.0"
-  id("org.jreleaser") version "1.21.0"
+  id("org.jreleaser") version "1.25.0"
 }
 
 fun isNonStable(version: String): Boolean {
@@ -45,7 +45,7 @@ allprojects {
   }
 
   configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
-    version = "1.7.1"
+    version = "1.8.0"
     filter {
       exclude("**/generated-src/**")
       exclude("**/generated/**")
@@ -54,7 +54,7 @@ allprojects {
 }
 
 tasks.wrapper {
-  gradleVersion = "8.14.3"
+  gradleVersion = "9.6.1"
   distributionType = Wrapper.DistributionType.ALL
 }
 

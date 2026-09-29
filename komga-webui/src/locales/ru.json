@@ -279,7 +279,9 @@
     "unlock_all": "Разблокировать все",
     "url": "Ссылка",
     "use_filter_panel_to_change_filter": "Воспользуйтесь панелью фильтров для изменения активного фильтра",
-    "year": "год"
+    "year": "год",
+    "all_of": "Все из",
+    "ui": "Интерфейс пользователя"
   },
   "dashboard": {
     "keep_reading": "Продолжить Чтение",
@@ -301,7 +303,12 @@
     "imported_as": "Импортировано как {name}",
     "results_preambule": "Результат импорта показан ниже. Вы также можете проверить неотмеченные книги для каждого предоставленного файла.",
     "size_limit": "Размер не должен превышать {size} MB",
-    "tab_title": "Импорт данных"
+    "tab_title": "Импорт данных",
+    "dialog_confirmation": {
+      "create": "Всё равно создать"
+    },
+    "field_file_label": "Список для чтения ComicRack (.cbl)",
+    "readlist_created": "Список для чтения создан: {name}"
   },
   "dialog": {
     "add_to_collection": {
@@ -599,6 +606,19 @@
       "page_of_pages": "{page} / {pages}",
       "title": "Осмотр Книги",
       "title_comparison": "Сравнение книг"
+    },
+    "add_api_key": {
+      "button_confirm": "Сгенерировать",
+      "context": "API Ключи могут быть использованы для аутентификации через протокол синхронизации Kobo Sync.",
+      "dialog_title": "Сгенерировать новый API ключ",
+      "field_comment": "Комментарий",
+      "field_comment_hint": "Для чего нужен этот API ключ?"
+    },
+    "delete_apikey": {
+      "button_confirm": "Удалить",
+      "confirm_delete": "Я понимаю, удалить API ключ \"{name}\"",
+      "dialog_title": "Удалить API ключ",
+      "warning_html": "Любое приложение или скрипт использующее данный API ключ, потеряет доступ к API Komga. Вы не можете отменить это действие."
     }
   },
   "duplicate_pages": {
@@ -606,12 +626,15 @@
       "count": "Количество",
       "delete_count": "Количество удалений",
       "size": "Размер",
-      "total_size": "Общий размер"
+      "total_size": "Общий размер",
+      "date_added": "Дата добавления",
+      "date_modified": "Дата изменения"
     },
     "info": "Удаление дубликатов страниц изменит ваши файлы. Сделайте резервную копию ваших файлов и используйте ручное удаление перед тем как использовать автоматическое удаление.",
     "unknown_size": "Неизвестный размер",
     "action_remove_all": "Remove all from list",
-    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone."
+    "confirm_remove_all": "All {count} known page hashes will be removed from the list. This cannot be undone.",
+    "empty_title_known": "Нет известных дубликатов"
   },
   "duplicates": {
     "file_hash": "Хеш-сумма файла",
@@ -652,6 +675,11 @@
       "ENDED": "Закончена",
       "HIATUS": "Заморожена",
       "ONGOING": "Выпускается"
+    },
+    "media_profile": {
+      "DIVINA": "DIVINA",
+      "EPUB": "EPUB",
+      "PDF": "PDF"
     }
   },
   "epubreader": {
@@ -819,7 +847,8 @@
   "navigation": {
     "home": "Главная",
     "libraries": "Библиотеки",
-    "logout": "Выйти"
+    "logout": "Выйти",
+    "try_new_ui": "Попробуйте новый интерфейс"
   },
   "no_libraries_pinned": {
     "subtitle": "Вы можете закрепить библиотеку через меню с тремя точками",

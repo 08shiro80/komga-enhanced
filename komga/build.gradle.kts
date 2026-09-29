@@ -12,11 +12,11 @@ plugins {
   kotlin("kapt")
   id("org.springframework.boot") version libs.versions.springboot.get()
   alias(libs.plugins.gradleGitProperties)
-  id("nu.studer.jooq") version "10.1"
-  id("org.flywaydb.flyway") version "11.7.2"
+  id("nu.studer.jooq") version "10.2.1"
+  id("org.flywaydb.flyway") version "13.1.0"
   id("com.github.johnrengelman.processes") version "0.5.0"
   id("org.springdoc.openapi-gradle-plugin") version "1.9.0"
-  id("com.google.devtools.ksp") version "2.2.21-2.0.4"
+  id("com.google.devtools.ksp") version "2.3.1"
   jacoco
 }
 
@@ -63,7 +63,7 @@ dependencies {
 
   implementation("org.flywaydb:flyway-core")
 
-  api("io.github.oshai:kotlin-logging-jvm:7.0.7")
+  api("io.github.oshai:kotlin-logging-jvm:8.0.4")
 
   implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")
 
@@ -73,26 +73,26 @@ dependencies {
   // Kotlinx Serialization for Tachiyomi backup parsing
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.8.1")
 
-  implementation("commons-io:commons-io:2.19.0")
-  implementation("org.apache.commons:commons-lang3:3.18.0")
-  implementation("commons-validator:commons-validator:1.10.0")
+  implementation("commons-io:commons-io:2.22.0")
+  implementation("org.apache.commons:commons-lang3:3.20.0")
+  implementation("commons-validator:commons-validator:1.11.0")
 
   implementation("org.apache.lucene:lucene-core:${libs.versions.lucene.get()}")
   implementation("org.apache.lucene:lucene-analysis-common:${libs.versions.lucene.get()}")
   implementation("org.apache.lucene:lucene-queryparser:${libs.versions.lucene.get()}")
   implementation("org.apache.lucene:lucene-backward-codecs:${libs.versions.lucene.get()}")
 
-  implementation("com.ibm.icu:icu4j:77.1")
+  implementation("com.ibm.icu:icu4j:78.3")
 
   implementation("com.appmattus.crypto:cryptohash:1.0.2")
 
-  implementation("org.apache.tika:tika-core:3.2.3")
-  implementation("org.apache.commons:commons-compress:1.27.1")
+  implementation("org.apache.tika:tika-core:3.3.2")
+  implementation("org.apache.commons:commons-compress:1.28.0")
   implementation("com.github.junrar:junrar:8.1.0")
   implementation("com.github.gotson.nightcompress:nightcompress:1.1.1")
-  implementation("org.apache.pdfbox:pdfbox:3.0.5")
+  implementation("org.apache.pdfbox:pdfbox:3.0.8")
   implementation("net.grey-panther:natural-comparator:1.1")
-  implementation("org.jsoup:jsoup:1.21.1")
+  implementation("org.jsoup:jsoup:1.23.1")
 
   implementation("net.coobird:thumbnailator:0.4.20")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-jpeg:${libs.versions.twelvemonkeys.get()}")
