@@ -1,7 +1,9 @@
 import { defineMutation, defineQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import {
+  komgaAuthorizeTracker,
   komgaDeleteTracker,
   komgaGetTrackers,
+  komgaSyncTracker,
   komgaTestTracker,
   komgaUpdateTracker,
   type UserTrackerUpdateDto,
@@ -37,8 +39,23 @@ export const useDeleteTracker = defineMutation(() => {
   })
 })
 
-export const useTestTracker = defineMutation(() =>
-  useMutation({
+export const useTestTracker = defineMutation(() => {
+  const queryCache = useQueryCache()
+  return useMutation({
     mutation: (tracker: string) => komgaTestTracker({ path: { tracker } }),
+    onSettled: () => void queryCache.invalidateQueries({ key: QUERY_KEYS_TRACKERS.root }),
+  })
+})
+
+export const useSyncTracker = defineMutation(() =>
+  useMutation({
+    mutation: (tracker: string) => komgaSyncTracker({ path: { tracker } }),
+  }),
+)
+
+export const useAuthorizeTracker = defineMutation(() =>
+  useMutation({
+    mutation: ({ tracker, returnTo }: { tracker: string; returnTo: string }) =>
+      komgaAuthorizeTracker({ path: { tracker }, body: { returnTo } }),
   }),
 )

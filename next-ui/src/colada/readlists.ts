@@ -110,7 +110,7 @@ export const bookReadListsQuery = defineQueryOptions(({ bookId }: { bookId: stri
 
 export const bookPreviousInReadList = defineQueryOptions(
   ({ readListId, bookId }: { readListId: string; bookId: string }) => ({
-    key: [...QUERY_KEYS_READLIST.byId(bookId), 'books', bookId, 'previous'],
+    key: [...QUERY_KEYS_READLIST.byId(readListId), 'books', bookId, 'previous'],
     query: () =>
       komgaGetBookSiblingPreviousInReadList({
         path: {
@@ -123,7 +123,7 @@ export const bookPreviousInReadList = defineQueryOptions(
 
 export const bookNextInReadList = defineQueryOptions(
   ({ readListId, bookId }: { readListId: string; bookId: string }) => ({
-    key: [...QUERY_KEYS_READLIST.byId(bookId), 'books', bookId, 'next'],
+    key: [...QUERY_KEYS_READLIST.byId(readListId), 'books', bookId, 'next'],
     query: () =>
       komgaGetBookSiblingNextInReadList({
         path: {

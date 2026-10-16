@@ -61,14 +61,17 @@ export function useRouteQuerySchema<T extends v.GenericSchema>(
 
   // data → store: keep the per-view persisted value in sync, removing it when back to defaults.
   if (persistKey && appStore) {
+    let lastStr = updateFn(data.value)
     watch(
       data,
       (value) => {
         const str = updateFn(value)
+        if (str === lastStr) return
+        lastStr = str
         if (str === undefined) delete appStore.filterQuery[persistKey]
         else appStore.filterQuery[persistKey] = str
       },
-      { deep: true, immediate: true },
+      { deep: true },
     )
   }
 

@@ -15,7 +15,17 @@ const router = createRouter({
   history: createWebHistory(
     import.meta.env.PROD ? window.resourceBaseUrl : import.meta.env.BASE_URL,
   ),
-  routes: setupLayouts(routes),
+  routes: [
+    {
+      path: '/next/:path(.*)+',
+      redirect: (to) => ({
+        path: to.path.slice('/next'.length),
+        query: to.query,
+        hash: to.hash,
+      }),
+    },
+    ...setupLayouts(routes),
+  ],
   scrollBehavior(to, from, savedPosition) {
     // ignore redundant navigations (like useRouteQuery syncing URL parameters)
     // this prevents the page from jumping when filters or tabs are clicked

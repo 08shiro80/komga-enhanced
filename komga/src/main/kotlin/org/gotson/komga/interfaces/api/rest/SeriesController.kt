@@ -53,6 +53,7 @@ import org.gotson.komga.infrastructure.openapi.AuthorsAsQueryParam
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration
 import org.gotson.komga.infrastructure.openapi.PageableAsQueryParam
 import org.gotson.komga.infrastructure.openapi.PageableWithoutSortAsQueryParam
+import org.gotson.komga.infrastructure.scrobbler.TrackerIdDiscovery
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
 import org.gotson.komga.infrastructure.web.Authors
 import org.gotson.komga.infrastructure.web.DelimitedPair
@@ -126,6 +127,7 @@ class SeriesController(
   private val contentRestrictionChecker: ContentRestrictionChecker,
   private val blacklistedChapterRepository: BlacklistedChapterRepository,
   private val chapterChecker: ChapterChecker,
+  private val trackerIdDiscovery: TrackerIdDiscovery,
 ) {
   @Operation(summary = "List series", description = "Use POST /api/v1/series/list instead. Deprecated since 1.19.0.", tags = [OpenApiConfiguration.TagNames.SERIES, OpenApiConfiguration.TagNames.DEPRECATED])
   @Deprecated("use /v1/series/list instead")
@@ -753,7 +755,10 @@ class SeriesController(
           alternateTitlesLock = alternateTitlesLock ?: existing.alternateTitlesLock,
         )
       }
-    seriesMetadataRepository.update(updated)
+    trackerIdDiscovery.withLinkLock {
+      seriesMetadataRepository.update(updated)
+      if (existing.links != updated.links) trackerIdDiscovery.linksEdited(seriesId, existing.links, updated.links)
+    }
 
     seriesRepository.findByIdOrNull(seriesId)?.let { eventPublisher.publishEvent(DomainEvent.SeriesUpdated(it)) }
   } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)

@@ -340,7 +340,7 @@ const {
   sortActive,
   isDefault: sortIsDefault,
   restore: sortRestore,
-} = useSort(sortDefault, sortOptions, false)
+} = useSort(sortDefault, sortOptions, false, `${viewName.value}:sort`)
 
 // Fork: on first visit (no explicit sort in the URL yet) seed the book sort from the library's
 // configured default (defaultBookSortField/Order). An explicit user choice (URL sort) always wins.

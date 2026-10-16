@@ -27,7 +27,7 @@ class LogLevelInitializer(
     val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
     loggerContext
       .getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)
-      .level = newLevel
+      .level = if (newLevel.isGreaterOrEqual(Level.INFO)) newLevel else Level.INFO
     loggerContext
       .getLogger("org.gotson.komga")
       .level = newLevel

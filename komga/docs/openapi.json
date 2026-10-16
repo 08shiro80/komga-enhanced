@@ -7,7 +7,7 @@
       "url": "https://github.com/gotson/komga/blob/master/LICENSE"
     },
     "title": "Komga API",
-    "version": "1.29.0-fork-0.1.6.1"
+    "version": "1.29.1-fork-0.1.6.1"
   },
   "externalDocs": {
     "description": "Komga documentation",
@@ -12762,7 +12762,8 @@
         "summary": "Unlink a tracker account of the current user",
         "tags": [
           "user-tracker-controller"
-        ]
+        ],
+        "description": "Removes the stored credentials and the sync state of this tracker."
       },
       "put": {
         "description": "Omitted settings keep their value, blank or null settings are removed.",
@@ -12808,6 +12809,159 @@
         ]
       }
     },
+    "/api/v1/trackers/{tracker}/authorize": {
+      "post": {
+        "description": "Only for AniList and MyAnimeList. Returns the provider URL the browser must open. The provider redirects back to the callback endpoint, which redirects to returnTo.",
+        "operationId": "authorizeTracker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackerAuthorizationRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackerAuthorizationDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Start the authorization of a tracker account of the current user",
+        "tags": [
+          "user-tracker-controller"
+        ]
+      }
+    },
+    "/api/v1/trackers/{tracker}/callback": {
+      "get": {
+        "description": "Opened by the browser after the provider login. Always redirects into the application (the returnTo path of the authorization, or the trackers page) with the query parameters trackerAuth, trackerAuthResult (success or error) and trackerAuthError (denied, missing_code, exchange_failed, rate_limited, not_configured, storage_failed, session_expired, invalid_state, state_mismatch or unsupported_tracker).",
+        "operationId": "authorizationCallback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Found"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Authorization callback of a tracker provider",
+        "tags": [
+          "user-tracker-controller"
+        ]
+      }
+    },
+    "/api/v1/trackers/{tracker}/sync": {
+      "post": {
+        "description": "Queues every read series of the current user for this tracker. Only progress that is ahead of the tracker is sent.",
+        "operationId": "syncTracker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackerSyncDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Sync the read progress of the current user to a tracker now",
+        "tags": [
+          "user-tracker-controller"
+        ]
+      }
+    },
     "/api/v1/trackers/{tracker}/test": {
       "post": {
         "operationId": "testTracker",
@@ -12846,7 +13000,8 @@
         "summary": "Test the connection of a tracker account of the current user",
         "tags": [
           "user-tracker-controller"
-        ]
+        ],
+        "description": "The result is also stored as the account status."
       }
     },
     "/api/v1/transient-books": {
@@ -21524,6 +21679,28 @@
           "width"
         ]
       },
+      "TrackerAuthorizationDto": {
+        "type": "object",
+        "properties": {
+          "authorizationUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorizationUrl"
+        ]
+      },
+      "TrackerAuthorizationRequestDto": {
+        "type": "object",
+        "properties": {
+          "returnTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "returnTo"
+        ]
+      },
       "TrackerCheckResultDto": {
         "type": "object",
         "properties": {
@@ -21537,6 +21714,50 @@
         "required": [
           "message",
           "success"
+        ]
+      },
+      "TrackerStatusDto": {
+        "type": "object",
+        "properties": {
+          "accountName": {
+            "type": "string"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "lastErrorAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSuccessAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "TrackerSyncDto": {
+        "type": "object",
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "queued"
         ]
       },
       "TransientBookDto": {
@@ -21705,10 +21926,16 @@
       "UserTrackerDto": {
         "type": "object",
         "properties": {
+          "authorizationRedirectUri": {
+            "type": "string"
+          },
           "enabled": {
             "type": "boolean"
           },
           "linked": {
+            "type": "boolean"
+          },
+          "scrobblerEnabled": {
             "type": "boolean"
           },
           "secretsSet": {
@@ -21724,6 +21951,9 @@
               "type": "string"
             }
           },
+          "status": {
+            "$ref": "#/components/schemas/TrackerStatusDto"
+          },
           "tracker": {
             "type": "string"
           }
@@ -21731,8 +21961,10 @@
         "required": [
           "enabled",
           "linked",
+          "scrobblerEnabled",
           "secretsSet",
           "settings",
+          "status",
           "tracker"
         ]
       },

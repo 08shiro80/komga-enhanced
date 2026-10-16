@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETARCH},sharing=
     --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETARCH},sharing=locked \
     apt-get -y update && \
     apt-get -y install --no-install-recommends \
-      ca-certificates libheif1 libwebp7 libjxl0.7 libarchive13 \
+      ca-certificates libheif1 libwebp7 libwebpdemux2 libjxl0.7 libarchive13 \
       curl python3 python3-pip zip locales && \
     # FORK-CRITICAL (issue #32): libjxl0.7 + locale-gen below MUST stay.
     # Without the non-roman locales, sun.jnu.encoding falls back to ASCII on
@@ -50,6 +50,7 @@ FROM build-linux AS build-amd64
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/x86_64-linux-gnu"
 RUN cd /usr/lib/x86_64-linux-gnu && \
     ln -sf libwebp.so.7 libwebp.so && \
+    ln -sf libwebpdemux.so.2 libwebpdemux.so && \
     ln -sf libheif.so.1 libheif.so && \
     ln -sf libjxl.so.0.7 libjxl.so && \
     ln -sf libarchive.so.13 libarchive.so
@@ -59,6 +60,7 @@ FROM build-linux AS build-arm64
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu"
 RUN cd /usr/lib/aarch64-linux-gnu && \
     ln -sf libwebp.so.7 libwebp.so && \
+    ln -sf libwebpdemux.so.2 libwebpdemux.so && \
     ln -sf libheif.so.1 libheif.so && \
     ln -sf libjxl.so.0.7 libjxl.so && \
     ln -sf libarchive.so.13 libarchive.so

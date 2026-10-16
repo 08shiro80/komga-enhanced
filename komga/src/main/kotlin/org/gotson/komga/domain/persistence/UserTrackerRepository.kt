@@ -10,6 +10,11 @@ interface UserTrackerRepository {
     tracker: String,
   ): UserTracker?
 
+  fun exists(
+    userId: String,
+    tracker: String,
+  ): Boolean
+
   fun findByTracker(tracker: String): Collection<UserTracker>
 
   fun save(userTracker: UserTracker)
@@ -22,6 +27,16 @@ interface UserTrackerRepository {
     accessToken: String,
     refreshToken: String?,
   ): Boolean
+
+  fun updateStatus(
+    userId: String,
+    tracker: String,
+    values: Map<String, String?>,
+  ): Boolean
+
+  fun encryptPlaintextSecrets(): Int
+
+  fun countEncryptedSecrets(): Int
 
   fun delete(
     userId: String,

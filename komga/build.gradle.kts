@@ -313,6 +313,8 @@ tasks {
 
   withType<ProcessResources> {
     dependsOn("copyDefaultPlugins", "prepareThymeLeaf", "nextuiCopyIndex")
+    val publicDir = destinationDirectory.dir("public")
+    doFirst { publicDir.get().asFile.deleteRecursively() }
     filesMatching("application*.yml") {
       expand(
         mapOf(

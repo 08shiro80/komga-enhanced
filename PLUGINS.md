@@ -135,7 +135,7 @@ the source at
 ### Logging & config
 
 Use the `PluginContext` you receive in `initialize` for logging (it writes to the
-plugin's log, visible in the Plugin Manager) and to read configuration values
+server's `plugins.log` file next to `komga.log`) and to read configuration values
 (`context.config`).
 
 To expose user-configurable settings, give your plugin a `configSchema` — a JSON-Schema

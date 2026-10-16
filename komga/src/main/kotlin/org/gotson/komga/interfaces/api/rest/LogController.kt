@@ -52,7 +52,7 @@ class LogController(
     val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
     loggerContext
       .getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)
-      .level = newLevel
+      .level = if (newLevel.isGreaterOrEqual(Level.INFO)) newLevel else Level.INFO
     loggerContext
       .getLogger("org.gotson.komga")
       .level = newLevel
@@ -102,52 +102,53 @@ class LogController(
     val emitter = SseEmitter(0L)
     val file = logFile().toFile()
 
-    val future = sseExecutor.submit {
-      try {
-        RandomAccessFile(file, "r").use { raf ->
-          raf.seek(maxOf(0L, raf.length() - 8192))
-          if (raf.filePointer > 0) raf.readLine()
+    val future =
+      sseExecutor.submit {
+        try {
+          RandomAccessFile(file, "r").use { raf ->
+            raf.seek(maxOf(0L, raf.length() - 8192))
+            if (raf.filePointer > 0) raf.readLine()
 
-          val batch = mutableListOf<String>()
-          var lastSend = System.currentTimeMillis()
-          while (!Thread.currentThread().isInterrupted) {
-            val line = raf.readLine()
-            if (line != null) {
-              batch.add(String(line.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8))
-              if (batch.size >= 50) {
-                emitter.send(
-                  SseEmitter
-                    .event()
-                    .data(batch.joinToString("\n")),
-                )
-                batch.clear()
-                lastSend = System.currentTimeMillis()
+            val batch = mutableListOf<String>()
+            var lastSend = System.currentTimeMillis()
+            while (!Thread.currentThread().isInterrupted) {
+              val line = raf.readLine()
+              if (line != null) {
+                batch.add(String(line.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8))
+                if (batch.size >= 50) {
+                  emitter.send(
+                    SseEmitter
+                      .event()
+                      .data(batch.joinToString("\n")),
+                  )
+                  batch.clear()
+                  lastSend = System.currentTimeMillis()
+                }
+              } else {
+                if (batch.isNotEmpty()) {
+                  emitter.send(
+                    SseEmitter
+                      .event()
+                      .data(batch.joinToString("\n")),
+                  )
+                  batch.clear()
+                  lastSend = System.currentTimeMillis()
+                } else if (System.currentTimeMillis() - lastSend >= 15_000) {
+                  // Heartbeat on an idle log so a broken pipe (dead client) surfaces as a send failure and
+                  // tears down the emitter/executor, instead of leaking the polling thread + file handle.
+                  emitter.send(SseEmitter.event().comment("keepalive"))
+                  lastSend = System.currentTimeMillis()
+                }
+                Thread.sleep(200)
               }
-            } else {
-              if (batch.isNotEmpty()) {
-                emitter.send(
-                  SseEmitter
-                    .event()
-                    .data(batch.joinToString("\n")),
-                )
-                batch.clear()
-                lastSend = System.currentTimeMillis()
-              } else if (System.currentTimeMillis() - lastSend >= 15_000) {
-                // Heartbeat on an idle log so a broken pipe (dead client) surfaces as a send failure and
-                // tears down the emitter/executor, instead of leaking the polling thread + file handle.
-                emitter.send(SseEmitter.event().comment("keepalive"))
-                lastSend = System.currentTimeMillis()
-              }
-              Thread.sleep(200)
             }
           }
+        } catch (_: InterruptedException) {
+          emitter.complete()
+        } catch (_: Exception) {
+          emitter.complete()
         }
-      } catch (_: InterruptedException) {
-        emitter.complete()
-      } catch (_: Exception) {
-        emitter.complete()
       }
-    }
 
     emitter.onCompletion { future.cancel(true) }
     emitter.onTimeout { future.cancel(true) }

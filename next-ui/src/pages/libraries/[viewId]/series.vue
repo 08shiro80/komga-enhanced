@@ -376,7 +376,7 @@ const {
   sortActive,
   isDefault: sortIsDefault,
   restore: sortRestore,
-} = useSort(sortDefault, sortOptions, false)
+} = useSort(sortDefault, sortOptions, false, `${viewName.value}:sort`)
 
 const conds = computed(() => ({
   allOf: [

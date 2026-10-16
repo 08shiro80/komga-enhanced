@@ -113,7 +113,7 @@ class PluginInitializer(
           name = "Manga Scrobbler (AniList / MyAnimeList / Kitsu / MangaDex)",
           version = PluginVersions.MANGA_SCROBBLER,
           author = "Jack O'Hagan",
-          description = "Syncs read progress to AniList, MyAnimeList, Kitsu and/or MangaDex when a book is marked completed. Every user links their own tracker accounts under My account → Trackers; only that user's progress is synced to their accounts. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net / kitsu.app / mangadex.org) or via manual JSON mappings.",
+          description = "Syncs read progress to AniList, MyAnimeList, Kitsu and/or MangaDex when a book is marked completed, and pulls progress from AniList, MyAnimeList and Kitsu back every hour. Every user links their own tracker accounts under My account → Trackers; only that user's progress is synced to their accounts. The highest read chapter of a series is sent and remote progress is never lowered. Tracker IDs come from the mappings, the series links (anilist.co / myanimelist.net / kitsu.app / mangadex.org) and, if enabled, from the MangaDex entry and a verified title search; found IDs are remembered per series.",
           enabled = false,
           pluginType = PluginType.SCROBBLER,
           entryPoint = "org.gotson.komga.infrastructure.scrobbler.MangaScrobblerPlugin",
@@ -125,22 +125,27 @@ class PluginInitializer(
             {
               "type": "object",
               "properties": {
-                "auto_detect_links": {
+                "discover_ids": {
                   "type": "string",
-                  "title": "Auto-detect tracker IDs from series links",
+                  "title": "Discover missing tracker IDs",
                   "default": "true",
                   "enum": ["false", "true"],
-                  "description": "If true, extract IDs from anilist.co / myanimelist.net URLs in SeriesMetadata.links."
+                  "description": "Series links and mappings are always used. If true, a missing ID is also taken from the MangaDex entry of the series (its AniList / MyAnimeList / Kitsu links) or found by a title search that must match a local title exactly. Found IDs are stored and added to the series links unless the links are locked."
                 },
                 "mappings": {
                   "type": "string",
                   "title": "Manual series mappings (JSON)",
-                  "description": "Override auto-detection. Example: {\"Berserk\":{\"anilist_id\":30002,\"mal_id\":2}}"
+                  "description": "Takes precedence over links and discovery. Keys are Komga series IDs or series titles, values may contain anilist_id, mal_id, kitsu_id and mangadex_id. Example: {\"Berserk\":{\"anilist_id\":30002,\"mal_id\":2}}"
+                },
+                "library_ids": {
+                  "type": "string",
+                  "title": "Only these libraries (CSV of library IDs)",
+                  "description": "Optional. If set, only these Komga libraries are scrobbled. Empty means all libraries. Find IDs in the library URL or API."
                 },
                 "exclude_library_ids": {
                   "type": "string",
                   "title": "Exclude libraries (CSV of library IDs)",
-                  "description": "Optional. Komga library IDs to never scrobble (e.g. your Western comics library when this plugin tracks manga). Find IDs in the library URL or API."
+                  "description": "Optional. Komga library IDs to never scrobble (e.g. your Western comics library when this plugin tracks manga)."
                 }
               },
               "required": []
@@ -153,7 +158,7 @@ class PluginInitializer(
           name = "Comic Scrobbler (Metron)",
           version = PluginVersions.COMIC_SCROBBLER,
           author = "Jack O'Hagan",
-          description = "Syncs comic read progress to Metron (metron.cloud) when a book is marked completed. Every user links their own Metron account under My account → Trackers; only that user's progress is synced. Resolves issue IDs from series links (metron.cloud/issue/... or metron.cloud/series/... from Metron Metadata Provider), auto-search by series name, or via manual JSON mappings.",
+          description = "Syncs comic read progress to Metron (metron.cloud) when a book is marked completed, with the date the book was read. Every user links their own Metron account under My account → Trackers; only that user's progress is synced. The Metron issue comes from a metron.cloud/issue/... book link, otherwise from the issue number within the Metron series of the series (mapping, metron.cloud/series/... series link or a verified series search). Every issue is sent once per user.",
           enabled = false,
           pluginType = PluginType.SCROBBLER,
           entryPoint = "org.gotson.komga.infrastructure.comicscrobbler.ComicScrobblerPlugin",
@@ -165,17 +170,22 @@ class PluginInitializer(
             {
               "type": "object",
               "properties": {
-                "auto_detect_links": {
+                "discover_ids": {
                   "type": "string",
-                  "title": "Auto-detect issue IDs from series links",
+                  "title": "Search missing Metron series",
                   "default": "true",
                   "enum": ["false", "true"],
-                  "description": "If true, extract issue/series IDs from metron.cloud URLs in SeriesMetadata.links."
+                  "description": "Series links and mappings are always used. If true, a series without Metron link is searched on Metron by its titles; the result must match a local title exactly. Found series are stored and added to the series links unless the links are locked."
                 },
                 "mappings": {
                   "type": "string",
-                  "title": "Manual issue mappings (JSON)",
-                  "description": "Fallback when auto-detect/search fails. Example: {\"Amazing Spider-Man\":{\"metron_issue_id\":12345}}"
+                  "title": "Manual series mappings (JSON)",
+                  "description": "Takes precedence over links and search. Keys are Komga series IDs or series titles. Example: {\"Amazing Spider-Man (2018)\":{\"metron_series_id\":12345}}"
+                },
+                "library_ids": {
+                  "type": "string",
+                  "title": "Only these libraries (CSV of library IDs)",
+                  "description": "Optional. If set, only these Komga libraries are sent to Metron. Empty means all libraries."
                 },
                 "exclude_library_ids": {
                   "type": "string",
@@ -237,7 +247,7 @@ class PluginInitializer(
                 "mal_client_id": {
                   "type": "string",
                   "title": "MyAnimeList Client ID (tracker link lookup)",
-                  "description": "Optional. MAL API client ID used to find MyAnimeList links for series metadata. Scrobbling uses each user's own MAL account (My account → Trackers)."
+                  "description": "Optional. Server MAL API client ID used by the MyAnimeList title search (series links and the Manga Scrobbler ID discovery). If empty, the scrobbler falls back to the client ID of the reading user's own MAL account."
                 }
               },
               "required": []

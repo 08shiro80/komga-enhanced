@@ -25,13 +25,13 @@ class KoreaderHasher {
     val size = 1024
     val digest = Algorithm.MD5.createDigest()
 
-    val file = RandomAccessFile(path.toFile(), "r")
-
-    val buffer = ByteArray(size)
-    (-1..10).forEach {
-      file.seek(step shl (2 * it))
-      val s = file.read(buffer)
-      if (s > 0) digest.update(buffer)
+    RandomAccessFile(path.toFile(), "r").use { file ->
+      val buffer = ByteArray(size)
+      (-1..10).forEach {
+        file.seek(step shl (2 * it))
+        val s = file.read(buffer)
+        if (s > 0) digest.update(buffer, 0, s)
+      }
     }
 
     return digest.digest().toHexString()

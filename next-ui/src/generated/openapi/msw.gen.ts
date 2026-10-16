@@ -4,7 +4,7 @@
 
 import { type DefaultBodyType, http, type HttpHandler, HttpResponse, type HttpResponseResolver, type RequestHandlerOptions as RequestHandlerOptions2 } from 'msw';
 
-import type { AddBlacklistData, AddBlacklistResponses, AddFollowData, AddFollowResponses, AddFollowsBatchData, AddFollowsBatchResponses, AddLibraryData, AddLibraryResponses, AddUserData, AddUserResponses, AddUserUploadedBookThumbnailData, AddUserUploadedBookThumbnailResponses, AddUserUploadedCollectionThumbnailData, AddUserUploadedCollectionThumbnailResponses, AddUserUploadedReadListThumbnailData, AddUserUploadedReadListThumbnailResponses, AddUserUploadedSeriesThumbnailData, AddUserUploadedSeriesThumbnailResponses, AnalyzeTransientBookResponses, ApplyCoverData, ApplyCoverResponses, ApplyMetadataData, ApplyMetadataResponses, BlacklistBookResponses, BookAnalyzeResponses, BookRefreshMetadataResponses, BooksRegenerateThumbnailsResponses, CheckComponentResponses, CheckFollowsNowResponses, CheckUrlResponses, CheckUrlsData, CheckUrlsResponses, ClaimServerResponses, CleanOldBackupsResponses, ClearCancelledDownloadsResponses, ClearCompletedDownloadsResponses, ClearFailedDownloadsResponses, ClearPendingDownloadsResponses, ClearPluginLogsResponses, ClientOptions, ConvertHeaderSessionToCookieResponses, CreateApiKeyForCurrentUserData, CreateApiKeyForCurrentUserResponses, CreateBackupResponses, CreateCollectionData, CreateCollectionResponses, CreateDownloadData, CreateDownloadResponses, CreateFullBackupResponses, CreateOrUpdateKnownPageHashData, CreateOrUpdateKnownPageHashResponses, CreateReadListData, CreateReadListResponses, DeleteAllChapterUrlsResponses, DeleteAllKnownPageHashesResponses, DeleteApiKeyByKeyIdResponses, DeleteBackupResponses, DeleteBookFileResponses, DeleteBookReadProgressResponses, DeleteChapterUrlResponses, DeleteChapterUrlsByDateRangeResponses, DeleteChapterUrlsForSeriesResponses, DeleteCollectionByIdResponses, DeletedChaptersScanStatusResponses, DeleteDownloadResponses, DeleteDuplicatePagesByPageHashResponses, DeleteFollowResponses, DeleteFollowsBatchData, DeleteFollowsBatchResponses, DeleteGlobalSettingsData, DeleteGlobalSettingsResponses, DeleteKnownPageHashResponses, DeleteLibraryByIdResponses, DeleteOversizedPageData, DeleteOversizedPageResponses, DeleteOversizedPagesBatchData, DeleteOversizedPagesBatchResponses, DeletePluginResponses, DeleteReadListByIdResponses, DeleteSeriesFileResponses, DeleteSingleMatchByPageHashData, DeleteSingleMatchByPageHashResponses, DeleteSyncPointsForCurrentUserResponses, DeleteTrackerResponses, DeleteUserByIdResponses, DeleteUserSettingsData, DeleteUserSettingsResponses, DeleteUserUploadedBookThumbnailResponses, DeleteUserUploadedCollectionThumbnailResponses, DeleteUserUploadedReadListThumbnailResponses, DeleteUserUploadedSeriesThumbnailResponses, DownloadBackupResponses, DownloadBookFile1Responses, DownloadBookFileResponses, DownloadLogsResponses, DownloadReadListAsZipResponses, DownloadSeriesAsZipResponses, EmptyTaskQueueResponses, FollowMangaOnMangaDexResponses, ForceResyncMangaDexSubscriptionResponses, GetActuatorInfoResponses, GetAgeRatingsResponses, GetAllDownloadsResponses, GetAllPluginsResponses, GetAnnouncementsResponses, GetApiKeysForCurrentUserResponses, GetAuthenticationActivityForCurrentUserResponses, GetAuthenticationActivityResponses, GetAuthorsNamesResponses, GetAuthorsResponses, GetAuthorsRolesResponses, GetBlacklistResponses, GetBookByIdResponses, GetBookEpubResourceResponses, GetBookPageRawByNumberResponses, GetBookPagesResponses, GetBookPositionsResponses, GetBookProgressionResponses, GetBooksByReadListIdResponses, GetBooksData, GetBooksDuplicatesResponses, GetBookSiblingNextInReadListResponses, GetBookSiblingNextResponses, GetBookSiblingPreviousInReadListResponses, GetBookSiblingPreviousResponses, GetBooksLatestResponses, GetBooksOnDeckResponses, GetBooksResponses, GetBookThumbnailsResponses, GetBookWebPubManifestDivinaResponses, GetBookWebPubManifestEpubResponses, GetBookWebPubManifestPdfResponses, GetBookWebPubManifestResponses, GetChapterUrlsByDateRangeResponses, GetChapterUrlsForSeriesResponses, GetClaimStatusResponses, GetCollectionByIdResponses, GetCollectionsBySeriesIdResponses, GetCollectionsResponses, GetCollectionThumbnailsResponses, GetCurrentUserResponses, GetDirectoryListingData, GetDirectoryListingResponses, GetDownloadByIdResponses, GetDownloadedUrlsResponses, GetFollowsBySeriesResponses, GetFollowScheduleResponses, GetFollowsResponses, GetFontFamilyAsCssResponses, GetFontFileResponses, GetFontsResponses, GetForkReleasesResponses, GetGalleryDlForkUpdatesResponses, GetGenresResponses, GetGlobalSettingsResponses, GetHistoricalEventsResponses, GetKnownPageHashesResponses, GetLanguagesResponses, GetLatestAuthenticationActivityByUserIdResponses, GetLibrariesResponses, GetLibraryByIdResponses, GetLogLevelResponses, GetLogsResponses, GetMangaDexFollowsResponses, GetMetadataResponses, GetMihonReadProgressByReadListIdResponses, GetMihonReadProgressBySeriesIdResponses, GetNewChaptersResponses, GetNotableEntitiesKindsResponses, GetNotableEntitiesNamesResponses, GetNotableEntitiesResponses, GetOAuth2ProvidersResponses, GetOversizedPagesResponses, GetPageByTransientBookIdResponses, GetPageHashMatchesResponses, GetPluginByIdResponses, GetPluginConfigResponses, GetPluginLogsResponses, GetPublishersResponses, GetReadListByIdResponses, GetReadListsByBookIdResponses, GetReadListsResponses, GetReadListThumbnailsResponses, GetReleasesResponses, GetSeriesAlphabeticalGroupsData, GetSeriesAlphabeticalGroupsResponses, GetSeriesByCollectionIdResponses, GetSeriesByIdResponses, GetSeriesData, GetSeriesLatestResponses, GetSeriesMetadataSourcesResponses, GetSeriesNewResponses, GetSeriesReleaseYearsResponses, GetSeriesResponses, GetSeriesThumbnailsResponses, GetSeriesUpdatedResponses, GetServerSettingsResponses, GetSharingLabelsResponses, GetSinglePageBooksResponses, GetStatsResponses, GetTagsResponses, GetTrackersResponses, GetUnknownPageHashesResponses, GetUserSettingsResponses, GetUsersResponses, HealthCheckResponses, IgnoreOversizedPageData, IgnoreOversizedPageResponses, IgnoreOversizedPagesBatchData, IgnoreOversizedPagesBatchResponses, IgnoreResponses, ImportBooksData, ImportBooksResponses, ImportFollowTxtResponses, ImportTachiyomiData, ImportTachiyomiResponses, InstallPluginData, InstallPluginResponses, IsBookBlacklistedResponses, LibraryAnalyzeResponses, LibraryEmptyTrashResponses, LibraryRefreshMetadataResponses, LibraryScanDeletedChaptersPreviewResponses, LibraryScanDeletedChaptersResponses, LibraryScanDeletedChaptersRunResponses, LibraryScanResponses, ListBackupsResponses, ListFixesResponses, ListMangaDexTagsResponses, MangaDexDownloadableCheckData, MangaDexDownloadableCheckResponses, MarkAnnouncementsReadData, MarkAnnouncementsReadResponses, MarkBookReadProgressData, MarkBookReadProgressResponses, MarkBookThumbnailSelectedResponses, MarkCollectionThumbnailSelectedResponses, MarkReadListThumbnailSelectedResponses, MarkSeriesAsReadResponses, MarkSeriesAsUnreadResponses, MarkSeriesThumbnailSelectedResponses, MatchComicRackListData, MatchComicRackListResponses, MatchSeriesNowResponses, MigrateToUuidFoldersResponses, PerformActionData, PerformActionResponses, PingResponses, PostLogout1Responses, PostLogoutResponses, ProtectBookResponses, QueueLibraryMatchResponses, QueueSeriesMatchResponses, RemoveBlacklistResponses, RepairAllResponses, RepairComicInfoResponses, RepairComicInfoStatusResponses, RepairResponses, RescanFlaggedResponses, RestoreBackupResponses, SaveGlobalSettingData, SaveGlobalSettingResponses, SaveUserSettingData, SaveUserSettingResponses, ScanTransientBooksData, ScanTransientBooksResponses, SearchMangaDexAdvancedData, SearchMangaDexAdvancedResponses, SearchMetadataResponses, SeriesAnalyzeResponses, SeriesRefreshMetadataResponses, SeriesScanDeletedChaptersPreviewResponses, SetLogLevelResponses, SplitAllStatusResponses, SplitAllTallPagesData, SplitAllTallPagesResponses, SplitTallPagesResponses, StatusResponses, StreamLogsResponses, SyncFollowsToMangaDexResponses, TestMetadataExtractionResponses, TestTrackerResponses, UnblacklistBookResponses, UnfollowMangaOnMangaDexResponses, UnignoreOversizedPageData, UnignoreOversizedPageResponses, UnignoreResponses, UnprotectBookResponses, UpdateBookMetadataByBatchData, UpdateBookMetadataByBatchResponses, UpdateBookMetadataData, UpdateBookMetadataResponses, UpdateBookProgressionData, UpdateBookProgressionResponses, UpdateCollectionByIdData, UpdateCollectionByIdResponses, UpdateFollowData, UpdateFollowResponses, UpdateFollowScheduleData, UpdateFollowScheduleResponses, UpdateLibraryByIdData, UpdateLibraryByIdResponses, UpdateMihonReadProgressByReadListIdData, UpdateMihonReadProgressByReadListIdResponses, UpdateMihonReadProgressBySeriesIdData, UpdateMihonReadProgressBySeriesIdResponses, UpdatePasswordByUserIdData, UpdatePasswordByUserIdResponses, UpdatePasswordForCurrentUserData, UpdatePasswordForCurrentUserResponses, UpdatePluginConfigData, UpdatePluginConfigResponses, UpdatePluginData, UpdatePluginResponses, UpdateReadListByIdData, UpdateReadListByIdResponses, UpdateSeriesMetadataData, UpdateSeriesMetadataResponses, UpdateServerSettingsData, UpdateServerSettingsResponses, UpdateTrackerData, UpdateTrackerResponses, UpdateUserByIdData, UpdateUserByIdResponses, VerifyAllResponses } from './types.gen';
+import type { AddBlacklistData, AddBlacklistResponses, AddFollowData, AddFollowResponses, AddFollowsBatchData, AddFollowsBatchResponses, AddLibraryData, AddLibraryResponses, AddUserData, AddUserResponses, AddUserUploadedBookThumbnailData, AddUserUploadedBookThumbnailResponses, AddUserUploadedCollectionThumbnailData, AddUserUploadedCollectionThumbnailResponses, AddUserUploadedReadListThumbnailData, AddUserUploadedReadListThumbnailResponses, AddUserUploadedSeriesThumbnailData, AddUserUploadedSeriesThumbnailResponses, AnalyzeTransientBookResponses, ApplyCoverData, ApplyCoverResponses, ApplyMetadataData, ApplyMetadataResponses, AuthorizeTrackerData, AuthorizeTrackerResponses, BlacklistBookResponses, BookAnalyzeResponses, BookRefreshMetadataResponses, BooksRegenerateThumbnailsResponses, CheckComponentResponses, CheckFollowsNowResponses, CheckUrlResponses, CheckUrlsData, CheckUrlsResponses, ClaimServerResponses, CleanOldBackupsResponses, ClearCancelledDownloadsResponses, ClearCompletedDownloadsResponses, ClearFailedDownloadsResponses, ClearPendingDownloadsResponses, ClearPluginLogsResponses, ClientOptions, ConvertHeaderSessionToCookieResponses, CreateApiKeyForCurrentUserData, CreateApiKeyForCurrentUserResponses, CreateBackupResponses, CreateCollectionData, CreateCollectionResponses, CreateDownloadData, CreateDownloadResponses, CreateFullBackupResponses, CreateOrUpdateKnownPageHashData, CreateOrUpdateKnownPageHashResponses, CreateReadListData, CreateReadListResponses, DeleteAllChapterUrlsResponses, DeleteAllKnownPageHashesResponses, DeleteApiKeyByKeyIdResponses, DeleteBackupResponses, DeleteBookFileResponses, DeleteBookReadProgressResponses, DeleteChapterUrlResponses, DeleteChapterUrlsByDateRangeResponses, DeleteChapterUrlsForSeriesResponses, DeleteCollectionByIdResponses, DeletedChaptersScanStatusResponses, DeleteDownloadResponses, DeleteDuplicatePagesByPageHashResponses, DeleteFollowResponses, DeleteFollowsBatchData, DeleteFollowsBatchResponses, DeleteGlobalSettingsData, DeleteGlobalSettingsResponses, DeleteKnownPageHashResponses, DeleteLibraryByIdResponses, DeleteOversizedPageData, DeleteOversizedPageResponses, DeleteOversizedPagesBatchData, DeleteOversizedPagesBatchResponses, DeletePluginResponses, DeleteReadListByIdResponses, DeleteSeriesFileResponses, DeleteSingleMatchByPageHashData, DeleteSingleMatchByPageHashResponses, DeleteSyncPointsForCurrentUserResponses, DeleteTrackerResponses, DeleteUserByIdResponses, DeleteUserSettingsData, DeleteUserSettingsResponses, DeleteUserUploadedBookThumbnailResponses, DeleteUserUploadedCollectionThumbnailResponses, DeleteUserUploadedReadListThumbnailResponses, DeleteUserUploadedSeriesThumbnailResponses, DownloadBackupResponses, DownloadBookFile1Responses, DownloadBookFileResponses, DownloadLogsResponses, DownloadReadListAsZipResponses, DownloadSeriesAsZipResponses, EmptyTaskQueueResponses, FollowMangaOnMangaDexResponses, ForceResyncMangaDexSubscriptionResponses, GetActuatorInfoResponses, GetAgeRatingsResponses, GetAllDownloadsResponses, GetAllPluginsResponses, GetAnnouncementsResponses, GetApiKeysForCurrentUserResponses, GetAuthenticationActivityForCurrentUserResponses, GetAuthenticationActivityResponses, GetAuthorsNamesResponses, GetAuthorsResponses, GetAuthorsRolesResponses, GetBlacklistResponses, GetBookByIdResponses, GetBookEpubResourceResponses, GetBookPageRawByNumberResponses, GetBookPagesResponses, GetBookPositionsResponses, GetBookProgressionResponses, GetBooksByReadListIdResponses, GetBooksData, GetBooksDuplicatesResponses, GetBookSiblingNextInReadListResponses, GetBookSiblingNextResponses, GetBookSiblingPreviousInReadListResponses, GetBookSiblingPreviousResponses, GetBooksLatestResponses, GetBooksOnDeckResponses, GetBooksResponses, GetBookThumbnailsResponses, GetBookWebPubManifestDivinaResponses, GetBookWebPubManifestEpubResponses, GetBookWebPubManifestPdfResponses, GetBookWebPubManifestResponses, GetChapterUrlsByDateRangeResponses, GetChapterUrlsForSeriesResponses, GetClaimStatusResponses, GetCollectionByIdResponses, GetCollectionsBySeriesIdResponses, GetCollectionsResponses, GetCollectionThumbnailsResponses, GetCurrentUserResponses, GetDirectoryListingData, GetDirectoryListingResponses, GetDownloadByIdResponses, GetDownloadedUrlsResponses, GetFollowsBySeriesResponses, GetFollowScheduleResponses, GetFollowsResponses, GetFontFamilyAsCssResponses, GetFontFileResponses, GetFontsResponses, GetForkReleasesResponses, GetGalleryDlForkUpdatesResponses, GetGenresResponses, GetGlobalSettingsResponses, GetHistoricalEventsResponses, GetKnownPageHashesResponses, GetLanguagesResponses, GetLatestAuthenticationActivityByUserIdResponses, GetLibrariesResponses, GetLibraryByIdResponses, GetLogLevelResponses, GetLogsResponses, GetMangaDexFollowsResponses, GetMetadataResponses, GetMihonReadProgressByReadListIdResponses, GetMihonReadProgressBySeriesIdResponses, GetNewChaptersResponses, GetNotableEntitiesKindsResponses, GetNotableEntitiesNamesResponses, GetNotableEntitiesResponses, GetOAuth2ProvidersResponses, GetOversizedPagesResponses, GetPageByTransientBookIdResponses, GetPageHashMatchesResponses, GetPluginByIdResponses, GetPluginConfigResponses, GetPluginLogsResponses, GetPublishersResponses, GetReadListByIdResponses, GetReadListsByBookIdResponses, GetReadListsResponses, GetReadListThumbnailsResponses, GetReleasesResponses, GetSeriesAlphabeticalGroupsData, GetSeriesAlphabeticalGroupsResponses, GetSeriesByCollectionIdResponses, GetSeriesByIdResponses, GetSeriesData, GetSeriesLatestResponses, GetSeriesMetadataSourcesResponses, GetSeriesNewResponses, GetSeriesReleaseYearsResponses, GetSeriesResponses, GetSeriesThumbnailsResponses, GetSeriesUpdatedResponses, GetServerSettingsResponses, GetSharingLabelsResponses, GetSinglePageBooksResponses, GetStatsResponses, GetTagsResponses, GetTrackersResponses, GetUnknownPageHashesResponses, GetUserSettingsResponses, GetUsersResponses, HealthCheckResponses, IgnoreOversizedPageData, IgnoreOversizedPageResponses, IgnoreOversizedPagesBatchData, IgnoreOversizedPagesBatchResponses, IgnoreResponses, ImportBooksData, ImportBooksResponses, ImportFollowTxtResponses, ImportTachiyomiData, ImportTachiyomiResponses, InstallPluginData, InstallPluginResponses, IsBookBlacklistedResponses, LibraryAnalyzeResponses, LibraryEmptyTrashResponses, LibraryRefreshMetadataResponses, LibraryScanDeletedChaptersPreviewResponses, LibraryScanDeletedChaptersResponses, LibraryScanDeletedChaptersRunResponses, LibraryScanResponses, ListBackupsResponses, ListFixesResponses, ListMangaDexTagsResponses, MangaDexDownloadableCheckData, MangaDexDownloadableCheckResponses, MarkAnnouncementsReadData, MarkAnnouncementsReadResponses, MarkBookReadProgressData, MarkBookReadProgressResponses, MarkBookThumbnailSelectedResponses, MarkCollectionThumbnailSelectedResponses, MarkReadListThumbnailSelectedResponses, MarkSeriesAsReadResponses, MarkSeriesAsUnreadResponses, MarkSeriesThumbnailSelectedResponses, MatchComicRackListData, MatchComicRackListResponses, MatchSeriesNowResponses, MigrateToUuidFoldersResponses, PerformActionData, PerformActionResponses, PingResponses, PostLogout1Responses, PostLogoutResponses, ProtectBookResponses, QueueLibraryMatchResponses, QueueSeriesMatchResponses, RemoveBlacklistResponses, RepairAllResponses, RepairComicInfoResponses, RepairComicInfoStatusResponses, RepairResponses, RescanFlaggedResponses, RestoreBackupResponses, SaveGlobalSettingData, SaveGlobalSettingResponses, SaveUserSettingData, SaveUserSettingResponses, ScanTransientBooksData, ScanTransientBooksResponses, SearchMangaDexAdvancedData, SearchMangaDexAdvancedResponses, SearchMetadataResponses, SeriesAnalyzeResponses, SeriesRefreshMetadataResponses, SeriesScanDeletedChaptersPreviewResponses, SetLogLevelResponses, SplitAllStatusResponses, SplitAllTallPagesData, SplitAllTallPagesResponses, SplitTallPagesResponses, StatusResponses, StreamLogsResponses, SyncFollowsToMangaDexResponses, SyncTrackerResponses, TestMetadataExtractionResponses, TestTrackerResponses, UnblacklistBookResponses, UnfollowMangaOnMangaDexResponses, UnignoreOversizedPageData, UnignoreOversizedPageResponses, UnignoreResponses, UnprotectBookResponses, UpdateBookMetadataByBatchData, UpdateBookMetadataByBatchResponses, UpdateBookMetadataData, UpdateBookMetadataResponses, UpdateBookProgressionData, UpdateBookProgressionResponses, UpdateCollectionByIdData, UpdateCollectionByIdResponses, UpdateFollowData, UpdateFollowResponses, UpdateFollowScheduleData, UpdateFollowScheduleResponses, UpdateLibraryByIdData, UpdateLibraryByIdResponses, UpdateMihonReadProgressByReadListIdData, UpdateMihonReadProgressByReadListIdResponses, UpdateMihonReadProgressBySeriesIdData, UpdateMihonReadProgressBySeriesIdResponses, UpdatePasswordByUserIdData, UpdatePasswordByUserIdResponses, UpdatePasswordForCurrentUserData, UpdatePasswordForCurrentUserResponses, UpdatePluginConfigData, UpdatePluginConfigResponses, UpdatePluginData, UpdatePluginResponses, UpdateReadListByIdData, UpdateReadListByIdResponses, UpdateSeriesMetadataData, UpdateSeriesMetadataResponses, UpdateServerSettingsData, UpdateServerSettingsResponses, UpdateTrackerData, UpdateTrackerResponses, UpdateUserByIdData, UpdateUserByIdResponses, VerifyAllResponses } from './types.gen';
 
 export type RequestHandlerOptions = RequestHandlerOptions2 & {
     baseUrl?: ClientOptions['baseUrl'];
@@ -7217,6 +7217,99 @@ export function handleUpdateTracker(response?: HandleUpdateTrackerResponse | Htt
     }, options);
 }
 
+export type HandleAuthorizeTrackerResponse = {
+    body: AuthorizeTrackerResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/v1/trackers/{tracker}/authorize` operation.
+ */
+export function handleAuthorizeTracker(response?: HandleAuthorizeTrackerResponse | HttpResponseResolver<{
+    tracker: string;
+}, AuthorizeTrackerData['body']>, options?: RequestHandlerOptions): HttpHandler {
+    return http.post<{
+        tracker: string;
+    }, AuthorizeTrackerData['body']>(`${options?.baseUrl ?? '*'}/api/v1/trackers/:tracker/authorize`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleAuthorizationCallbackResponse = {
+    body: DefaultBodyType;
+    status?: number;
+};
+
+/**
+ * Handler for the `GET /api/v1/trackers/{tracker}/callback` operation.
+ */
+export function handleAuthorizationCallback(response?: HandleAuthorizationCallbackResponse | HttpResponseResolver<{
+    tracker: string;
+}, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.get<{
+        tracker: string;
+    }, never>(`${options?.baseUrl ?? '*'}/api/v1/trackers/:tracker/callback`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return new HttpResponse(body, { status: response?.status });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleSyncTrackerResponse = {
+    body: SyncTrackerResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/v1/trackers/{tracker}/sync` operation.
+ */
+export function handleSyncTracker(response?: HandleSyncTrackerResponse | HttpResponseResolver<{
+    tracker: string;
+}, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.post<{
+        tracker: string;
+    }, never>(`${options?.baseUrl ?? '*'}/api/v1/trackers/:tracker/sync`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
 export type HandleTestTrackerResponse = {
     body: TestTrackerResponses[200];
     status?: 200;
@@ -9097,6 +9190,18 @@ export type MswHandlerFactories = {
      */
     updateTracker: typeof handleUpdateTracker;
     /**
+     * Handler for the `POST /api/v1/trackers/{tracker}/authorize` operation.
+     */
+    authorizeTracker: typeof handleAuthorizeTracker;
+    /**
+     * Handler for the `GET /api/v1/trackers/{tracker}/callback` operation.
+     */
+    authorizationCallback: typeof handleAuthorizationCallback;
+    /**
+     * Handler for the `POST /api/v1/trackers/{tracker}/sync` operation.
+     */
+    syncTracker: typeof handleSyncTracker;
+    /**
      * Handler for the `POST /api/v1/trackers/{tracker}/test` operation.
      */
     testTracker: typeof handleTestTracker;
@@ -9484,6 +9589,9 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
         getTrackers: wrap(handleGetTrackers),
         deleteTracker: wrap(handleDeleteTracker),
         updateTracker: wrap(handleUpdateTracker),
+        authorizeTracker: wrap(handleAuthorizeTracker),
+        authorizationCallback: wrap(handleAuthorizationCallback),
+        syncTracker: wrap(handleSyncTracker),
         testTracker: wrap(handleTestTracker),
         scanTransientBooks: wrap(handleScanTransientBooks),
         analyzeTransientBook: wrap(handleAnalyzeTransientBook),
@@ -9685,6 +9793,9 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
             invoke(pick.getSeriesThumbnail, overrides.getSeriesThumbnail),
             invoke(pick.getSeriesThumbnails, overrides.getSeriesThumbnails),
             invoke(pick.addUserUploadedSeriesThumbnail, overrides.addUserUploadedSeriesThumbnail),
+            invoke(pick.authorizeTracker, overrides.authorizeTracker),
+            invoke(pick.authorizationCallback, overrides.authorizationCallback),
+            invoke(pick.syncTracker, overrides.syncTracker),
             invoke(pick.testTracker, overrides.testTracker),
             invoke(pick.analyzeTransientBook, overrides.analyzeTransientBook),
             invoke(pick.updatePasswordByUserId, overrides.updatePasswordByUserId),

@@ -394,7 +394,7 @@ class ChapterChecker(
   )
 
   private fun filterRedownloadable(
-    staleEntries: List<org.gotson.komga.domain.model.ChapterUrl>,
+    staleEntries: Collection<org.gotson.komga.domain.model.ChapterUrl>,
     chapterMetadataCache: MutableMap<String, ChapterInfo?>,
   ): List<org.gotson.komga.domain.model.ChapterUrl> =
     staleEntries.filter { entry ->
@@ -410,7 +410,7 @@ class ChapterChecker(
 
   private fun removeRedownloadable(
     series: Series,
-    chapterUrls: List<org.gotson.komga.domain.model.ChapterUrl>,
+    chapterUrls: Collection<org.gotson.komga.domain.model.ChapterUrl>,
     dryRun: Boolean,
     chapterMetadataCache: MutableMap<String, ChapterInfo?>,
     cbzCount: Int,

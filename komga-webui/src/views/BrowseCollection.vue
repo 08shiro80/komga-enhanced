@@ -541,10 +541,20 @@ export default Vue.extend({
       this.$store.dispatch('dialogAddBooksToReadList', books.content.map(b => b.id))
     },
     async startEditElements() {
+      this.unsetWatches()
       this.filters = {}
+      this.$store.commit('setCollectionFilter', {id: this.collectionId, filter: this.filters})
+      this.page = 1
       this.unpaged = true
-      await this.reloadPage()
-      this.editElements = true
+      this.updateRoute()
+      try {
+        await this.loadPage(this.collectionId, this.page)
+        this.editElements = true
+      } catch (e) {
+        this.unpaged = false
+      } finally {
+        this.setWatches()
+      }
     },
     cancelEditElements() {
       this.editElements = false
@@ -553,6 +563,10 @@ export default Vue.extend({
       this.reloadPage()
     },
     doEditElements() {
+      if (this.totalElements !== null && this.seriesCopy.length !== this.totalElements) {
+        this.reloadPage()
+        return
+      }
       this.editElements = false
       const update = {
         seriesIds: this.series.map(x => x.id),
@@ -565,9 +579,11 @@ export default Vue.extend({
       this.$store.dispatch('dialogEditCollection', this.collection)
     },
     seriesChanged(event: SeriesSseDto) {
+      if (this.editElements) return
       if (this.series.some(s => s.id === event.seriesId)) this.reloadPage()
     },
     readProgressChanged(event: ReadProgressSeriesSseDto) {
+      if (this.editElements) return
       if (this.series.some(b => b.id === event.seriesId)) this.reloadPage()
     },
   },

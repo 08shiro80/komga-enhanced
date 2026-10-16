@@ -95,7 +95,8 @@ class GalleryDlWrapper(
     if (target.exists()) {
       val existingChapterId = chapterMatcher.extractChapterId(target.toPath())
       val sameChapter = incomingChapterId != null && existingChapterId == incomingChapterId
-      if (!sameChapter) {
+      val identityUnknown = incomingChapterId == null && existingChapterId == null
+      if (!sameChapter && !identityUnknown) {
         target =
           if (incomingChapterId != null) {
             disambiguateTarget(destDir, source.nameWithoutExtension, source.extension, incomingChapterId)

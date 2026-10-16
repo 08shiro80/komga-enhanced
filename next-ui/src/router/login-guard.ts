@@ -28,7 +28,14 @@ export function useLoginGuard(router: Router) {
           return { name: '/startup', query: query }
         }
       } catch (e) {
-        if (isApiErrorWithCause(e) && e.cause.status === 401) return { name: '/login' }
+        if (isApiErrorWithCause(e) && e.cause.status === 401) {
+          const query = Object.assign(
+            {},
+            to.query,
+            to.fullPath !== '/' ? { redirect: to.fullPath } : {},
+          )
+          return { name: '/login', query: query }
+        }
         return { name: '/error' }
       }
     }

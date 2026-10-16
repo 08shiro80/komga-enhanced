@@ -1,5 +1,6 @@
 package org.gotson.komga.infrastructure.download
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -82,6 +83,60 @@ class MangaDexApiClient(
     if (info != null) mangaInfoCache[mangaId] = Pair(info, System.currentTimeMillis())
     return info
   }
+
+  fun lookupMangaForTracking(mangaId: String): MangaDexLookup<MangaDexTrackingInfo> =
+    lookup("manga $mangaId", "https://api.mangadex.org/manga/$mangaId") { root ->
+      val attributes = root.at("/data/attributes")
+      val links = attributes.get("links")
+      MangaDexTrackingInfo(
+        links =
+          if (links != null && links.isObject) {
+            links
+              .properties()
+              .filter { it.value.isTextual }
+              .associate { it.key to it.value.asText() }
+          } else {
+            emptyMap()
+          },
+        contentRating = attributes.get("contentRating")?.asText(null),
+      )
+    }
+
+  fun lookupMangaIdForChapter(chapterId: String): MangaDexLookup<String> =
+    lookup("chapter $chapterId", "https://api.mangadex.org/chapter/$chapterId") { root ->
+      root
+        .at("/data/relationships")
+        .firstOrNull { it.get("type")?.asText() == "manga" }
+        ?.get("id")
+        ?.asText(null)
+    }
+
+  private fun <T> lookup(
+    context: String,
+    url: String,
+    parse: (JsonNode) -> T?,
+  ): MangaDexLookup<T> =
+    try {
+      val request =
+        HttpRequest
+          .newBuilder()
+          .uri(URI.create(url))
+          .timeout(Duration.ofSeconds(10))
+          .GET()
+          .build()
+      val response = sendWithRetry(request, context, HttpResponse.BodyHandlers.ofString())
+      when (response.statusCode()) {
+        200 -> parse(objectMapper.readTree(response.body()))?.let { MangaDexLookup.Found(it) } ?: MangaDexLookup.NotFound
+        404 -> MangaDexLookup.NotFound
+        else -> MangaDexLookup.Failed("MangaDex returned HTTP ${response.statusCode()} for $context")
+      }
+    } catch (e: InterruptedException) {
+      Thread.currentThread().interrupt()
+      MangaDexLookup.Failed("MangaDex request for $context was interrupted")
+    } catch (e: Exception) {
+      logger.debug(e) { "MangaDex request for $context failed" }
+      MangaDexLookup.Failed("MangaDex request for $context failed: ${e.message}")
+    }
 
   fun fetchMangaDexMetadata(mangaId: String): MangaInfo? {
     try {
@@ -517,3 +572,20 @@ class MangaDexApiClient(
     return ((epochSeconds * 1000L) - System.currentTimeMillis()).coerceIn(0L, 60_000L)
   }
 }
+
+sealed interface MangaDexLookup<out T> {
+  data class Found<T>(
+    val value: T,
+  ) : MangaDexLookup<T>
+
+  data object NotFound : MangaDexLookup<Nothing>
+
+  data class Failed(
+    val reason: String,
+  ) : MangaDexLookup<Nothing>
+}
+
+data class MangaDexTrackingInfo(
+  val links: Map<String, String>,
+  val contentRating: String?,
+)

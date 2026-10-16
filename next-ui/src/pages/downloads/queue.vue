@@ -342,6 +342,7 @@
 <script lang="ts" setup>
 import { useIntl, defineMessage, type MessageDescriptor } from 'vue-intl'
 import {
+  useCancelAllActiveDownloads,
   useClearDownloads,
   useCreateDownload,
   useDeleteDownload,
@@ -364,6 +365,7 @@ const { data: libraries } = useLibraries()
 
 const { mutateAsync: createDownload, isLoading: creating } = useCreateDownload()
 const { mutateAsync: performAction } = useDownloadAction()
+const { mutateAsync: cancelAllActiveDownloads } = useCancelAllActiveDownloads()
 const { mutateAsync: deleteDownload } = useDeleteDownload()
 const { mutateAsync: clearDownloads, isLoading: clearing } = useClearDownloads()
 
@@ -491,8 +493,13 @@ const activeStatuses = ['DOWNLOADING', 'PENDING', 'PAUSED']
 const activeCount = computed(() => merged.value.filter((d) => activeStatuses.includes(d.status)).length)
 
 async function cancelAllActive() {
-  const active = merged.value.filter((d) => activeStatuses.includes(d.status))
-  await Promise.allSettled(active.map((d) => action(d.id, 'cancel')))
+  try {
+    const active = merged.value.filter((d) => activeStatuses.includes(d.status))
+    await cancelAllActiveDownloads()
+    active.forEach((d) => downloadsStore.remove(d.id))
+  } catch (e) {
+    messagesStore.messages.push({ message: (e as Error).message, color: 'error' })
+  }
 }
 
 async function remove(id: string) {

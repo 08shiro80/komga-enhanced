@@ -6,16 +6,41 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## [0.1.6.1] - 2026-10-13
+## [0.1.6.1] - 2026-10-05
+
+
+### 2026-10-17 — Fixes
+
+- **WebP images are decoded natively again in the Docker image:** the image was missing `libwebpdemux`, so the native WebP reader was disabled at every start ("Could not load libwebp").
+- **Log level DEBUG no longer floods the log** with library internals (JDK process traces, Tomcat connection errors, SQL); DEBUG now applies to Komga's own logging while third-party libraries stay at INFO.
+- **The new UI no longer overwrites your saved filters just by opening a page:** opening a view (or a link/bookmark with filters in its URL) wrote those filters over the ones you had saved for that view, even when you changed nothing. Saved filters now only change when you actually change a filter.
+- **Series pages in the new UI no longer send a failing collection request** (error 400 in the log on every series page; upstream bug).
+- **German labels of the read buttons in the new UI (`/next`) are correct now:** the book button showed "Gelesen" instead of "Lesen", and "Zusammenfassung" (summary) instead of "Weiterlesen" for a book you already started.
+
+| File | Change |
+|------|--------|
+| `komga/docker/Dockerfile.tpl` | Install `libwebpdemux2` and add the unversioned `libwebpdemux.so` symlink (amd64 + arm64). |
+| `interfaces/api/rest/LogController.kt` · `application/startup/LogLevelInitializer.kt` | Root logger never below INFO; the selected level applies to `org.gotson.komga`. |
+| `next-ui/src/composables/useRouteQuerySchema.ts` | The per-view persisted filter is written only when its serialized value changes (no write on mount). |
+| `next-ui/src/components/collection/Navigation.vue` | Sibling-series query runs only when a collection ID exists. |
+| `komga/build.gradle.kts` | `processResources` clears `public/` before copying the UI builds, so stale assets from earlier builds no longer end up in the JAR. |
+| `next-ui/i18n/de.json` | `Y8SsFO` → "Lesen", `cIM3eJ` → "Weiterlesen" (wrong upstream translations; kept on upstream merges). |
 
 ### 2026-10-16 — Review follow-up fixes
 
+**Upstream merge — base 1.29.0 → 1.29.1** (`baseVersion` → 1.29.1): adopts upstream Komga 1.29.1 in full — reader links from the new UI open reliably when it is set as the default (including direct `/classic/…` and `/next/…` deep links), the unfinished *Server → User Interface* page is removed, dialogs gain consistent close buttons, tables behave consistently on mobile, and long file names wrap in the duplicate-pages match table. See the upstream [CHANGELOG.md](CHANGELOG.md).
+
 - **The new UI remembers the presentation mode and sort order you pick per view** across reloads — they silently reset to the defaults before.
 - **A user-installed replacement for a bundled plugin survives restarts:** previously the bundled copy was restored on every start and could silently shadow the newer user-installed JAR.
+- **KOReader sync finds your books now:** the hash Komga computed differed from KOReader's own `partialMD5` for almost every file, so progress sync could never match a book; hashing also leaked one open file handle per book, which could fail a library-wide hash pass with "Too many open files".
+- **Editing read list or collection elements can no longer wipe the rest of the list:** opening the edit mode right after a reload could save only the currently visible page, removing every other book/series from the read list or collection. The edit mode now always loads the full list first and refuses to save a partial one; live updates no longer reshuffle the list while you are reordering it.
+- **Integrity repair is reliable:** `zip -FF` no longer hangs for 10 minutes per truncated file waiting for a hidden confirmation prompt, and a file that could only be partially rescued is reported as *partial* ("needs re-download") instead of overwriting the original and claiming *Fixed* (which silently lost the unrecovered pages).
+- **Scrobblers never lower tracker progress anymore:** re-completing an earlier chapter (or finishing one below the progress pulled from the tracker) no longer pushes the lower number to AniList/MyAnimeList/Kitsu/MangaDex/Metron or overwrites the stored sync state with it.
+- **"Known duplicate pages" is fast again:** a missing database index made every page of that view take seconds on large libraries (~4 s at 780k pages); with the new index it responds in milliseconds.
 
-### 2026-10-14 — Bug-hunt fixes
+### 2026-10-14 — Fixes
 
-A deep multi-pass review of the fork's own code (backend, classic UI and new UI) confirmed 139 bugs; this release fixes them. The user-visible ones:
+A deep multi-pass review of the fork's own code (backend, classic UI and new UI) confirmed 139 bugs; this release fixes them:
 
 **Downloads & subscriptions**
 - A running download's status no longer flips back to "pending" every few seconds, pausing/cancelling is no longer overwritten by progress updates, and a paused-then-resumed download can no longer be marked failed by its old run.
@@ -63,10 +88,13 @@ A deep multi-pass review of the fork's own code (backend, classic UI and new UI)
 **Upstream merge — base 1.27.1 → 1.29.0** (`baseVersion` → 1.29.0): adopts upstream Komga 1.27.1 → 1.29.0 in full — the Vue 3 UI gains contextual navigation, breadcrumbs and sibling (previous/next) navigation, notable entities (teams/characters/locations from ComicInfo.xml, with filters), a poster filter, OAuth2 login, a server setting to make the new UI the default (classic UI stays reachable under `/classic`), plus the Koreader progress-sync refactor, optional HTTP sessions stored in a database (enabled in Docker: a `sessions.sqlite` appears in the config folder), new database indices and Gradle 9.8.1. See the upstream [CHANGELOG.md](CHANGELOG.md) for the complete list. **junrar 8.1.0 → 8.1.2, jsoup 1.23.1 → 1.23.2, thumbnailator 0.4.21, jbig2-imageio 3.0.5, zxing 3.5.4.** Requires `./gradlew jooq-codegen-primary` on build.
 
 ### Scrobblers (user request by CheetahDoesStuff, [#47](https://github.com/08shiro80/komga-enhanced/discussions/47))
-- **Scrobbling is now per user:** every user links their own AniList, MyAnimeList, Kitsu, MangaDex and Metron accounts under **My account → Trackers** (classic and new UI). When a user finishes a book, the progress is synced only to that user's accounts — friends sharing a server no longer end up on one shared tracker account. Each account can be tested, paused or unlinked; stored tokens and passwords are never shown again.
-- **The pull from trackers back into Komga works for every linked user** (AniList / MyAnimeList / Kitsu) and now renews expired MyAnimeList/Kitsu tokens automatically.
-- **Admins keep only the server policy** in the Plugin Manager (scrobbler on/off, link auto-detection, manual mappings, excluded libraries). The old server-wide tracker accounts and the `sync_user_id` option are gone.
-- **Upgrade:** existing tracker settings are moved to the user from `sync_user_id`, or to the first admin when it was empty; trackers that were not selected before stay linked but paused. MangaDex scrobbling no longer falls back to the gallery-dl / Subscription Sync account — link your own MangaDex account. The MyAnimeList client ID used to find MyAnimeList links for series metadata now lives in **Auto Metadata Match** (copied automatically).
+- **Scrobbling is now per user:** every user links their own AniList, MyAnimeList, Kitsu, MangaDex and Metron accounts under **My account → Trackers** (classic and new UI). When a user finishes a book, the progress is synced only to that user's accounts — friends sharing a server no longer end up on one shared tracker account. Each account shows its status (account name, last sync, last error, "connect again" when needed), can be tested, paused, synced on demand ("Sync now") or unlinked; stored tokens and passwords are never shown again.
+- **Linking an account:** AniList and MyAnimeList use **Connect** — enter the client ID/secret of your own API client (the page shows the exact redirect URL to register at the provider), log in at the provider and you are sent back to Komga. Kitsu uses your Kitsu login (email/username + password). MangaDex uses your account plus a personal API client. Metron uses an API token from your Metron profile (username/password only as a fallback).
+- **All tracker credentials are stored encrypted** (AES-256-GCM). The key is created once as `tracker-secrets.key` in the config folder — back it up together with the database; without it users have to link their trackers again.
+- **Tracking works right after reading, without a metadata refresh:** the tracker entry of a series is found from its links, from the MangaDex entry of downloaded series (exact AniList/MyAnimeList/Kitsu IDs) or from a verified title search over all local titles, and remembered. The highest read chapter is sent, tracker progress is never lowered, entries get a reading/completed status and start/finish dates where the tracker supports them (not MyAnimeList). One-shots (Komga one-shot series or series tagged "Oneshot", e.g. from MangaDex) are sent as chapter 1 and completed. Removing a wrong tracker link from a series stops it from being used again.
+- **The pull from trackers back into Komga works for every linked user** (AniList / MyAnimeList / Kitsu): newer remote progress marks the books as read, lower remote progress is sent again. Rate limits are respected per tracker; postponed updates are retried automatically.
+- **Admins keep only the server policy** in the Plugin Manager (scrobbler on/off, ID discovery, manual mappings by series ID or title, included/excluded libraries). The old server-wide tracker accounts and the `sync_user_id` option are gone.
+- **Upgrade:** existing tracker settings are moved to the user from `sync_user_id`, or to the first admin when it was empty; trackers that were not selected before stay linked but paused. Kitsu has to be linked again with your Kitsu login. MangaDex scrobbling no longer falls back to the gallery-dl / Subscription Sync account — link your own MangaDex account. The MyAnimeList client ID used to find MyAnimeList links for series metadata now lives in **Auto Metadata Match** (copied automatically).
 
 ### Downloads
 - **Fixed: existing chapters got wrong chapter numbers after a download** (e.g. chapter 69 shown as 127): after every download the series was sorted twice in parallel (a full library scan plus a separate folder scan), and the second sort could overwrite chapter numbers that had just been re-read from `ComicInfo.xml` with plain position numbers. Sorting now only rewrites numbers that actually change, so this can no longer happen. Already affected series are corrected by **Refresh metadata** on the series (or library).
@@ -83,7 +111,7 @@ A deep multi-pass review of the fork's own code (backend, classic UI and new UI)
 ### Reliability
 - **MangaDex metadata no longer mislabels series as "Adult" (18+):** when a title had no content rating from MangaDex, the age rating defaulted to 18; it is now left unset, and only `erotica`/`pornographic` map to 18.
 - **MangaDex search on the Discover page now finds adult-rated titles:** the search request previously defaulted to safe/suggestive only, so erotica/pornographic titles were silently missing from results — all content ratings are now requested.
-- **A chapter download can no longer overwrite a different chapter's file:** when a chapter's identity couldn't be resolved, its `.cbz` could replace an existing, unrelated chapter (data loss). Such collisions now get a distinct filename instead.
+- **A chapter download can no longer overwrite a different chapter's file:** a `.cbz` whose chapter identity differs from (or cannot be matched against) the existing file now gets a distinct filename instead of replacing it (data loss). Sources without any chapter identifiers keep replacing the same file name, so re-downloads there do not pile up `(2)` duplicates.
 - **A paused download is no longer duplicated:** a follow/subscription check could enqueue a second copy of a download that was merely paused — it now recognizes the paused entry.
 - **MangaDex subscription auth is race-safe:** restarting the subscription sync while a feed check was in flight could leave the access token in an inconsistent state; token refresh/clear is now serialized.
 

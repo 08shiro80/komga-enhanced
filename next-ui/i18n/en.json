@@ -275,6 +275,10 @@
     "defaultMessage": "Click to confirm",
     "description": "Confirmation dialog: default checkbox label"
   },
+  "3zkvDp": {
+    "defaultMessage": "Close",
+    "description": "Book picker dialog: Close button"
+  },
   "40HXjy": {
     "defaultMessage": "Cancel",
     "description": "Metadata edition: add role dialog - cancel button"
@@ -590,6 +594,10 @@
   "BQmPch": {
     "defaultMessage": "Delete book",
     "description": "Task name: DeleteBook"
+  },
+  "BXkP7H": {
+    "defaultMessage": "Close",
+    "description": "Series picker dialog: Close button"
   },
   "Bewgy6": {
     "defaultMessage": "Series cover",
@@ -1283,6 +1291,10 @@
     "defaultMessage": "Deleted page",
     "description": "History Table, expansion panel for deleted page: alt description for deleted page"
   },
+  "Qz1UTX": {
+    "defaultMessage": "Close",
+    "description": "File name picker dialog: Close button"
+  },
   "REmxIM": {
     "defaultMessage": "Modified",
     "description": "Known Duplicate Page Table header: modified date"
@@ -1690,10 +1702,6 @@
   "YeUvoE": {
     "defaultMessage": "Custom role...",
     "description": "Metadata edition: add role menu - custom role"
-  },
-  "Yf4DJ2": {
-    "defaultMessage": "User Interface",
-    "description": "Drawer menu for Server > User Interface"
   },
   "Ym48fa": {
     "defaultMessage": "No recent events",
@@ -2499,21 +2507,81 @@
     "defaultMessage": "Download failed",
     "description": "Download notification: failed: title"
   },
+  "fork/account/trackers/accountName": {
+    "defaultMessage": "Account: {name}",
+    "description": "Account trackers: connected remote account"
+  },
+  "fork/account/trackers/authorizationError/denied": {
+    "defaultMessage": "The {name} login was cancelled or access was denied",
+    "description": "Account trackers: provider login was cancelled or denied"
+  },
+  "fork/account/trackers/authorizationError/exchangeFailed": {
+    "defaultMessage": "{name} rejected the login. Check the client ID, the client secret and the registered redirect URL. Details are in the server log.",
+    "description": "Account trackers: exchanging the authorization code failed"
+  },
+  "fork/account/trackers/authorizationError/invalidState": {
+    "defaultMessage": "The {name} login took too long or was already used. Click Connect again.",
+    "description": "Account trackers: the provider login request is unknown or expired"
+  },
+  "fork/account/trackers/authorizationError/missingCode": {
+    "defaultMessage": "{name} returned no authorization code",
+    "description": "Account trackers: provider returned no authorization code"
+  },
+  "fork/account/trackers/authorizationError/notConfigured": {
+    "defaultMessage": "The {name} client settings were removed during the login",
+    "description": "Account trackers: client settings were removed during the provider login"
+  },
+  "fork/account/trackers/authorizationError/rateLimited": {
+    "defaultMessage": "Too many requests to {name} at the moment, try again in a few minutes.",
+    "description": "Account trackers: the token exchange was stopped by the request limit"
+  },
+  "fork/account/trackers/authorizationError/sessionExpired": {
+    "defaultMessage": "Your Komga session expired during the {name} login. Click Connect again.",
+    "description": "Account trackers: the Komga session expired during the provider login"
+  },
+  "fork/account/trackers/authorizationError/stateMismatch": {
+    "defaultMessage": "The {name} login was started by another Komga user and was not applied.",
+    "description": "Account trackers: the provider login belongs to another user"
+  },
+  "fork/account/trackers/authorizationError/storageFailed": {
+    "defaultMessage": "The {name} tokens could not be stored. Details are in the server log.",
+    "description": "Account trackers: tokens could not be stored encrypted"
+  },
+  "fork/account/trackers/authorizationError/unsupportedTracker": {
+    "defaultMessage": "{name} does not use a provider login. Enter the login details on this page instead.",
+    "description": "Account trackers: the callback was opened for a tracker without provider login"
+  },
+  "fork/account/trackers/authorizationFailed": {
+    "defaultMessage": "Connecting the {name} account failed",
+    "description": "Account trackers: provider login failed for an unknown reason"
+  },
+  "fork/account/trackers/authorized": {
+    "defaultMessage": "{name} account connected",
+    "description": "Account trackers: provider login succeeded"
+  },
   "fork/account/trackers/cancel": {
     "defaultMessage": "Cancel",
     "description": "Account trackers: cancel button"
+  },
+  "fork/account/trackers/comicScrobblerDisabled": {
+    "defaultMessage": "The administrator has not enabled the Comic Scrobbler plugin, nothing is synced to Metron at the moment.",
+    "description": "Account trackers: the comic scrobbler plugin is disabled"
   },
   "fork/account/trackers/confirmUnlink": {
     "defaultMessage": "Remove your {name} account and its saved credentials?",
     "description": "Account trackers: unlink confirmation"
   },
+  "fork/account/trackers/connect": {
+    "defaultMessage": "Connect",
+    "description": "Account trackers: connect button for trackers with provider login"
+  },
+  "fork/account/trackers/credentialsRejected": {
+    "defaultMessage": "The tracker rejected the saved login, correct it and save. {reason}",
+    "description": "Account trackers: the stored credentials were rejected"
+  },
   "fork/account/trackers/enabled": {
     "defaultMessage": "Active",
     "description": "Account trackers: active switch"
-  },
-  "fork/account/trackers/field/accessToken": {
-    "defaultMessage": "Access token",
-    "description": "Account trackers: access token field"
   },
   "fork/account/trackers/field/clientId": {
     "defaultMessage": "Client ID",
@@ -2531,28 +2599,24 @@
     "defaultMessage": "Password",
     "description": "Account trackers: password field"
   },
-  "fork/account/trackers/field/refreshToken": {
-    "defaultMessage": "Refresh token",
-    "description": "Account trackers: refresh token field"
-  },
   "fork/account/trackers/field/token": {
-    "defaultMessage": "Access token",
-    "description": "Account trackers: token field"
+    "defaultMessage": "API token",
+    "description": "Account trackers: Metron API token field"
   },
   "fork/account/trackers/field/username": {
     "defaultMessage": "Username",
     "description": "Account trackers: username field"
   },
   "fork/account/trackers/hint/anilist": {
-    "defaultMessage": "Personal access token from anilist.co/api/v2/oauth/pin (implicit grant of your own AniList API client).",
+    "defaultMessage": "On anilist.co/settings/developer choose Create New Application and enter the redirect URL shown below. Save the client ID and client secret here, then click Connect.",
     "description": "Account trackers: AniList hint"
   },
   "fork/account/trackers/hint/kitsu": {
-    "defaultMessage": "OAuth2 tokens from kitsu.app/api/oauth/token. With refresh token, client ID and client secret the access token is renewed automatically.",
+    "defaultMessage": "Your Kitsu login (email or username and password). Komga signs in to Kitsu itself and renews the session automatically.",
     "description": "Account trackers: Kitsu hint"
   },
   "fork/account/trackers/hint/mal": {
-    "defaultMessage": "OAuth2 tokens of your own MyAnimeList API client. With refresh token, client ID and client secret the access token is renewed automatically.",
+    "defaultMessage": "On myanimelist.net/apiconfig create an API client and enter the redirect URL shown below as App Redirect URL. Save the client ID (and the client secret of web apps) here, then click Connect.",
     "description": "Account trackers: MyAnimeList hint"
   },
   "fork/account/trackers/hint/mangadex": {
@@ -2560,12 +2624,24 @@
     "description": "Account trackers: MangaDex hint"
   },
   "fork/account/trackers/hint/metron": {
-    "defaultMessage": "Your Metron (metron.cloud) account. Used by the Comic Scrobbler.",
+    "defaultMessage": "API token from your metron.cloud profile (Profile → API Tokens). Username and password are only a fallback. Used by the Comic Scrobbler.",
     "description": "Account trackers: Metron hint"
+  },
+  "fork/account/trackers/lastError": {
+    "defaultMessage": "Last error ({date}): {error}",
+    "description": "Account trackers: last error"
+  },
+  "fork/account/trackers/lastSuccess": {
+    "defaultMessage": "Last success: {date}",
+    "description": "Account trackers: last successful sync or test"
   },
   "fork/account/trackers/linked": {
     "defaultMessage": "Linked",
     "description": "Account trackers: linked chip"
+  },
+  "fork/account/trackers/mangaScrobblerDisabled": {
+    "defaultMessage": "The administrator has not enabled the Manga Scrobbler plugin, nothing is synced to this tracker at the moment.",
+    "description": "Account trackers: the manga scrobbler plugin is disabled"
   },
   "fork/account/trackers/menu": {
     "defaultMessage": "Trackers",
@@ -2574,6 +2650,22 @@
   "fork/account/trackers/notLinked": {
     "defaultMessage": "Not linked",
     "description": "Account trackers: not linked chip"
+  },
+  "fork/account/trackers/reconnect": {
+    "defaultMessage": "Connect again",
+    "description": "Account trackers: connect button when the account is already linked"
+  },
+  "fork/account/trackers/reconnectRequired": {
+    "defaultMessage": "The login is no longer valid, click Connect again. {reason}",
+    "description": "Account trackers: the provider login expired or was revoked"
+  },
+  "fork/account/trackers/redirectUri": {
+    "defaultMessage": "Redirect URL",
+    "description": "Account trackers: redirect URL field"
+  },
+  "fork/account/trackers/redirectUriHint": {
+    "defaultMessage": "Register exactly this URL in your API client at the provider.",
+    "description": "Account trackers: redirect URL field hint"
   },
   "fork/account/trackers/save": {
     "defaultMessage": "Save",
@@ -2587,13 +2679,33 @@
     "defaultMessage": "Saved — leave empty to keep",
     "description": "Account trackers: placeholder for a stored secret"
   },
+  "fork/account/trackers/secretsUnreadable": {
+    "defaultMessage": "The saved credentials cannot be read anymore (missing encryption key). Link the account again.",
+    "description": "Account trackers: stored credentials cannot be decrypted"
+  },
   "fork/account/trackers/subtitle": {
     "defaultMessage": "Link your own tracker accounts. When you finish a book, your progress is synced only to the accounts linked here. Scrobbling must be enabled by an administrator (Manga Scrobbler / Comic Scrobbler plugin).",
     "description": "Account trackers: page explanation"
   },
+  "fork/account/trackers/sync": {
+    "defaultMessage": "Sync now",
+    "description": "Account trackers: sync now button"
+  },
+  "fork/account/trackers/syncQueued": {
+    "defaultMessage": "{count, plural, one {# series queued for sync} other {# series queued for sync}}",
+    "description": "Account trackers: sync queued notification"
+  },
   "fork/account/trackers/test": {
     "defaultMessage": "Test connection",
     "description": "Account trackers: test connection button"
+  },
+  "fork/account/trackers/tokenExpires": {
+    "defaultMessage": "Login valid until {date}",
+    "description": "Account trackers: provider token expiry"
+  },
+  "fork/account/trackers/tokenExpiresSoon": {
+    "defaultMessage": "The login expires on {date}. Click Connect again to renew it.",
+    "description": "Account trackers: the provider token expires soon"
   },
   "fork/account/trackers/unlink": {
     "defaultMessage": "Unlink",

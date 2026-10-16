@@ -1,347 +1,214 @@
 package org.gotson.komga.infrastructure.scrobbler
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.gotson.komga.domain.model.LogLevel
-import org.gotson.komga.domain.model.ReadProgress
-import org.gotson.komga.domain.model.SyncState
+import jakarta.annotation.PreDestroy
+import org.gotson.komga.domain.model.KomgaUser
+import org.gotson.komga.domain.model.SeriesTrackerId
 import org.gotson.komga.domain.model.UserTracker
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
+import org.gotson.komga.domain.persistence.KomgaUserRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.ReadProgressRepository
+import org.gotson.komga.domain.persistence.SeriesReadStateRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
-import org.gotson.komga.domain.persistence.SyncStateRepository
+import org.gotson.komga.domain.persistence.SeriesTrackerIdRepository
 import org.gotson.komga.domain.persistence.UserTrackerRepository
-import org.springframework.http.MediaType
-import org.springframework.http.client.JdkClientHttpRequestFactory
+import org.gotson.komga.domain.service.BookLifecycle
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import org.springframework.web.client.RestClient
-import org.springframework.web.client.RestClientException
-import org.springframework.web.client.RestClientResponseException
+import java.time.Clock
 import java.time.Duration
-import java.time.Instant
-import java.time.LocalDateTime
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.floor
 
 private val logger = KotlinLogging.logger {}
 
-/**
- * Periodically pulls remote read progress from AniList / MAL / Kitsu and applies it
- * to Komga when the remote value is ahead of what we last synced.
- *
- * [SyncState.seriesId] is always the **Komga** series id; external tracker ids are
- * resolved from [SeriesMetadata.links] (same rules as [MangaScrobblerPlugin]).
- */
+private const val PLUGIN_ID = "manga-scrobbler"
+private const val LOG_PREFIX = "[manga-scrobbler]"
+
+private enum class PullOutcome {
+  IMPORTED,
+  PUSHED,
+  UNCHANGED,
+}
+
 @Component
 class MangaSyncPullerPlugin(
   private val pluginRepository: PluginRepository,
   private val pluginConfigRepository: PluginConfigRepository,
+  private val userTrackerRepository: UserTrackerRepository,
+  private val komgaUserRepository: KomgaUserRepository,
+  private val seriesRepository: SeriesRepository,
+  private val seriesTrackerIdRepository: SeriesTrackerIdRepository,
+  private val seriesReadStateRepository: SeriesReadStateRepository,
   private val bookRepository: BookRepository,
   private val bookMetadataRepository: BookMetadataRepository,
-  private val seriesRepository: SeriesRepository,
   private val readProgressRepository: ReadProgressRepository,
-  private val syncStateRepository: SyncStateRepository,
-  private val userTrackerRepository: UserTrackerRepository,
+  private val bookLifecycle: BookLifecycle,
   private val trackerIdResolver: TrackerIdResolver,
   private val trackerTokenProvider: TrackerTokenProvider,
-  private val objectMapper: ObjectMapper,
+  private val trackerStatusRecorder: TrackerStatusRecorder,
+  private val trackerConnectionChecker: TrackerConnectionChecker,
+  private val syncStateRecorder: SyncStateRecorder,
+  private val mangaScrobblerPlugin: MangaScrobblerPlugin,
+  mangaTrackerClients: List<MangaTrackerClient>,
+  clock: Clock = Clock.systemUTC(),
 ) {
-  private val pluginId = "manga-scrobbler"
-  private val timeoutFactory =
-    JdkClientHttpRequestFactory(
-      java.net.http.HttpClient
-        .newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
-        .build(),
-    ).apply { setReadTimeout(Duration.ofSeconds(15)) }
-  private val anilistClient =
-    RestClient
-      .builder()
-      .baseUrl("https://graphql.anilist.co")
-      .requestFactory(timeoutFactory)
-      .build()
-  private val malClient =
-    RestClient
-      .builder()
-      .baseUrl("https://api.myanimelist.net")
-      .requestFactory(timeoutFactory)
-      .build()
-  private val kitsuClient =
-    RestClient
-      .builder()
-      .baseUrl("https://kitsu.app/api/edge")
-      .requestFactory(timeoutFactory)
-      .build()
+  private val clients = mangaTrackerClients.associateBy { it.tracker }
 
-  @Scheduled(fixedDelay = 3600_000, initialDelay = 120_000)
+  private val sentBack = LogThrottle(Duration.ofHours(24), clock)
+
+  private val executor: ExecutorService =
+    Executors.newSingleThreadExecutor { r -> Thread(r, "scrobbler-puller").apply { isDaemon = true } }
+
+  private val running = AtomicBoolean(false)
+
+  @PreDestroy
+  fun shutdown() {
+    executor.shutdownNow()
+  }
+
+  @Scheduled(fixedDelay = 3_600_000, initialDelay = 120_000)
   fun pullAllTrackers() {
-    if (!isEnabled()) return
-    val config = loadConfig()
-    val excludedLibs = parseExcludedLibraryIds(config)
-    logger.debug { "Sync puller: checking tracker progress updates" }
-
-    activeAccounts(UserTracker.ANILIST).forEach { pullAnilist(it, config, excludedLibs) }
-    activeAccounts(UserTracker.MAL).forEach { pullMal(it, config, excludedLibs) }
-    activeAccounts(UserTracker.KITSU).forEach { pullKitsu(it, config, excludedLibs) }
-  }
-
-  private fun activeAccounts(tracker: String): List<UserTracker> = userTrackerRepository.findByTracker(tracker).filter { it.active }
-
-  private fun pullAnilist(
-    account: UserTracker,
-    config: Map<String, String?>,
-    excludedLibs: Set<String>,
-  ) {
-    val userId = account.userId
-    val token = account[UserTracker.KEY_TOKEN] ?: return
-    val states = syncStateRepository.findByUserIdAndTracker(userId, UserTracker.ANILIST)
-    for (state in states) {
-      if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) continue
-      val anilistId = trackerIdResolver.resolveFromKomgaSeriesId(state.seriesId, config).anilistId ?: continue
-      val query =
-        """
-        query (${'$'}id: Int) {
-          Media(id: ${'$'}id) {
-            mediaListEntry {
-              progress
-              status
-              updatedAt
-            }
-          }
-        }
-        """.trimIndent()
+    if (!ScrobblerConfig.enabled(pluginRepository, PLUGIN_ID)) return
+    if (!running.compareAndSet(false, true)) {
+      logger.debug { "$LOG_PREFIX Previous tracker pull is still running, skipping this run" }
+      return
+    }
+    executor.submit {
       try {
-        val response =
-          anilistClient
-            .post()
-            .header("Authorization", "Bearer $token")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("query" to query, "variables" to mapOf("id" to anilistId)))
-            .retrieve()
-            .body(String::class.java)
-
-        val json = response?.let { objectMapper.readTree(it) }
-        val mediaList = json?.get("data")?.get("Media")?.get("mediaListEntry")
-        if (mediaList == null || mediaList.isNull) continue
-
-        val remoteProgress = mediaList.get("progress")?.asInt(0) ?: 0
-        val remoteUpdatedAt = mediaList.get("updatedAt")?.asLong(0) ?: 0
-        if (remoteProgress > state.progress && remoteUpdatedAt > 0) {
-          applyRemoteProgress(state, remoteProgress, remoteUpdatedAt, userId, "AniList", excludedLibs)
-        }
+        pullAll()
       } catch (e: Exception) {
-        logger.debug(e) { "AniList pull failed for series ${state.seriesId}" }
+        logger.error(e) { "$LOG_PREFIX Unexpected error while pulling the trackers" }
+      } finally {
+        running.set(false)
       }
     }
   }
 
-  private fun pullMal(
-    account: UserTracker,
-    config: Map<String, String?>,
-    excludedLibs: Set<String>,
-  ) {
-    val userId = account.userId
-    var token = trackerTokenProvider.malToken(account) ?: return
-    val states = syncStateRepository.findByUserIdAndTracker(userId, UserTracker.MAL)
-    for (state in states) {
-      if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) continue
-      val malId = trackerIdResolver.resolveFromKomgaSeriesId(state.seriesId, config).malId ?: continue
-      try {
-        val response =
-          try {
-            requestMal(malId, token)
-          } catch (e: RestClientResponseException) {
-            if (!isUnauthorized(e)) throw e
-            token = trackerTokenProvider.refreshMal(account) ?: return
-            requestMal(malId, token)
-          }
-
-        val json = response?.let { objectMapper.readTree(it) }
-        val listStatus = json?.get("my_list_status") ?: continue
-        val remoteProgress = listStatus.get("num_chapters_read")?.asInt(0) ?: continue
-
-        if (remoteProgress > state.progress) {
-          applyRemoteProgress(state, remoteProgress, Instant.now().epochSecond, userId, "MAL", excludedLibs)
+  private fun pullAll() {
+    val config = ScrobblerConfig.load(pluginConfigRepository, PLUGIN_ID)
+    clients.keys.forEach { tracker ->
+      val accounts = userTrackerRepository.findByTracker(tracker).filter { it.active }
+      if (accounts.isEmpty()) return@forEach
+      val seriesByMediaId = seriesByMediaId(tracker)
+      accounts.forEach { account ->
+        try {
+          pull(account, config, seriesByMediaId)
+        } catch (e: Exception) {
+          logger.error(e) { "$LOG_PREFIX Unexpected error while pulling ${trackerDisplayNames[tracker]} for user ${account.userId}" }
         }
-      } catch (e: RestClientException) {
-        val is404 = e is RestClientResponseException && e.statusCode.value() == 404
-        if (!is404) {
-          logger.debug(e) { "MAL pull failed for series ${state.seriesId}" }
-        }
-      } catch (e: Exception) {
-        logger.debug(e) { "MAL pull failed for series ${state.seriesId}" }
       }
     }
   }
 
-  private fun pullKitsu(
+  private fun pull(
     account: UserTracker,
-    config: Map<String, String?>,
-    excludedLibs: Set<String>,
+    config: ScrobblerConfig,
+    seriesByMediaId: Map<String, Set<String>>,
   ) {
-    val userId = account.userId
-    var token = trackerTokenProvider.kitsuToken(account) ?: return
-    val kitsuUserId = trackerTokenProvider.kitsuUserId(account, token) ?: return
-    val states = syncStateRepository.findByUserIdAndTracker(userId, UserTracker.KITSU)
-    for (state in states) {
-      if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) continue
-      val kitsuId = trackerIdResolver.resolveFromKomgaSeriesId(state.seriesId, config).kitsuId ?: continue
+    val user = komgaUserRepository.findByIdOrNull(account.userId) ?: return
+    val client = clients.getValue(account.tracker)
+    val name = trackerDisplayNames[account.tracker]
+    val identified =
       try {
-        val response =
-          try {
-            requestKitsu(kitsuId, kitsuUserId, token)
-          } catch (e: RestClientResponseException) {
-            if (!isUnauthorized(e)) throw e
-            token = trackerTokenProvider.refreshKitsu(account) ?: return
-            requestKitsu(kitsuId, kitsuUserId, token)
-          }
+        if (needsIdentity(account)) trackerConnectionChecker.confirmIdentity(account) else account
+      } catch (e: TrackerCallException) {
+        trackerStatusRecorder.failure(account, e)
+        logger.debug { "$LOG_PREFIX $name pull for user ${account.userId} skipped, the remote account could not be identified: ${e.message}" }
+        return
+      }
+    val remote =
+      try {
+        trackerTokenProvider.withToken(identified) { token -> client.library(identified, token) }
+      } catch (e: TrackerCallException) {
+        trackerStatusRecorder.failure(identified, e)
+        if (e !is TrackerAuthException) logger.info { "$LOG_PREFIX $name pull for user ${identified.userId} postponed: ${e.message}" }
+        return
+      }
+    trackerStatusRecorder.success(identified)
 
-        val json = response?.let { objectMapper.readTree(it) }
-        val attrs = json?.get("data")?.firstOrNull()?.get("attributes")
-        if (attrs == null) continue
-
-        val remoteProgress = attrs.get("progress")?.asInt(0) ?: 0
-        if (remoteProgress > state.progress) {
-          applyRemoteProgress(state, remoteProgress, Instant.now().epochSecond, userId, "Kitsu", excludedLibs)
+    var imported = 0
+    var pushed = 0
+    remote.forEach { entry ->
+      seriesByMediaId[entry.mediaId].orEmpty().forEach { seriesId ->
+        when (apply(identified, user, config, seriesId, entry)) {
+          PullOutcome.IMPORTED -> imported++
+          PullOutcome.PUSHED -> pushed++
+          PullOutcome.UNCHANGED -> Unit
         }
-      } catch (e: Exception) {
-        logger.debug(e) { "Kitsu pull failed for series ${state.seriesId}" }
+      }
+    }
+    val summary = "$LOG_PREFIX $name pull for user ${identified.userId}: $imported series updated from $name, $pushed series sent back"
+    if (imported > 0 || pushed > 0) logger.info { summary } else logger.debug { summary }
+  }
+
+  private fun needsIdentity(account: UserTracker): Boolean =
+    account.identityCheckRequired ||
+      (account.tracker == UserTracker.ANILIST && account[UserTracker.KEY_REMOTE_USER_ID] == null)
+
+  private fun apply(
+    account: UserTracker,
+    user: KomgaUser,
+    config: ScrobblerConfig,
+    seriesId: String,
+    entry: RemoteEntry,
+  ): PullOutcome {
+    val series = seriesRepository.findByIdOrNull(seriesId) ?: return PullOutcome.UNCHANGED
+    if (!config.includesLibrary(series.libraryId) || !user.canAccessLibrary(series.libraryId)) return PullOutcome.UNCHANGED
+    val remoteProgress = entry.progress
+    if (remoteProgress <= 0) return PullOutcome.UNCHANGED
+    val state = seriesReadStateRepository.findByUserIdAndSeriesId(user.id, seriesId)
+    val local = state?.let { if (it.oneshot) 1 else floor(it.highestNumberSort.toDouble()).toInt() } ?: 0
+
+    return when {
+      remoteProgress > local -> {
+        syncStateRecorder.record(user.id, seriesId, account.tracker, remoteProgress, entry.status?.name, remoteUpdate = true)
+        val books = bookRepository.findAllBySeriesId(seriesId)
+        val numbers = bookMetadataRepository.findAllByIds(books.map { it.id }).associate { it.bookId to it.numberSort }
+        val alreadyRead =
+          readProgressRepository
+            .findAllByBookIdsAndUserId(books.map { it.id }, user.id)
+            .filter { it.completed }
+            .map { it.bookId }
+            .toSet()
+        val toMark =
+          books.filter { book ->
+            val number = numbers[book.id]
+            book.id !in alreadyRead && number != null && number > 0 && number <= remoteProgress.toFloat()
+          }
+        toMark.forEach { bookLifecycle.markReadProgressCompleted(it.id, user) }
+        if (toMark.isEmpty()) PullOutcome.UNCHANGED else PullOutcome.IMPORTED
+      }
+
+      remoteProgress < local -> {
+        if (!sentBack.shouldLog("${user.id}:$seriesId:${account.tracker}:$local")) return PullOutcome.UNCHANGED
+        syncStateRecorder.recordRemote(user.id, seriesId, account.tracker, remoteProgress, entry.status?.name)
+        mangaScrobblerPlugin.schedule(user.id, seriesId, listOf(account.tracker))
+        PullOutcome.PUSHED
+      }
+
+      else -> {
+        syncStateRecorder.record(user.id, seriesId, account.tracker, remoteProgress, entry.status?.name, remoteUpdate = true)
+        PullOutcome.UNCHANGED
       }
     }
   }
 
-  private fun requestMal(
-    malId: Int,
-    token: String,
-  ): String? =
-    malClient
-      .get()
-      .uri("/v2/manga/$malId?fields=my_list_status")
-      .header("Authorization", "Bearer $token")
-      .retrieve()
-      .body(String::class.java)
-
-  private fun requestKitsu(
-    kitsuId: Int,
-    kitsuUserId: String,
-    token: String,
-  ): String? =
-    kitsuClient
-      .get()
-      .uri("/library-entries?filter[userId]=$kitsuUserId&filter[mangaId]=$kitsuId&page[limit]=1")
-      .header("Authorization", "Bearer $token")
-      .header("Accept", "application/vnd.api+json")
-      .retrieve()
-      .body(String::class.java)
-
-  private fun isUnauthorized(e: RestClientResponseException): Boolean = e.statusCode.value() == 401 || e.statusCode.value() == 403
-
-  private fun parseExcludedLibraryIds(config: Map<String, String?>): Set<String> =
-    config["exclude_library_ids"]
-      ?.split(',')
-      ?.mapNotNull { it.trim().takeIf { s -> s.isNotEmpty() } }
-      ?.toSet()
-      ?: emptySet()
-
-  private fun shouldSkipKomgaSeries(
-    komgaSeriesId: String,
-    excludedLibs: Set<String>,
-  ): Boolean {
-    if (excludedLibs.isEmpty()) return false
-    val libraryId = seriesRepository.findByIdOrNull(komgaSeriesId)?.libraryId ?: return false
-    return libraryId in excludedLibs
-  }
-
-  private fun applyRemoteProgress(
-    state: SyncState,
-    remoteProgress: Int,
-    remoteUpdatedAt: Long,
-    userId: String,
-    trackerName: String,
-    excludedLibs: Set<String>,
-  ) {
-    try {
-      if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) return
-
-      val books = bookRepository.findAllBySeriesId(state.seriesId)
-      val metaById =
-        bookMetadataRepository
-          .findAllByIds(books.map { it.id })
-          .associateBy { it.bookId }
-
-      // Mark every chapter up to the remote progress as read, not only the exact match — decimal or gapped
-      // numbering would otherwise never resolve and retry hourly without progress.
-      val targetBooks =
-        books.filter { book ->
-          val number = metaById[book.id]?.numberSort
-          number != null && number <= remoteProgress.toFloat()
-        }
-
-      val alreadyRead =
-        readProgressRepository
-          .findAllByBookIdsAndUserId(targetBooks.map { it.id }, userId)
-          .filter { it.completed }
-          .map { it.bookId }
-          .toSet()
-
-      val newProgress =
-        targetBooks
-          .filterNot { it.id in alreadyRead }
-          .map { book ->
-            ReadProgress(
-              bookId = book.id,
-              userId = userId,
-              page = 1,
-              completed = true,
-              readDate = LocalDateTime.now(),
-              deviceId = "manga-sync-puller",
-              deviceName = "Manga Sync Puller ($trackerName)",
-            )
-          }
-      if (newProgress.isNotEmpty()) readProgressRepository.save(newProgress)
-
-      // Always advance syncState (even when no book matches the exact number) to avoid an hourly retry loop.
-      val latestBook = targetBooks.maxByOrNull { metaById[it.id]?.numberSort ?: 0f }
-      syncStateRepository.update(
-        state.copy(
-          progress = remoteProgress,
-          bookId = latestBook?.id ?: state.bookId,
-          lastSyncTimestamp = LocalDateTime.now(),
-          lastUpdateTimestamp = LocalDateTime.now(),
-          lastModifiedDate = LocalDateTime.now(),
-        ),
-      )
-      log(LogLevel.INFO, "$trackerName pull: komga series ${state.seriesId} → chapter $remoteProgress (${newProgress.size} newly marked)")
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to apply remote progress for series ${state.seriesId}" }
-    }
-  }
-
-  private fun isEnabled(): Boolean =
-    try {
-      pluginRepository.findByIdOrNull(pluginId)?.enabled == true
-    } catch (_: Exception) {
-      false
-    }
-
-  private fun loadConfig(): Map<String, String?> =
-    pluginConfigRepository
-      .findByPluginId(pluginId)
-      .associate { it.configKey to it.configValue }
-
-  private fun log(
-    level: LogLevel,
-    message: String,
-    throwable: Throwable? = null,
-  ) {
-    val line = "[$pluginId] $message"
-    when (level) {
-      LogLevel.ERROR -> logger.error(throwable) { line }
-      LogLevel.WARN -> logger.warn(throwable) { line }
-      LogLevel.DEBUG -> logger.debug(throwable) { line }
-      else -> logger.info(throwable) { line }
-    }
+  private fun seriesByMediaId(tracker: String): Map<String, Set<String>> {
+    val accepted = seriesTrackerIdRepository.findByTracker(tracker).filter { it.status == SeriesTrackerId.Status.ACCEPTED }
+    val acceptedSeries = accepted.map { it.seriesId }.toSet()
+    val fromLinks =
+      seriesTrackerIdRepository
+        .findLinkedSeriesUrls(trackerLinkUrlPart(tracker))
+        .filter { (seriesId, _) -> seriesId !in acceptedSeries }
+        .mapNotNull { (seriesId, url) -> trackerIdResolver.fromLink(tracker, url)?.takeIf { it.toIntOrNull() != null }?.let { seriesId to it } }
+    return (accepted.map { it.seriesId to it.trackerId } + fromLinks)
+      .groupBy({ it.second }, { it.first })
+      .mapValues { it.value.toSet() }
   }
 }

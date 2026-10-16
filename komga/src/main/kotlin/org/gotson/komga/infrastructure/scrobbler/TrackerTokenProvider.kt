@@ -1,28 +1,45 @@
 package org.gotson.komga.infrastructure.scrobbler
 
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.UserTracker
 import org.gotson.komga.domain.persistence.UserTrackerRepository
 import org.springframework.http.MediaType
+import org.springframework.http.client.ClientHttpRequestFactory
 import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
-import java.net.URLEncoder
+import org.springframework.web.client.RestClientException
+import org.springframework.web.client.RestClientResponseException
 import java.time.Duration
 import java.time.Instant
+import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 
 private val logger = KotlinLogging.logger {}
 
+private const val ANILIST_TOKEN_URL = "https://anilist.co/api/v2/oauth/token"
 private const val MAL_TOKEN_URL = "https://myanimelist.net/v1/oauth2/token"
 private const val KITSU_TOKEN_URL = "https://kitsu.app/api/oauth/token"
 private const val MANGADEX_TOKEN_URL = "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token"
+
+private fun defaultRequestFactory(): ClientHttpRequestFactory =
+  JdkClientHttpRequestFactory(
+    java.net.http.HttpClient
+      .newBuilder()
+      .connectTimeout(Duration.ofSeconds(15))
+      .build(),
+  ).apply { setReadTimeout(Duration.ofSeconds(30)) }
 
 @Component
 class TrackerTokenProvider(
   private val userTrackerRepository: UserTrackerRepository,
   private val objectMapper: ObjectMapper,
+  private val trackerRateLimiter: TrackerRateLimiter,
+  requestFactory: ClientHttpRequestFactory = defaultRequestFactory(),
 ) {
   private data class CachedToken(
     val accessToken: String,
@@ -37,129 +54,242 @@ class TrackerTokenProvider(
   )
 
   private val cache = ConcurrentHashMap<String, CachedToken>()
-  private val kitsuUserIds = ConcurrentHashMap<String, String>()
-  private val locks = ConcurrentHashMap<String, Any>()
+  private val locks = ConcurrentHashMap<String, ReentrantLock>()
 
   private val client =
     RestClient
       .builder()
-      .requestFactory(
-        JdkClientHttpRequestFactory(
-          java.net.http.HttpClient
-            .newBuilder()
-            .connectTimeout(Duration.ofSeconds(15))
-            .build(),
-        ).apply { setReadTimeout(Duration.ofSeconds(30)) },
-      ).build()
+      .requestFactory(requestFactory)
+      .build()
 
-  fun malToken(account: UserTracker): String? = oauthToken(account, MAL_TOKEN_URL)
-
-  fun refreshMal(account: UserTracker): String? = synchronized(lockFor(account)) { refreshOauth(account, MAL_TOKEN_URL) }
-
-  fun kitsuToken(account: UserTracker): String? = oauthToken(account, KITSU_TOKEN_URL)
-
-  fun refreshKitsu(account: UserTracker): String? = synchronized(lockFor(account)) { refreshOauth(account, KITSU_TOKEN_URL) }
-
-  fun mangadexToken(account: UserTracker): String? =
-    synchronized(lockFor(account)) {
-      validCached(account) ?: requestMangaDexToken(account)
+  fun token(account: UserTracker): String =
+    locked(account) {
+      when (account.tracker) {
+        UserTracker.ANILIST -> account[UserTracker.KEY_TOKEN] ?: throw TrackerAuthException("anilist account is not connected")
+        UserTracker.MAL -> validCached(account) ?: malTokenWithStoredFallback(account)
+        UserTracker.KITSU -> validCached(account) ?: requestKitsuToken(account)
+        UserTracker.MANGADEX -> validCached(account) ?: requestMangaDexToken(account)
+        else -> throw TrackerAuthException("${account.tracker} does not use tokens")
+      }
     }
 
-  fun invalidate(account: UserTracker) {
-    cache.remove(cacheKey(account))
-    kitsuUserIds.remove(cacheKey(account))
+  fun refreshAfterUnauthorized(account: UserTracker): String =
+    locked(account) {
+      when (account.tracker) {
+        UserTracker.MAL -> {
+          if (!canRefreshMal(account)) throw TrackerAuthException("mal access token was rejected and cannot be refreshed, connect the account again")
+          refreshMalToken(account)
+        }
+        UserTracker.KITSU -> {
+          cache.computeIfPresent(cacheKey(account)) { _, cached -> cached.copy(expiry = null) }
+          requestKitsuToken(account)
+        }
+        UserTracker.MANGADEX -> {
+          cache.remove(cacheKey(account))
+          requestMangaDexToken(account)
+        }
+        else -> throw TrackerAuthException("${account.tracker} rejected the token, connect the account again")
+      }
+    }
+
+  fun <T> withToken(
+    account: UserTracker,
+    call: (String) -> T,
+  ): T {
+    val token = token(account)
+    try {
+      return call(token)
+    } catch (e: Exception) {
+      val failure = classifyTrackerFailure(account.tracker, e, listOf(token))
+      if (failure !is TrackerUnauthorizedException) throw failure
+    }
+    val refreshed = refreshAfterUnauthorized(account)
+    try {
+      return call(refreshed)
+    } catch (e: Exception) {
+      val failure = classifyTrackerFailure(account.tracker, e, listOf(refreshed))
+      if (failure is TrackerUnauthorizedException) throw TrackerAuthException(failure.message ?: "${account.tracker} rejected the token", failure)
+      throw failure
+    }
   }
 
-  fun kitsuUserId(
-    account: UserTracker,
-    token: String,
-  ): String? {
-    val key = cacheKey(account)
-    kitsuUserIds[key]?.let { return it }
+  fun tokenExpiry(account: UserTracker): Instant? {
+    account[UserTracker.KEY_TOKEN_EXPIRES_AT]?.let { stored -> return runCatching { Instant.parse(stored) }.getOrNull() }
+    if (account.tracker != UserTracker.ANILIST) return null
+    val payload = account[UserTracker.KEY_TOKEN]?.split('.')?.getOrNull(1) ?: return null
     return try {
-      val response =
-        client
-          .get()
-          .uri("https://kitsu.app/api/edge/users?filter[self]=true")
-          .header("Authorization", "Bearer $token")
-          .header("Accept", "application/vnd.api+json")
-          .retrieve()
-          .body(String::class.java)
-      val id =
-        response
-          ?.let { objectMapper.readTree(it) }
-          ?.at("/data/0/id")
-          ?.asText(null)
-          ?.takeIf { it.isNotBlank() }
-      if (id != null) {
-        kitsuUserIds[key] = id
-      } else {
-        logger.warn { "Kitsu self-user lookup returned no user id for user ${account.userId}" }
-      }
-      id
-    } catch (e: Exception) {
-      logger.warn(e) { "Kitsu self-user lookup failed for user ${account.userId}: ${e.message}" }
+      objectMapper
+        .readTree(Base64.getUrlDecoder().decode(payload))
+        .get("exp")
+        ?.takeIf { it.canConvertToLong() }
+        ?.let { Instant.ofEpochSecond(it.asLong()) }
+    } catch (_: IllegalArgumentException) {
+      null
+    } catch (_: JsonProcessingException) {
       null
     }
   }
 
-  private fun requestMangaDexToken(account: UserTracker): String? {
-    val username = account[UserTracker.KEY_USERNAME] ?: return null
-    val password = account[UserTracker.KEY_PASSWORD] ?: return null
-    val clientId = account[UserTracker.KEY_CLIENT_ID] ?: return null
-    val clientSecret = account[UserTracker.KEY_CLIENT_SECRET] ?: return null
+  fun completeAuthorization(
+    account: UserTracker,
+    code: String,
+    redirectUri: String,
+    codeVerifier: String?,
+  ): UserTracker = trackerRateLimiter.withMaxWait(interactiveMaxWait) { exchangeAuthorizationCode(account, code, redirectUri, codeVerifier) }
+
+  private fun exchangeAuthorizationCode(
+    account: UserTracker,
+    code: String,
+    redirectUri: String,
+    codeVerifier: String?,
+  ): UserTracker {
+    val clientId = account[UserTracker.KEY_CLIENT_ID] ?: throw TrackerAuthException("${account.tracker} client ID is not set")
+    val clientSecret = account[UserTracker.KEY_CLIENT_SECRET]
+    val response =
+      when (account.tracker) {
+        UserTracker.ANILIST -> {
+          if (clientSecret == null) throw TrackerAuthException("anilist client secret is not set")
+          requestToken(
+            account,
+            ANILIST_TOKEN_URL,
+            mapOf(
+              "grant_type" to "authorization_code",
+              "client_id" to clientId,
+              "client_secret" to clientSecret,
+              "redirect_uri" to redirectUri,
+              "code" to code,
+            ),
+            MediaType.APPLICATION_JSON,
+            listOf(clientSecret, code),
+          )
+        }
+
+        UserTracker.MAL -> {
+          if (codeVerifier == null) throw TrackerAuthException("mal authorization requires a PKCE code verifier")
+          requestToken(
+            account,
+            MAL_TOKEN_URL,
+            formEncode(
+              "grant_type" to "authorization_code",
+              "client_id" to clientId,
+              "client_secret" to clientSecret,
+              "code" to code,
+              "code_verifier" to codeVerifier,
+              "redirect_uri" to redirectUri,
+            ),
+            MediaType.APPLICATION_FORM_URLENCODED,
+            listOf(clientSecret, code, codeVerifier),
+          )
+        }
+
+        else -> throw TrackerAuthException("${account.tracker} does not support the authorization code flow")
+      }
+
+    val settings = account.settings.filterKeys { it != UserTracker.KEY_STATUS && it != UserTracker.KEY_STATUS_MESSAGE }.toMutableMap()
+    settings[UserTracker.KEY_IDENTITY_CHECK] = UserTracker.IDENTITY_CHECK_REQUIRED
+    if (account.tracker == UserTracker.ANILIST) {
+      settings[UserTracker.KEY_TOKEN] = response.accessToken
+      if (response.expiresIn > 0) {
+        settings[UserTracker.KEY_TOKEN_EXPIRES_AT] = Instant.now().plusSeconds(response.expiresIn).toString()
+      } else {
+        settings.remove(UserTracker.KEY_TOKEN_EXPIRES_AT)
+      }
+    } else {
+      settings[UserTracker.KEY_ACCESS_TOKEN] = response.accessToken
+      if (response.refreshToken != null) settings[UserTracker.KEY_REFRESH_TOKEN] = response.refreshToken else settings.remove(UserTracker.KEY_REFRESH_TOKEN)
+    }
+    val updated = UserTracker(account.userId, account.tracker, settings)
+    locked(account) {
+      userTrackerRepository.save(updated)
+      invalidate(account)
+      if (account.tracker == UserTracker.MAL) cacheToken(account, response)
+    }
+    return updated
+  }
+
+  fun invalidate(account: UserTracker) {
+    cache.remove(cacheKey(account))
+  }
+
+  private fun requestMangaDexToken(account: UserTracker): String {
+    val clientId = account[UserTracker.KEY_CLIENT_ID] ?: throw TrackerAuthException("mangadex client ID is not set")
+    val clientSecret = account[UserTracker.KEY_CLIENT_SECRET] ?: throw TrackerAuthException("mangadex client secret is not set")
+    return passwordGrant(account, MANGADEX_TOKEN_URL, listOf("client_id" to clientId, "client_secret" to clientSecret))
+  }
+
+  private fun requestKitsuToken(account: UserTracker): String = passwordGrant(account, KITSU_TOKEN_URL, emptyList())
+
+  private fun passwordGrant(
+    account: UserTracker,
+    tokenUrl: String,
+    clientParams: List<Pair<String, String>>,
+  ): String {
+    val username = account[UserTracker.KEY_USERNAME] ?: throw TrackerAuthException("${account.tracker} username is not set")
+    val password = account[UserTracker.KEY_PASSWORD] ?: throw TrackerAuthException("${account.tracker} password is not set")
+    val secrets = listOf(password) + clientParams.map { it.second }
 
     val cachedRefresh = cache[cacheKey(account)]?.refreshToken
     val refreshed =
-      if (cachedRefresh != null) {
-        requestToken(
-          account,
-          MANGADEX_TOKEN_URL,
-          "grant_type=refresh_token&refresh_token=${encode(cachedRefresh)}&client_id=${encode(clientId)}&client_secret=${encode(clientSecret)}",
-        )
-      } else {
-        null
+      cachedRefresh?.let { refreshTkn ->
+        try {
+          requestToken(
+            account,
+            tokenUrl,
+            formEncode("grant_type" to "refresh_token", "refresh_token" to refreshTkn, *clientParams.toTypedArray()),
+            MediaType.APPLICATION_FORM_URLENCODED,
+            secrets + refreshTkn,
+          )
+        } catch (e: TrackerAuthException) {
+          logger.debug { "${account.tracker} token refresh failed for user ${account.userId}, requesting a new token: ${e.message}" }
+          null
+        }
       }
     val response =
       refreshed
         ?: requestToken(
           account,
-          MANGADEX_TOKEN_URL,
-          "grant_type=password&username=${encode(username)}&password=${encode(password)}&client_id=${encode(clientId)}&client_secret=${encode(clientSecret)}",
+          tokenUrl,
+          formEncode("grant_type" to "password", "username" to username, "password" to password, *clientParams.toTypedArray()),
+          MediaType.APPLICATION_FORM_URLENCODED,
+          secrets,
         )
-        ?: return null
     return cacheToken(account, response)
   }
 
-  private fun oauthToken(
-    account: UserTracker,
-    tokenUrl: String,
-  ): String? =
-    synchronized(lockFor(account)) {
-      validCached(account)
-        ?: (if (canRefresh(account)) refreshOauth(account, tokenUrl) else null)
-        ?: account[UserTracker.KEY_ACCESS_TOKEN]
+  private fun malTokenWithStoredFallback(account: UserTracker): String {
+    val stored = account[UserTracker.KEY_ACCESS_TOKEN]
+    if (!canRefreshMal(account)) return stored ?: throw TrackerAuthException("mal account is not connected")
+    return try {
+      refreshMalToken(account)
+    } catch (e: TrackerAuthException) {
+      stored ?: throw e
     }
+  }
 
-  private fun canRefresh(account: UserTracker): Boolean =
+  private fun canRefreshMal(account: UserTracker): Boolean =
     account[UserTracker.KEY_REFRESH_TOKEN] != null &&
-      account[UserTracker.KEY_CLIENT_ID] != null &&
-      account[UserTracker.KEY_CLIENT_SECRET] != null
+      account[UserTracker.KEY_CLIENT_ID] != null
 
-  private fun refreshOauth(
-    account: UserTracker,
-    tokenUrl: String,
-  ): String? {
-    val current = userTrackerRepository.findByUserIdAndTracker(account.userId, account.tracker) ?: return null
-    val refreshTkn = current[UserTracker.KEY_REFRESH_TOKEN] ?: return null
-    val clientId = current[UserTracker.KEY_CLIENT_ID] ?: return null
-    val clientSecret = current[UserTracker.KEY_CLIENT_SECRET] ?: return null
+  private fun refreshMalToken(account: UserTracker): String {
+    val current =
+      userTrackerRepository.findByUserIdAndTracker(account.userId, account.tracker)
+        ?: throw TrackerAuthException("${account.tracker} account is not linked")
+    val refreshTkn = current[UserTracker.KEY_REFRESH_TOKEN] ?: throw TrackerAuthException("${account.tracker} has no refresh token, connect the account again")
+    val clientId = current[UserTracker.KEY_CLIENT_ID] ?: throw TrackerAuthException("${account.tracker} client ID is not set")
+    val clientSecret = current[UserTracker.KEY_CLIENT_SECRET]
     val response =
       requestToken(
         account,
-        tokenUrl,
-        "grant_type=refresh_token&refresh_token=${encode(refreshTkn)}&client_id=${encode(clientId)}&client_secret=${encode(clientSecret)}",
-      ) ?: return null
+        MAL_TOKEN_URL,
+        formEncode(
+          "grant_type" to "refresh_token",
+          "refresh_token" to refreshTkn,
+          "client_id" to clientId,
+          "client_secret" to clientSecret,
+        ),
+        MediaType.APPLICATION_FORM_URLENCODED,
+        listOf(refreshTkn, clientSecret),
+      )
     val persisted =
       userTrackerRepository.updateRefreshedTokens(
         account.userId,
@@ -169,55 +299,68 @@ class TrackerTokenProvider(
         response.accessToken,
         response.refreshToken,
       )
-    if (!persisted) {
-      logger.warn { "${account.tracker} account of user ${account.userId} changed during token refresh, discarding the refreshed token" }
-      return null
-    }
+    if (!persisted) throw TrackerUnavailableException("${account.tracker} account changed during token refresh, discarding the refreshed token")
     return cacheToken(account, response)
   }
 
   private fun requestToken(
     account: UserTracker,
     tokenUrl: String,
-    body: String,
-  ): TokenResponse? =
-    try {
-      val response =
+    body: Any,
+    contentType: MediaType,
+    secrets: Collection<String?>,
+  ): TokenResponse {
+    trackerRateLimiter.acquire(account.tracker)
+    val response =
+      try {
         client
           .post()
           .uri(tokenUrl)
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .contentType(contentType)
+          .accept(MediaType.APPLICATION_JSON)
           .body(body)
           .retrieve()
           .body(String::class.java)
-      val json = response?.let { objectMapper.readTree(it) }
-      val accessTkn =
-        json
-          ?.get("access_token")
-          ?.takeIf { it.isTextual }
-          ?.asText()
-      if (json == null || accessTkn == null) {
-        logger.error { "${account.tracker} token response for user ${account.userId} has no access_token" }
-        null
-      } else {
-        val refreshTkn =
-          json
-            .get("refresh_token")
-            ?.takeIf { it.isTextual }
-            ?.asText()
-        TokenResponse(accessTkn, refreshTkn, json.get("expires_in")?.asLong() ?: 0)
+      } catch (e: RestClientResponseException) {
+        val detail = e.providerErrorDetail(secrets)
+        throw when (e.statusCode.value()) {
+          400, 401, 403 -> TrackerAuthException("${account.tracker} rejected the login ($detail)", e)
+          429 -> {
+            val retryAfter = e.responseHeaders?.let { parseRetryAfter(it) }
+            trackerRateLimiter.backoff(account.tracker, retryAfter)
+            TrackerRateLimitedException("${account.tracker} token request was rate limited ($detail)", retryAfter, e)
+          }
+          else -> TrackerUnavailableException("${account.tracker} token request failed ($detail)", e)
+        }
+      } catch (e: RestClientException) {
+        throw TrackerUnavailableException("${account.tracker} token request failed: ${e.message}", e)
       }
-    } catch (e: Exception) {
-      logger.error(e) { "${account.tracker} token request failed for user ${account.userId}: ${e.message}" }
-      null
-    }
+    val json =
+      try {
+        response?.let { objectMapper.readTree(it) }
+      } catch (e: JsonProcessingException) {
+        throw TrackerUnavailableException("${account.tracker} token response is not valid JSON", e)
+      } ?: throw TrackerUnavailableException("${account.tracker} token response is empty")
+    val accessTkn =
+      json
+        .get("access_token")
+        ?.takeIf { it.isTextual }
+        ?.asText()
+        ?: throw TrackerUnavailableException("${account.tracker} token response has no access_token")
+    val refreshTkn =
+      json
+        .get("refresh_token")
+        ?.takeIf { it.isTextual }
+        ?.asText()
+    return TokenResponse(accessTkn, refreshTkn, json.get("expires_in")?.asLong() ?: 0)
+  }
 
   private fun cacheToken(
     account: UserTracker,
     response: TokenResponse,
   ): String {
     cache[cacheKey(account)] = CachedToken(response.accessToken, Instant.now().plusSeconds(response.expiresIn - 60), response.refreshToken)
-    logger.info { "${account.tracker} token obtained for user ${account.userId} (expires in ${response.expiresIn}s)" }
+    logger.debug { "${account.tracker} token obtained for user ${account.userId} (expires in ${response.expiresIn}s)" }
     return response.accessToken
   }
 
@@ -226,9 +369,23 @@ class TrackerTokenProvider(
       ?.takeIf { it.expiry != null && Instant.now().isBefore(it.expiry) }
       ?.accessToken
 
-  private fun lockFor(account: UserTracker): Any = locks.computeIfAbsent(cacheKey(account)) { Any() }
+  private fun <T> locked(
+    account: UserTracker,
+    call: () -> T,
+  ): T {
+    val lock = locks.computeIfAbsent(cacheKey(account)) { ReentrantLock() }
+    val maxWait = trackerRateLimiter.maxWait()
+    if (maxWait == null) {
+      lock.lock()
+    } else if (!lock.tryLock(maxWait.toMillis(), TimeUnit.MILLISECONDS)) {
+      throw TrackerRateLimitedException("${account.tracker} account is busy, try again later", maxWait)
+    }
+    try {
+      return call()
+    } finally {
+      lock.unlock()
+    }
+  }
 
   private fun cacheKey(account: UserTracker) = "${account.userId}:${account.tracker}"
-
-  private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
 }

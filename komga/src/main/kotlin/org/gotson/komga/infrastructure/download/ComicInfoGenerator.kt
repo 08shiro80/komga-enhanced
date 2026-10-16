@@ -189,30 +189,6 @@ class ComicInfoGenerator {
     }
   }
 
-  // Returns the <Number> from the CBZ's ComicInfo.xml, or null if the file has no
-  // ComicInfo / no number / is unreadable. Lets resume identify a finished chapter
-  // from the source-written metadata instead of relying on the filename convention.
-  fun readChapterNumber(cbzFile: File): String? =
-    try {
-      ZipFile(cbzFile).use { zip ->
-        val entry = zip.getEntry("ComicInfo.xml")
-        if (entry == null) {
-          null
-        } else {
-          val xml = zip.getInputStream(entry).use { it.readBytes().decodeToString() }
-          Regex("<Number>(.*?)</Number>")
-            .find(xml)
-            ?.groupValues
-            ?.get(1)
-            ?.trim()
-            ?.ifEmpty { null }
-        }
-      }
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to read ComicInfo.xml number from ${cbzFile.name}" }
-      null
-    }
-
   // Returns the <Web> value (concatenated href list as written by the source). The
   // repair-comicinfo fix uses this to recognize CBZs that came from a non-MangaDex
   // source (mangabuddy, cubari, ...) and must not be re-injected with MangaDex

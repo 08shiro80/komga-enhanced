@@ -101,6 +101,7 @@ class SecurityConfiguration(
             "/opds/v2/auth",
             // KOReader user creation
             "/koreader/users/create",
+            "/api/v1/trackers/*/callback",
           ).permitAll()
 
         // all other endpoints are restricted to authenticated users

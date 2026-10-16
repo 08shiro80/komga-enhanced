@@ -1,25 +1,13 @@
 package org.gotson.komga.infrastructure.metadata.metron
 
-import org.springframework.http.client.JdkClientHttpRequestFactory
-import org.springframework.web.client.RestClient
-import java.time.Duration
+import org.gotson.komga.domain.model.UserTracker
+import java.util.Base64
 
-/**
- * Shared HTTP client defaults for Metron (metron.cloud) — used by metadata search
- * and comic scrobbler so slow/unresponsive API calls do not hang worker threads forever.
- */
 object MetronHttp {
-  private const val DEFAULT_BASE = "https://metron.cloud"
-
-  fun restClient(baseUrl: String = DEFAULT_BASE): RestClient {
-    val factory =
-      JdkClientHttpRequestFactory().apply {
-        setReadTimeout(Duration.ofSeconds(90))
-      }
-    return RestClient
-      .builder()
-      .baseUrl(baseUrl)
-      .requestFactory(factory)
-      .build()
+  fun authorization(account: UserTracker): String? {
+    account[UserTracker.KEY_TOKEN]?.let { return "Bearer $it" }
+    val username = account[UserTracker.KEY_USERNAME] ?: return null
+    val password = account[UserTracker.KEY_PASSWORD] ?: return null
+    return "Basic ${Base64.getEncoder().encodeToString("$username:$password".toByteArray())}"
   }
 }

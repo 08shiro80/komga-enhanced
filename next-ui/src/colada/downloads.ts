@@ -10,6 +10,7 @@ import {
   komgaPerformAction,
   type DownloadCreateDto,
 } from '@/generated/openapi'
+import { client } from '@/generated/openapi/client.gen'
 import { useCurrentUser } from '@/colada/users'
 import { STALE_TIME } from '@/types/time'
 
@@ -45,6 +46,14 @@ export const useDownloadAction = defineMutation(() => {
   return useMutation({
     mutation: ({ id, action }: { id: string; action: string }) =>
       komgaPerformAction({ path: { id }, body: { action } }),
+    onSuccess: () => void queryCache.invalidateQueries({ key: QUERY_KEYS_DOWNLOADS.root }),
+  })
+})
+
+export const useCancelAllActiveDownloads = defineMutation(() => {
+  const queryCache = useQueryCache()
+  return useMutation({
+    mutation: () => client.post({ url: '/api/v1/downloads/cancel/active' }),
     onSuccess: () => void queryCache.invalidateQueries({ key: QUERY_KEYS_DOWNLOADS.root }),
   })
 })

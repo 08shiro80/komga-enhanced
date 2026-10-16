@@ -112,8 +112,13 @@ class SeriesJsonWriter(
     ageRatingBucket(details.ageRating)?.let { metadata["age_rating"] = it }
     details.releaseDate
       ?.trim()
-      ?.let { yearPrefixRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
-      ?.let { metadata["year"] = it }
+      ?.let {
+        yearPrefixRegex
+          .find(it)
+          ?.groupValues
+          ?.get(1)
+          ?.toIntOrNull()
+      }?.let { metadata["year"] = it }
     normalizeStatus(details.status)?.let { metadata["status"] = it }
     externalId?.takeIf { it.isNotBlank() }?.let { metadata["comicid"] = it }
     if (details.genres.isNotEmpty()) metadata["genres"] = details.genres

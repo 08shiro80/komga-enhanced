@@ -116,6 +116,7 @@ const { data: siblings, isPending: siblingsLoading } = useQuery(() => ({
     },
     pageRequest: PageRequest.Unpaged(sort.value),
   }),
+  enabled: !!collection.value?.id,
 }))
 
 const previous = computed(() =>

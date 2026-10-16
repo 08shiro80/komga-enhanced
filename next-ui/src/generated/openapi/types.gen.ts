@@ -1894,9 +1894,31 @@ export type ThumbnailSeriesDto = {
     width: number;
 };
 
+export type TrackerAuthorizationDto = {
+    authorizationUrl: string;
+};
+
+export type TrackerAuthorizationRequestDto = {
+    returnTo: string;
+};
+
 export type TrackerCheckResultDto = {
     message: string;
     success: boolean;
+};
+
+export type TrackerStatusDto = {
+    accountName?: string;
+    lastError?: string;
+    lastErrorAt?: Date;
+    lastSuccessAt?: Date;
+    message?: string;
+    state: string;
+    tokenExpiresAt?: Date;
+};
+
+export type TrackerSyncDto = {
+    queued: number;
 };
 
 export type TransientBookDto = {
@@ -1937,12 +1959,15 @@ export type UserDto = {
 };
 
 export type UserTrackerDto = {
+    authorizationRedirectUri?: string;
     enabled: boolean;
     linked: boolean;
+    scrobblerEnabled: boolean;
     secretsSet: Array<string>;
     settings: {
         [key: string]: string;
     };
+    status: TrackerStatusDto;
     tracker: string;
 };
 
@@ -8899,6 +8924,82 @@ export type UpdateTrackerResponses = {
 };
 
 export type UpdateTrackerResponse = UpdateTrackerResponses[keyof UpdateTrackerResponses];
+
+export type AuthorizeTrackerData = {
+    body: TrackerAuthorizationRequestDto;
+    path: {
+        tracker: string;
+    };
+    query?: never;
+    url: '/api/v1/trackers/{tracker}/authorize';
+};
+
+export type AuthorizeTrackerErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type AuthorizeTrackerError = AuthorizeTrackerErrors[keyof AuthorizeTrackerErrors];
+
+export type AuthorizeTrackerResponses = {
+    /**
+     * OK
+     */
+    200: TrackerAuthorizationDto;
+};
+
+export type AuthorizeTrackerResponse = AuthorizeTrackerResponses[keyof AuthorizeTrackerResponses];
+
+export type AuthorizationCallbackData = {
+    body?: never;
+    path: {
+        tracker: string;
+    };
+    query?: {
+        code?: string;
+        state?: string;
+        error?: string;
+    };
+    url: '/api/v1/trackers/{tracker}/callback';
+};
+
+export type AuthorizationCallbackErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type AuthorizationCallbackError = AuthorizationCallbackErrors[keyof AuthorizationCallbackErrors];
+
+export type SyncTrackerData = {
+    body?: never;
+    path: {
+        tracker: string;
+    };
+    query?: never;
+    url: '/api/v1/trackers/{tracker}/sync';
+};
+
+export type SyncTrackerErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type SyncTrackerError = SyncTrackerErrors[keyof SyncTrackerErrors];
+
+export type SyncTrackerResponses = {
+    /**
+     * OK
+     */
+    200: TrackerSyncDto;
+};
+
+export type SyncTrackerResponse = SyncTrackerResponses[keyof SyncTrackerResponses];
 
 export type TestTrackerData = {
     body?: never;

@@ -1402,9 +1402,31 @@ export const vThumbnailSeriesDto = v.object({
     width: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))
 });
 
+export const vTrackerAuthorizationDto = v.object({
+    authorizationUrl: v.string()
+});
+
+export const vTrackerAuthorizationRequestDto = v.object({
+    returnTo: v.string()
+});
+
 export const vTrackerCheckResultDto = v.object({
     message: v.string(),
     success: v.boolean()
+});
+
+export const vTrackerStatusDto = v.object({
+    accountName: v.optional(v.string()),
+    lastError: v.optional(v.string()),
+    lastErrorAt: v.optional(v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val)))),
+    lastSuccessAt: v.optional(v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val)))),
+    message: v.optional(v.string()),
+    state: v.string(),
+    tokenExpiresAt: v.optional(v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))))
+});
+
+export const vTrackerSyncDto = v.object({
+    queued: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))
 });
 
 export const vTransientBookDto = v.object({
@@ -1428,10 +1450,13 @@ export const vTransientBookDto = v.object({
 });
 
 export const vUserTrackerDto = v.object({
+    authorizationRedirectUri: v.optional(v.string()),
     enabled: v.boolean(),
     linked: v.boolean(),
+    scrobblerEnabled: v.boolean(),
     secretsSet: v.array(v.string()),
     settings: v.record(v.string(), v.string()),
+    status: vTrackerStatusDto,
     tracker: v.string()
 });
 
@@ -4164,6 +4189,36 @@ export const vUpdateTrackerPath = v.object({
  * No Content
  */
 export const vUpdateTrackerResponse = v.void();
+
+export const vAuthorizeTrackerBody = vTrackerAuthorizationRequestDto;
+
+export const vAuthorizeTrackerPath = v.object({
+    tracker: v.string()
+});
+
+/**
+ * OK
+ */
+export const vAuthorizeTrackerResponse = vTrackerAuthorizationDto;
+
+export const vAuthorizationCallbackPath = v.object({
+    tracker: v.string()
+});
+
+export const vAuthorizationCallbackQuery = v.object({
+    code: v.optional(v.string()),
+    state: v.optional(v.string()),
+    error: v.optional(v.string())
+});
+
+export const vSyncTrackerPath = v.object({
+    tracker: v.string()
+});
+
+/**
+ * OK
+ */
+export const vSyncTrackerResponse = vTrackerSyncDto;
 
 export const vTestTrackerPath = v.object({
     tracker: v.string()

@@ -7,6 +7,7 @@ import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.language.toCurrentTimeZone
 import org.gotson.komga.language.toUTC
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
@@ -19,6 +20,7 @@ class SyncStateDao(
 ) : SplitDslDaoBase(dslRW, dslRO),
   SyncStateRepository {
   private val ss = Tables.SYNC_STATE
+  private val ut = Tables.USER_TRACKER
 
   override fun findByUserIdAndSeriesIdAndTracker(
     userId: String,
@@ -32,35 +34,6 @@ class SyncStateDao(
       .and(ss.TRACKER.eq(tracker))
       .fetchOne()
       ?.toDomain()
-
-  override fun findByUserIdAndTracker(
-    userId: String,
-    tracker: String,
-  ): Collection<SyncState> =
-    dslRO
-      .selectFrom(ss)
-      .where(ss.USER_ID.eq(userId))
-      .and(ss.TRACKER.eq(tracker))
-      .fetch()
-      .map { it.toDomain() }
-
-  override fun findByTracker(tracker: String): Collection<SyncState> =
-    dslRO
-      .selectFrom(ss)
-      .where(ss.TRACKER.eq(tracker))
-      .fetch()
-      .map { it.toDomain() }
-
-  override fun findByTrackerUpdatedSince(
-    tracker: String,
-    since: LocalDateTime,
-  ): Collection<SyncState> =
-    dslRO
-      .selectFrom(ss)
-      .where(ss.TRACKER.eq(tracker))
-      .and(ss.LAST_UPDATE_TIMESTAMP.greaterOrEqual(since.toUTC()))
-      .fetch()
-      .map { it.toDomain() }
 
   override fun insert(state: SyncState) {
     dslRW
@@ -76,17 +49,20 @@ class SyncStateDao(
         ss.SCORE,
         ss.LAST_SYNC_TIMESTAMP,
         ss.LAST_UPDATE_TIMESTAMP,
-      ).values(
-        state.id,
-        state.userId,
-        state.bookId,
-        state.seriesId,
-        state.tracker,
-        state.progress,
-        state.status,
-        state.score,
-        state.lastSyncTimestamp?.toUTC(),
-        state.lastUpdateTimestamp?.toUTC(),
+      ).select(
+        DSL
+          .select(
+            DSL.`val`(state.id, ss.ID),
+            DSL.`val`(state.userId, ss.USER_ID),
+            DSL.`val`(state.bookId, ss.BOOK_ID),
+            DSL.`val`(state.seriesId, ss.SERIES_ID),
+            DSL.`val`(state.tracker, ss.TRACKER),
+            DSL.`val`(state.progress, ss.PROGRESS),
+            DSL.`val`(state.status, ss.STATUS),
+            DSL.`val`(state.score, ss.SCORE),
+            DSL.`val`(state.lastSyncTimestamp?.toUTC(), ss.LAST_SYNC_TIMESTAMP),
+            DSL.`val`(state.lastUpdateTimestamp?.toUTC(), ss.LAST_UPDATE_TIMESTAMP),
+          ).whereExists(account(state)),
       ).execute()
   }
 
@@ -101,20 +77,25 @@ class SyncStateDao(
       .set(ss.LAST_UPDATE_TIMESTAMP, state.lastUpdateTimestamp?.toUTC())
       .set(ss.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z")))
       .where(ss.ID.eq(state.id))
+      .andExists(account(state))
       .execute()
   }
 
-  override fun delete(id: String) {
-    dslRW
-      .deleteFrom(ss)
-      .where(ss.ID.eq(id))
-      .execute()
-  }
+  private fun account(state: SyncState) =
+    DSL
+      .selectOne()
+      .from(ut)
+      .where(ut.USER_ID.eq(state.userId))
+      .and(ut.TRACKER.eq(state.tracker))
 
-  override fun deleteBySeriesId(seriesId: String) {
+  override fun deleteByUserIdAndTracker(
+    userId: String,
+    tracker: String,
+  ) {
     dslRW
       .deleteFrom(ss)
-      .where(ss.SERIES_ID.eq(seriesId))
+      .where(ss.USER_ID.eq(userId))
+      .and(ss.TRACKER.eq(tracker))
       .execute()
   }
 

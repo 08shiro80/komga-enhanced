@@ -948,7 +948,7 @@
     "defaultMessage": "Gelesen"
   },
   "Y8SsFO": {
-    "defaultMessage": "Gelesen"
+    "defaultMessage": "Lesen"
   },
   "YHxouG": {
     "defaultMessage": "Import angefordert"
@@ -1185,7 +1185,7 @@
     "defaultMessage": "{count, plural, one {# Buch} other {# Bücher} }"
   },
   "cIM3eJ": {
-    "defaultMessage": "Zusammenfassung"
+    "defaultMessage": "Weiterlesen"
   },
   "cM9FuW": {
     "defaultMessage": "Wählen Sie eine Serie"

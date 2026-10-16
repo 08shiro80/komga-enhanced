@@ -6,7 +6,12 @@ import type { SortOption } from '@/types/sort'
 
 export const QueryParamSort = 'sort'
 
-export function useSort(defaultSort: Sort[], options: SortOption[], multiSort: boolean) {
+export function useSort(
+  defaultSort: Sort[],
+  options: SortOption[],
+  multiSort: boolean,
+  persistKey?: string,
+) {
   const sort = useRouteQuerySchema(
     QueryParamSort,
     MultiSortSchema,
@@ -15,6 +20,7 @@ export function useSort(defaultSort: Sort[], options: SortOption[], multiSort: b
       return JSON.stringify(data.map((it) => stringifySort(it)))
     },
     defaultSort,
+    persistKey,
   ).data
 
   const validSorts = options.flatMap((it) => sortDefinitionToSorts(it))

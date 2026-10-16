@@ -224,15 +224,16 @@ class IntegrityController(
           logger.info { "Repair: fixed ${srcPath.fileName} (${outcome.entries} entries) — flagged OUTDATED for re-analyze" }
         }
         is RepairOutcome.Partial -> {
+          val originalLabel = if (outcome.original >= 0) outcome.original.toString() else "?"
           val current = mediaRepository.findById(book.id)
           mediaRepository.update(
             current.copy(
               status = Media.Status.ERROR,
-              comment = "Partial repair: ${outcome.recovered}/${outcome.original} entries — needs re-download",
+              comment = "Partial repair: ${outcome.recovered}/$originalLabel entries — needs re-download",
             ),
           )
           repairPartial.incrementAndGet()
-          logger.warn { "Repair: partial ${srcPath.fileName} (${outcome.recovered}/${outcome.original}) — keep ERROR" }
+          logger.warn { "Repair: partial ${srcPath.fileName} (${outcome.recovered}/$originalLabel) — keep ERROR" }
         }
         is RepairOutcome.Failed -> {
           repairFailed.incrementAndGet()
@@ -253,7 +254,9 @@ class IntegrityController(
     val process =
       ProcessBuilder("zip", "-FF", srcPath.toString(), "--out", tmpFixed.toString())
         .redirectErrorStream(true)
+        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .start()
+    runCatching { process.outputStream.use { it.write("y\n".toByteArray()) } }
     val finished = process.waitFor(600, TimeUnit.SECONDS)
     if (!finished) {
       process.destroyForcibly()
@@ -269,7 +272,7 @@ class IntegrityController(
         Files.deleteIfExists(tmpFixed)
         return RepairOutcome.Failed("fixed file unreadable: ${it.message}")
       }
-    if (recoveredCount > 0 && (originalCount < 0 || recoveredCount >= originalCount)) {
+    if (recoveredCount > 0 && originalCount >= 0 && recoveredCount >= originalCount) {
       Files.move(tmpFixed, srcPath, StandardCopyOption.REPLACE_EXISTING)
       return RepairOutcome.Fixed(recoveredCount)
     }

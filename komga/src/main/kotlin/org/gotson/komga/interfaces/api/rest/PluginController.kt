@@ -365,8 +365,13 @@ class PluginController(
     }
     request.releaseDate
       ?.trim()
-      ?.let { yearPrefixRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
-      ?.let { metadata["year"] = it }
+      ?.let {
+        yearPrefixRegex
+          .find(it)
+          ?.groupValues
+          ?.get(1)
+          ?.toIntOrNull()
+      }?.let { metadata["year"] = it }
     request.status?.let {
       metadata["status"] =
         when (it.lowercase()) {
