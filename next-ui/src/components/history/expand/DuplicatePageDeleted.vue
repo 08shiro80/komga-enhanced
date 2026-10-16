@@ -40,32 +40,43 @@
         </tbody>
       </v-table>
 
-      <!--   TODO: add link to known page hash (that page does not exist yet)   -->
-      <v-img
-        width="200"
-        height="200"
-        contain
-        :src="pageHashKnownThumbnailUrl(event.properties['page file hash'])"
-        lazy-src="@/assets/cover.svg"
-        class="my-2"
-        :alt="
+      <RouterLink
+        :to="{ name: '/media/duplicate-pages/known' }"
+        class="d-inline-block"
+        :title="
           $formatMessage({
-            description:
-              'History Table, expansion panel for deleted page: alt description for deleted page',
-            defaultMessage: 'Deleted page',
-            id: 'Qxij/I',
+            description: 'History Table, deleted page: link to known page hashes',
+            defaultMessage: 'View known page hashes',
+            id: 'fork/history/viewKnownHashes',
           })
         "
       >
-        <template #placeholder>
-          <div class="d-flex align-center justify-center fill-height">
-            <v-progress-circular
-              color="grey"
-              indeterminate
-            />
-          </div>
-        </template>
-      </v-img>
+        <v-img
+          width="200"
+          height="200"
+          contain
+          :src="pageHashKnownThumbnailUrl(event.properties['page file hash'])"
+          lazy-src="@/assets/cover.svg"
+          class="my-2"
+          :alt="
+            $formatMessage({
+              description:
+                'History Table, expansion panel for deleted page: alt description for deleted page',
+              defaultMessage: 'Deleted page',
+              id: 'Qxij/I',
+            })
+          "
+        >
+          <template #placeholder>
+            <div class="d-flex align-center justify-center fill-height">
+              <v-progress-circular
+                color="grey"
+                indeterminate
+              />
+            </div>
+          </template>
+        </v-img>
+      </RouterLink>
     </div>
   </v-sheet>
 </template>

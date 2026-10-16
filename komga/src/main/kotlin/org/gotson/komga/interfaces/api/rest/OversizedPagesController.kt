@@ -152,8 +152,14 @@ class OversizedPagesController(
     val finalComparator = (if (descending) keyComparator.reversed() else keyComparator).then(tiebreak)
     oversizedPages.sortWith(finalComparator)
 
-    val start = (page.pageNumber * page.pageSize).coerceAtMost(oversizedPages.size)
-    val end = ((page.pageNumber + 1) * page.pageSize).coerceAtMost(oversizedPages.size)
+    val start =
+      (page.pageNumber.toLong() * page.pageSize)
+        .coerceIn(0L, oversizedPages.size.toLong())
+        .toInt()
+    val end =
+      ((page.pageNumber + 1L) * page.pageSize)
+        .coerceIn(0L, oversizedPages.size.toLong())
+        .toInt()
     val pageContent =
       if (start < oversizedPages.size) {
         oversizedPages.subList(start, end)
@@ -182,7 +188,6 @@ class OversizedPagesController(
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found: $bookId")
 
     val splitMode = if (mode.equals("wide", ignoreCase = true)) SplitMode.WIDE else SplitMode.TALL
-    val normalizedMode = if (splitMode == SplitMode.WIDE) "wide" else "tall"
     val effectiveMaxRatio =
       when {
         maxRatio != null -> maxRatio
@@ -199,7 +204,7 @@ class OversizedPagesController(
         pageNumbers = pageNumbers?.toSet()?.takeIf { it.isNotEmpty() },
       )
     if (result.success && result.pagesSplit > 0) {
-      ignoredOversizedPageRepository.deleteByBookIdAndMode(bookId, normalizedMode)
+      ignoredOversizedPageRepository.deleteByBookId(bookId)
     }
     return result.toDto()
   }
@@ -304,7 +309,7 @@ class OversizedPagesController(
             pageNumbers = pageNumbers,
           )
         if (result.success && result.pagesSplit > 0) {
-          ignoredOversizedPageRepository.deleteByBookIdAndMode(book.id, normalizedMode)
+          ignoredOversizedPageRepository.deleteByBookId(book.id)
         }
         results.add(result.toDto())
       } catch (e: Exception) {
@@ -392,11 +397,14 @@ class OversizedPagesController(
     val book =
       bookRepository.findByIdOrNull(request.bookId)
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found: ${request.bookId}")
-    val normalizedMode = if (request.mode.equals("wide", ignoreCase = true)) "wide" else "tall"
     return try {
-      bookPageEditor.removePagesByNumber(book, setOf(request.pageNumber))
-      ignoredOversizedPageRepository.deleteByBookIdAndMode(book.id, normalizedMode)
-      DeletePagesResultDto(bookId = book.id, deleted = 1, success = true, message = "Deleted page ${request.pageNumber}")
+      val outcome = bookPageEditor.removePagesByNumber(book, setOf(request.pageNumber))
+      if (outcome == null) {
+        DeletePagesResultDto(bookId = book.id, deleted = 0, success = false, message = "No page deleted (page ${request.pageNumber} could not be removed)")
+      } else {
+        ignoredOversizedPageRepository.deleteByBookId(book.id)
+        DeletePagesResultDto(bookId = book.id, deleted = 1, success = true, message = "Deleted page ${request.pageNumber}")
+      }
     } catch (e: Exception) {
       DeletePagesResultDto(bookId = book.id, deleted = 0, success = false, message = "Failed: ${e.message}")
     }
@@ -411,7 +419,6 @@ class OversizedPagesController(
   fun deleteOversizedPagesBatch(
     @RequestBody request: DeleteOversizedPagesRequestDto,
   ): List<DeletePagesResultDto> {
-    val normalizedMode = if (request.mode.equals("wide", ignoreCase = true)) "wide" else "tall"
     val grouped = request.pages.groupBy({ it.bookId }, { it.pageNumber })
     val results = mutableListOf<DeletePagesResultDto>()
     for ((bookId, pageNumbers) in grouped) {
@@ -421,14 +428,19 @@ class OversizedPagesController(
         continue
       }
       try {
-        bookPageEditor.removePagesByNumber(book, pageNumbers.toSet())
-        ignoredOversizedPageRepository.deleteByBookIdAndMode(book.id, normalizedMode)
+        val distinctPages = pageNumbers.toSet()
+        val outcome = bookPageEditor.removePagesByNumber(book, distinctPages)
+        if (outcome == null) {
+          results.add(DeletePagesResultDto(bookId = book.id, deleted = 0, success = false, message = "No pages deleted (pages could not be removed)"))
+          continue
+        }
+        ignoredOversizedPageRepository.deleteByBookId(book.id)
         results.add(
           DeletePagesResultDto(
             bookId = book.id,
-            deleted = pageNumbers.size,
+            deleted = distinctPages.size,
             success = true,
-            message = "Deleted ${pageNumbers.size} pages",
+            message = "Deleted ${distinctPages.size} pages",
           ),
         )
       } catch (e: Exception) {

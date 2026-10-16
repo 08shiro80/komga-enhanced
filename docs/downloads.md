@@ -25,7 +25,7 @@ pip install gallery-dl
 curl -X POST http://localhost:25600/api/v1/downloads \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://mangadex.org/title/a1c7c817-4e59-43b7-9365-09c5f56e5eb1",
+    "sourceUrl": "https://mangadex.org/title/a1c7c817-4e59-43b7-9365-09c5f56e5eb1",
     "libraryId": "your-library-id"
   }'
 ```
@@ -51,15 +51,16 @@ curl -X POST http://localhost:25600/api/v1/downloads \
 
 ## Real-time Progress
 
-Connect to the SSE endpoint for live updates:
+Download progress is delivered through Komga's unified SSE stream (`/sse/v1/events`) as the named
+events `DownloadStarted`, `DownloadProgress`, `DownloadCompleted` and `DownloadFailed` (admin only):
 
 ```javascript
-const eventSource = new EventSource('/api/v1/downloads/progress');
+const eventSource = new EventSource('/komga/sse/v1/events', { withCredentials: true });
 
-eventSource.onmessage = (event) => {
-  const progress = JSON.parse(event.data);
-  console.log(`${progress.title}: ${progress.percent}%`);
-};
+eventSource.addEventListener('DownloadProgress', (event) => {
+  const d = JSON.parse(event.data);
+  console.log(`${d.title}: ${d.progressPercent}%`);
+});
 ```
 
 ## Crash Recovery

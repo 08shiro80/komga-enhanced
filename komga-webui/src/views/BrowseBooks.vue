@@ -586,10 +586,11 @@ export default Vue.extend({
     async loadPage(libraryId: string, page: number, sort: SortActive) {
       this.selectedBooks = []
 
-      const pageRequest = {
-        page: this.pageSize === 0 ? 0 : page - 1,
-        size: this.pageSize === 0 ? 2000000000 : this.pageSize,
-      } as PageRequest
+      const pageRequest = (
+        this.pageSize === 0
+          ? {unpaged: true}
+          : {page: page - 1, size: this.pageSize}
+      ) as PageRequest
 
       if (sort) {
         pageRequest.sort = [`${sort.key},${sort.order}`]

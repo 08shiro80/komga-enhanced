@@ -168,7 +168,6 @@ class TrackerLinkEnricher(
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: anilist error for '$title': ${e.message}" }
-      markSearched(cacheKey)
       null
     }
   }
@@ -176,7 +175,7 @@ class TrackerLinkEnricher(
   private fun searchMal(title: String): String? {
     val cacheKey = "$title:mal"
     if (searchCache.getOrDefault(cacheKey, false)) return null
-    val clientId = pluginConfigRepository.findByPluginIdAndKey("manga-scrobbler", "mal_client_id")?.configValue
+    val clientId = pluginConfigRepository.findByPluginIdAndKey("auto-metadata", "mal_client_id")?.configValue
     if (clientId.isNullOrBlank()) {
       logger.debug { "TrackerLinkEnricher: MAL client_id not configured, skipping '$title'" }
       return null
@@ -204,7 +203,6 @@ class TrackerLinkEnricher(
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: mal error for '$title': ${e.message}" }
-      markSearched(cacheKey)
       null
     }
   }
@@ -235,7 +233,6 @@ class TrackerLinkEnricher(
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: kitsu error for '$title': ${e.message}" }
-      markSearched(cacheKey)
       null
     }
   }
@@ -269,7 +266,6 @@ class TrackerLinkEnricher(
       }
     } catch (e: Exception) {
       logger.debug(e) { "TrackerLinkEnricher: mangadex error for '$title': ${e.message}" }
-      markSearched(cacheKey)
       null
     }
   }

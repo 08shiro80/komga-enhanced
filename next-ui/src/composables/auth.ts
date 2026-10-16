@@ -12,7 +12,7 @@ export const useAuthWatcher = createGlobalState(() => {
   watch(authErrorEvent, (newValue) => {
     if (newValue) {
       logger.debug('Auth error detected, redirect to login')
-      void router.push('/login')
+      void router.push({ name: '/login', query: { logout: '1' } })
       // Reset so the flag stays edge-triggered: after an SPA re-login (no full reload) a later session
       // expiry must produce a fresh false->true transition, otherwise the watcher never fires again.
       authErrorEvent.value = false

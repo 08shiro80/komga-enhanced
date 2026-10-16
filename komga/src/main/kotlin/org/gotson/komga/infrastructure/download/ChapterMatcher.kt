@@ -18,7 +18,7 @@ class ChapterMatcher {
     private val chapterNumChapterRegex = Regex("""^chapter[\s_]+(\d+(?:\.\d+)?[a-z]?)""")
     private val zipCommentUuidRegex = Regex("Chapter UUID:\\s*([0-9a-f-]+)")
     private val comicInfoWebRegex = Regex("<Web>(.+?)</Web>")
-    private val mangadexChapterUrlRegex = Regex("https://mangadex\\.org/chapter/[0-9a-f-]+")
+    private val mangadexChapterUrlRegex = Regex("https://mangadex\\.org/chapter/([0-9a-f-]+)")
     private val volumePrefixRegex = Regex("^v\\d+ .+")
     private val scanlationGroupRegex = """\[([^\]]+)\]\s*$""".toRegex()
     private val chapterNumericSplitRegex = Regex("""^(\d+(?:\.\d+)?)([^\d.].*)?$""")
@@ -41,8 +41,7 @@ class ChapterMatcher {
               .find(xml)
               ?.groupValues
               ?.get(1)
-              ?.substringAfterLast("/chapter/", "")
-              ?.takeIf { it.isNotBlank() }
+              ?.let { web -> mangadexChapterUrlRegex.find(web)?.groupValues?.get(1) }
           }
       }
     } catch (e: Exception) {

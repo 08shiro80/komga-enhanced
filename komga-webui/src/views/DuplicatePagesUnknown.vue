@@ -228,11 +228,11 @@ export default Vue.extend({
   },
   methods: {
     async loadData(page: number, sort: SortActive) {
-      const pageRequest = {
-        page: page - 1,
-        size: this.pageSize,
-        sort: [`${sort.key},${sort.order}`],
-      } as PageRequest
+      const pageRequest = (
+        this.pageSize === 0
+          ? {unpaged: true, sort: [`${sort.key},${sort.order}`]}
+          : {page: page - 1, size: this.pageSize, sort: [`${sort.key},${sort.order}`]}
+      ) as PageRequest
 
       const itemsPage = await this.$komgaPageHashes.getUnknownHashes(pageRequest)
       this.totalElements = itemsPage.totalElements

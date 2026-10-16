@@ -164,4 +164,17 @@ sealed class DomainEvent {
     val title: String?,
     val errorMessage: String?,
   ) : DomainEvent()
+
+  data class NewChaptersQueued(
+    val count: Int,
+    val source: String,
+    val libraryId: String?,
+  ) : DomainEvent()
+
+  data class ChapterAutoBlacklisted(
+    val seriesId: String?,
+    val chapterUrl: String,
+    val chapterNumber: String?,
+    val reason: String,
+  ) : DomainEvent()
 }

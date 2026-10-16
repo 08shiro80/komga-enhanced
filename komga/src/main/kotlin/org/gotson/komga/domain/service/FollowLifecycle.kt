@@ -56,27 +56,29 @@ class FollowLifecycle(
     libraryId: String,
     urls: List<String>,
   ): Pair<Int, Int> {
-    var added = 0
+    val now = LocalDateTime.now()
+    val seen = followRepository.findAllByLibraryId(libraryId).mapTo(mutableSetOf()) { it.url }
+    val toInsert = mutableListOf<Follow>()
     var skipped = 0
     for (raw in urls) {
       val url = raw.trim()
       if (url.isEmpty()) continue
-      if (followRepository.existsByLibraryIdAndUrl(libraryId, url)) {
+      if (!seen.add(url)) {
         skipped++
         continue
       }
-      followRepository.insert(
+      toInsert.add(
         Follow(
           id = UUID.randomUUID().toString(),
           libraryId = libraryId,
           url = url,
-          addedAt = LocalDateTime.now(),
+          addedAt = now,
         ),
       )
-      added++
     }
-    logger.info { "Batch follow import for library $libraryId: $added added, $skipped skipped" }
-    return added to skipped
+    followRepository.insertAll(toInsert)
+    logger.info { "Batch follow import for library $libraryId: ${toInsert.size} added, $skipped skipped" }
+    return toInsert.size to skipped
   }
 
   fun update(
@@ -114,10 +116,14 @@ class FollowLifecycle(
     logger.info { "Deleted follow entry: $id" }
   }
 
-  fun deleteBatch(ids: List<String>) {
+  fun deleteBatch(
+    ids: List<String>,
+    libraryId: String,
+  ) {
     if (ids.isEmpty()) return
-    followRepository.deleteByIds(ids)
-    logger.info { "Deleted ${ids.size} follow entries" }
+    val owned = ids.filter { followRepository.findById(it)?.libraryId == libraryId }
+    if (owned.isNotEmpty()) followRepository.deleteByIds(owned)
+    logger.info { "Deleted ${owned.size} follow entries" }
   }
 
   private fun resolveTitle(url: String): String? =
@@ -189,7 +195,7 @@ class FollowLifecycle(
     }
 
     val now = LocalDateTime.now()
-    follows.forEach { followRepository.updateLastChecked(it.id, now) }
+    followRepository.updateLastCheckedBatch(follows.map { it.id }, now)
     logger.info { "Follow check for library $libraryId: queued $queued of ${follows.size} follows" }
     return queued
   }

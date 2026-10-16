@@ -33,6 +33,14 @@ data class DownloadQueue(
   fun isActive() = status == DownloadStatus.DOWNLOADING
 
   fun canRetry() = retryCount < maxRetries && (status == DownloadStatus.FAILED || status == DownloadStatus.PENDING)
+
+  // Heuristic on the gallery-dl error text: these signal a permanently broken source (gone/forbidden/
+  // no extractor), so auto-retry would just re-run the full pipeline with no chance of success. A manual
+  // retry stays possible. Transient errors (timeout, connection reset, 5xx) do not match and still retry.
+  fun isPermanentFailure(): Boolean {
+    val msg = errorMessage?.lowercase() ?: return false
+    return listOf("unsupported url", "no suitable extractor", "404 not found", "forbidden").any { it in msg }
+  }
 }
 
 enum class SourceType {

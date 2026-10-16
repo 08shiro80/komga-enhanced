@@ -1,10 +1,10 @@
 package org.gotson.komga.infrastructure.download
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PreDestroy
+import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.PluginConfig
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
@@ -15,6 +15,7 @@ import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.service.DownloadExecutor
 import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.stereotype.Component
@@ -45,9 +46,10 @@ class MangaDexSubscriptionSyncer(
   private val chapterUrlRepository: ChapterUrlRepository,
   private val blacklistedChapterRepository: BlacklistedChapterRepository,
   private val taskScheduler: TaskScheduler,
+  private val eventPublisher: ApplicationEventPublisher,
+  private val objectMapper: ObjectMapper,
 ) {
   private val pluginId = "mangadex-subscription"
-  private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val httpClient: HttpClient =
     HttpClient
       .newBuilder()
@@ -87,7 +89,7 @@ class MangaDexSubscriptionSyncer(
       return
     }
 
-    val intervalMinutes = config["sync_interval_minutes"]?.toLongOrNull() ?: 30L
+    val intervalMinutes = (config["sync_interval_minutes"]?.toLongOrNull() ?: 30L).coerceAtLeast(1L)
     logger.info { "Starting MangaDex Subscription syncer (interval: ${intervalMinutes}min)" }
 
     try {
@@ -108,9 +110,11 @@ class MangaDexSubscriptionSyncer(
   fun restart() {
     logger.info { "Restarting MangaDex Subscription syncer" }
     stopScheduler()
-    accessToken = null
-    refreshToken = null
-    expiresAt = null
+    synchronized(this) {
+      accessToken = null
+      refreshToken = null
+      expiresAt = null
+    }
     startIfEnabled()
   }
 
@@ -127,8 +131,11 @@ class MangaDexSubscriptionSyncer(
         .format(mangaDexDateFormat)
     saveConfigValue("last_check_time", rewoundTime)
     logger.info { "Force resync triggered: rewound last_check_time to $rewoundTime ($lookbackDays days)" }
-    runFeedCheck()
-    return ResyncResult(true, "Resync completed (window: $lookbackDays days)")
+    return if (runFeedCheck()) {
+      ResyncResult(true, "Resync completed (window: $lookbackDays days)")
+    } else {
+      ResyncResult(false, "Resync did not run or failed (a check may already be running, credentials missing or API error)")
+    }
   }
 
   data class ResyncResult(
@@ -212,6 +219,7 @@ class MangaDexSubscriptionSyncer(
       !config["username"].isNullOrBlank() &&
       !config["password"].isNullOrBlank()
 
+  @Synchronized
   private fun authenticate(config: Map<String, String?>) {
     val body =
       "grant_type=password" +
@@ -243,6 +251,7 @@ class MangaDexSubscriptionSyncer(
     logger.info { "MangaDex authentication successful (expires in ${expiresIn}s)" }
   }
 
+  @Synchronized
   private fun refreshAccessToken(config: Map<String, String?>) {
     val currentRefreshToken = refreshToken
     if (currentRefreshToken == null) {
@@ -292,21 +301,21 @@ class MangaDexSubscriptionSyncer(
     return accessToken ?: throw MangaDexApiException("No valid access token after refresh")
   }
 
-  private fun runFeedCheck() {
+  private fun runFeedCheck(): Boolean {
     if (!feedCheckRunning.compareAndSet(false, true)) {
       logger.debug { "MangaDex feed check already running, skipping overlapping invocation" }
-      return
+      return false
     }
     try {
       val plugin = pluginRepository.findByIdOrNull(pluginId)
       if (plugin == null || !plugin.enabled) {
         logger.debug { "MangaDex Subscription plugin disabled, skipping feed check" }
-        return
+        return false
       }
 
       val config = loadConfig()
 
-      if (!hasRequiredCredentials(config)) return
+      if (!hasRequiredCredentials(config)) return false
 
       val targetLibraryName = config["target_library"]?.takeIf { it.isNotBlank() }
       val library =
@@ -321,15 +330,17 @@ class MangaDexSubscriptionSyncer(
         }
       if (library == null) {
         logger.warn { "No library found — MangaDex subscription sync skipped" }
-        return
+        return false
       }
-      checkForNewManga(config, library)
-      checkFeed(config, library)
+      val newMangaOk = checkForNewManga(config, library)
+      val feedOk = checkFeed(config, library)
+      return newMangaOk && feedOk
     } catch (e: Exception) {
       // Must catch everything: runFeedCheck runs via scheduleAtFixedRate, where an uncaught exception
       // cancels the schedule permanently (sync dead until app restart). Non-MangaDexApiException paths
-      // (e.g. IllegalStateException from resolveLanguage, Jackson errors on a non-JSON 200 body) reach here.
+      // (e.g. Jackson errors on a non-JSON 200 body) reach here.
       logger.error(e) { "MangaDex feed check failed: ${e.message}" }
+      return false
     } finally {
       feedCheckRunning.set(false)
     }
@@ -339,26 +350,27 @@ class MangaDexSubscriptionSyncer(
   private fun checkForNewManga(
     config: Map<String, String?>,
     library: org.gotson.komga.domain.model.Library?,
-  ) {
+  ): Boolean {
     val token = getValidToken(config)
 
     var offset = 0
     val limit = 100
     var queued = 0
+    var complete = true
+    val language = resolveLanguage()
 
     while (true) {
       val url = "$apiBase/user/follows/manga?limit=$limit&offset=$offset"
       val response = apiGet(url, token)
       if (response.statusCode() != 200) {
         logger.warn { "Followed manga request failed (HTTP ${response.statusCode()})" }
+        complete = false
         break
       }
 
       val data: Map<String, Any> = objectMapper.readValue(response.body())
       val mangaList = data["data"] as? List<Map<String, Any>> ?: emptyList()
       val total = (data["total"] as? Number)?.toInt() ?: 0
-
-      val language = resolveLanguage()
 
       for (manga in mangaList) {
         val mangaId = manga["id"] as? String ?: continue
@@ -394,14 +406,17 @@ class MangaDexSubscriptionSyncer(
 
     if (queued > 0) {
       logger.info { "Followed manga check: queued $queued new manga for full download" }
+      eventPublisher.publishEvent(DomainEvent.NewChaptersQueued(queued, "subscription-new-manga", library?.id))
     }
+    return complete
   }
 
   private fun resolveLanguage(): String =
     pluginConfigRepository
       .findByPluginIdAndKey("gallery-dl-downloader", "default_language")
       ?.configValue
-      ?: throw IllegalStateException("gallery-dl plugin default_language not configured")
+      ?.takeIf { it.isNotBlank() }
+      ?: "en"
 
   private fun hasDownloadableChapters(
     mangaId: String,
@@ -411,6 +426,7 @@ class MangaDexSubscriptionSyncer(
     val url =
       "$apiBase/manga/$mangaId/feed" +
         "?translatedLanguage[]=$language" +
+        "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic" +
         "&includeFuturePublishAt=0" +
         "&includeEmptyPages=0" +
         "&includeExternalUrl=0" +
@@ -434,7 +450,7 @@ class MangaDexSubscriptionSyncer(
   private fun checkFeed(
     config: Map<String, String?>,
     library: org.gotson.komga.domain.model.Library?,
-  ) {
+  ): Boolean {
     val token = getValidToken(config)
     val language = resolveLanguage()
 
@@ -460,8 +476,15 @@ class MangaDexSubscriptionSyncer(
     var totalSkippedByDate = 0
     var stopPaging = false
     var feedComplete = true
+    var cappedByOffsetWindow = false
+    var oldestScannedPublishAt: Instant? = null
 
     while (!stopPaging) {
+      if (offset + limit > 10000) {
+        logger.warn { "Subscription feed exceeds the MangaDex 10000-offset window, stopping pagination (newest chapters are already collected)" }
+        cappedByOffsetWindow = true
+        break
+      }
       val url =
         "$apiBase/user/follows/manga/feed" +
           "?translatedLanguage[]=$language" +
@@ -469,6 +492,7 @@ class MangaDexSubscriptionSyncer(
           "&order[publishAt]=desc" +
           "&includeFuturePublishAt=0" +
           "&includeEmptyPages=0" +
+          "&includeExternalUrl=0" +
           "&limit=$limit&offset=$offset"
 
       val response = apiGet(url, token)
@@ -496,6 +520,9 @@ class MangaDexSubscriptionSyncer(
           publishAtRaw?.let {
             runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull()
           }
+        if (publishAt != null && (oldestScannedPublishAt == null || publishAt.isBefore(oldestScannedPublishAt))) {
+          oldestScannedPublishAt = publishAt
+        }
         if (publishAt != null && publishAt.isBefore(lastCheckInstant)) {
           totalSkippedByDate++
           stopPaging = true
@@ -538,6 +565,10 @@ class MangaDexSubscriptionSyncer(
 
       for ((mangaId, chapters) in newChaptersByManga) {
         val mangaUrl = "https://mangadex.org/title/$mangaId"
+        if (downloadExecutor.isUrlAlreadyQueued(mangaUrl)) {
+          logger.debug { "Skipping $mangaId: already queued" }
+          continue
+        }
         try {
           downloadExecutor.createDownload(
             sourceUrl = mangaUrl,
@@ -554,16 +585,36 @@ class MangaDexSubscriptionSyncer(
       }
 
       logger.info { "Subscription feed: queued $queued manga with new chapters" }
+      if (queued > 0) {
+        eventPublisher.publishEvent(DomainEvent.NewChaptersQueued(queued, "subscription-new-chapters", library?.id))
+      }
     }
 
-    if (feedComplete) {
-      saveConfigValue(
-        "last_check_time",
-        Instant.now().atOffset(ZoneOffset.UTC).format(mangaDexDateFormat),
-      )
-    } else {
-      logger.warn { "Subscription feed incomplete (API error), keeping previous last_check_time to avoid skipping chapters" }
+    when {
+      !feedComplete -> {
+        logger.warn { "Subscription feed incomplete (API error), keeping previous last_check_time to avoid skipping chapters" }
+      }
+
+      cappedByOffsetWindow && oldestScannedPublishAt != null -> {
+        saveConfigValue(
+          "last_check_time",
+          oldestScannedPublishAt.atOffset(ZoneOffset.UTC).format(mangaDexDateFormat),
+        )
+        logger.warn { "Subscription feed was capped at the 10000-offset window, setting last_check_time to the oldest scanned chapter ($oldestScannedPublishAt) so the next run continues from there" }
+      }
+
+      cappedByOffsetWindow -> {
+        logger.warn { "Subscription feed was capped at the 10000-offset window with no usable publishAt, keeping previous last_check_time" }
+      }
+
+      else -> {
+        saveConfigValue(
+          "last_check_time",
+          Instant.now().atOffset(ZoneOffset.UTC).format(mangaDexDateFormat),
+        )
+      }
     }
+    return feedComplete
   }
 
   private fun isChapterKnown(
@@ -655,7 +706,7 @@ class MangaDexSubscriptionSyncer(
     val limit = 100
     while (true) {
       val response = apiGet("$apiBase/user/follows/manga?limit=$limit&offset=$offset", token)
-      if (response.statusCode() != 200) break
+      if (response.statusCode() != 200) throw MangaDexApiException("MangaDex follows fetch failed: HTTP ${response.statusCode()}")
       val data: Map<String, Any> = objectMapper.readValue(response.body())
       val list = data["data"] as? List<Map<String, Any>> ?: emptyList()
       val total = (data["total"] as? Number)?.toInt() ?: 0

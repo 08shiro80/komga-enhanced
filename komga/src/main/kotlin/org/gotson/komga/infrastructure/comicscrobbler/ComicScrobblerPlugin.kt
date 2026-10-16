@@ -6,14 +6,15 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.LogLevel
 import org.gotson.komga.domain.model.SyncState
+import org.gotson.komga.domain.model.UserTracker
 import org.gotson.komga.domain.model.WebLink
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
-import org.gotson.komga.domain.persistence.PluginLogRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.domain.persistence.SyncStateRepository
+import org.gotson.komga.domain.persistence.UserTrackerRepository
 import org.gotson.komga.infrastructure.metadata.metron.MetronHttp
 import org.gotson.komga.infrastructure.rate.MetronRateLimiter
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -33,11 +34,11 @@ private val logger = KotlinLogging.logger {}
 class ComicScrobblerPlugin(
   private val pluginRepository: PluginRepository,
   private val pluginConfigRepository: PluginConfigRepository,
-  private val pluginLogRepository: PluginLogRepository,
   private val bookRepository: BookRepository,
   private val bookMetadataRepository: BookMetadataRepository,
   private val seriesMetadataRepository: SeriesMetadataRepository,
   private val syncStateRepository: SyncStateRepository,
+  private val userTrackerRepository: UserTrackerRepository,
   private val objectMapper: ObjectMapper,
   private val rateLimiter: MetronRateLimiter,
 ) {
@@ -50,9 +51,8 @@ class ComicScrobblerPlugin(
       Thread(r, "comic-scrobbler-worker").apply { isDaemon = true }
     }
 
-  private val lastSyncedIssue = ConcurrentHashMap<String, Int>()
+  private val scrobbledIssues = ConcurrentHashMap<String, MutableSet<Int>>()
 
-  private val metronIssueRegex = Regex("""metron\.cloud/issue/(\d+)""", RegexOption.IGNORE_CASE)
   private val metronSeriesRegex = Regex("""metron\.cloud/series/(\d+)""", RegexOption.IGNORE_CASE)
 
   @EventListener(ApplicationReadyEvent::class)
@@ -62,8 +62,10 @@ class ComicScrobblerPlugin(
       logger.debug { "ComicScrobbler plugin not yet installed" }
       return
     }
-    syncStateRepository.findByTracker("metron").forEach { lastSyncedIssue[it.seriesId] = it.progress }
-    logger.info { "ComicScrobbler plugin loaded (enabled=${plugin.enabled}), hydrated ${lastSyncedIssue.size} synced series" }
+    syncStateRepository.findByTracker(UserTracker.METRON).forEach {
+      scrobbledIssues.computeIfAbsent(dedupeKey(it.userId, it.seriesId)) { ConcurrentHashMap.newKeySet() }.addAll(1..it.progress)
+    }
+    logger.info { "ComicScrobbler plugin loaded (enabled=${plugin.enabled}), hydrated ${scrobbledIssues.size} synced series" }
   }
 
   @EventListener
@@ -86,15 +88,13 @@ class ComicScrobblerPlugin(
     userId: String,
   ) {
     val config = loadConfig()
-    val mUser = config["metron_username"] ?: ""
-    val mPass = config["metron_password"] ?: ""
-    if (mUser.isBlank() || mPass.isBlank()) {
-      log(LogLevel.WARN, "Metron credentials not configured")
+    val account = userTrackerRepository.findByUserIdAndTracker(userId, UserTracker.METRON)
+    if (account == null || !account.active) {
+      logger.debug { "Skipping comic scrobble for user $userId: no linked Metron account" }
       return
     }
-
-    val filterUserId = config["sync_user_id"]?.takeIf { it.isNotBlank() }
-    if (filterUserId != null && filterUserId != userId) return
+    val mUser = account[UserTracker.KEY_USERNAME] ?: return
+    val mPass = account[UserTracker.KEY_PASSWORD] ?: return
 
     val book =
       bookRepository.findByIdOrNull(bookId) ?: run {
@@ -117,14 +117,20 @@ class ComicScrobblerPlugin(
         return
       }
 
-    val issueNumber = bookMeta.numberSort.toInt()
+    val numberSort = bookMeta.numberSort
+    if (numberSort % 1f != 0f) {
+      log(LogLevel.DEBUG, "Skipping fractional issue number ($numberSort)")
+      return
+    }
+    val issueNumber = numberSort.toInt()
     if (issueNumber <= 0) {
-      log(LogLevel.DEBUG, "Skipping non-positive issue number (${bookMeta.numberSort})")
+      log(LogLevel.DEBUG, "Skipping non-positive issue number ($numberSort)")
       return
     }
 
-    val previous = lastSyncedIssue[book.seriesId] ?: 0
-    if (issueNumber <= previous) return
+    val key = dedupeKey(userId, book.seriesId)
+    val synced = scrobbledIssues.computeIfAbsent(key) { ConcurrentHashMap.newKeySet() }
+    if (issueNumber in synced) return
 
     val issueId = resolveIssueId(seriesMeta.title, issueNumber, seriesMeta.links, config, mUser, mPass)
     if (issueId == null) {
@@ -133,24 +139,30 @@ class ComicScrobblerPlugin(
     }
 
     if (scrobble(issueId, mUser, mPass, seriesMeta.title)) {
-      lastSyncedIssue[book.seriesId] = issueNumber
-      recordMetronSync(book.seriesId, issueNumber, book.id)
+      synced.add(issueNumber)
+      recordMetronSync(userId, book.seriesId, issueNumber, book.id)
     }
   }
 
+  private fun dedupeKey(
+    userId: String,
+    seriesId: String,
+  ) = "$userId:$seriesId"
+
   private fun recordMetronSync(
+    userId: String,
     seriesId: String,
     issue: Int,
     bookId: String,
   ) {
     try {
       val now = LocalDateTime.now()
-      val existing = syncStateRepository.findBySeriesIdAndTracker(seriesId, "metron")
+      val existing = syncStateRepository.findByUserIdAndSeriesIdAndTracker(userId, seriesId, UserTracker.METRON)
       if (existing != null) {
         syncStateRepository.update(
           existing.copy(
             bookId = bookId,
-            progress = issue,
+            progress = maxOf(existing.progress, issue),
             lastSyncTimestamp = now,
             lastModifiedDate = now,
           ),
@@ -159,16 +171,17 @@ class ComicScrobblerPlugin(
         syncStateRepository.insert(
           SyncState(
             id = TsidCreator.getTsid256().toString(),
+            userId = userId,
             bookId = bookId,
             seriesId = seriesId,
-            tracker = "metron",
+            tracker = UserTracker.METRON,
             progress = issue,
             lastSyncTimestamp = now,
           ),
         )
       }
     } catch (e: Exception) {
-      logger.warn(e) { "Failed to record Metron sync state for series $seriesId" }
+      logger.warn(e) { "Failed to record Metron sync state for user $userId series $seriesId" }
     }
   }
 
@@ -180,23 +193,6 @@ class ComicScrobblerPlugin(
     mUser: String,
     mPass: String,
   ): Int? {
-    if ((config["auto_detect_links"] ?: "true").toBoolean()) {
-      for (link in links) {
-        val url = link.url.toString()
-        metronIssueRegex
-          .find(url)
-          ?.groupValues
-          ?.get(1)
-          ?.toIntOrNull()
-          ?.let { return it }
-        metronSeriesRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()?.let { seriesId ->
-          searchMetronIssueBySeriesId(seriesId, issueNumber, mUser, mPass)?.let { return it }
-        }
-      }
-    }
-
-    searchMetronIssue(seriesTitle, issueNumber, mUser, mPass)?.let { return it }
-
     val mappingsJson = config["mappings"]
     if (!mappingsJson.isNullOrBlank()) {
       try {
@@ -213,6 +209,17 @@ class ComicScrobblerPlugin(
         log(LogLevel.ERROR, "Invalid mappings JSON: ${e.message}")
       }
     }
+
+    if ((config["auto_detect_links"] ?: "true").toBoolean()) {
+      for (link in links) {
+        val url = link.url.toString()
+        metronSeriesRegex.find(url)?.groupValues?.get(1)?.toIntOrNull()?.let { seriesId ->
+          searchMetronIssueBySeriesId(seriesId, issueNumber, mUser, mPass)?.let { return it }
+        }
+      }
+    }
+
+    searchMetronIssue(seriesTitle, issueNumber, mUser, mPass)?.let { return it }
     return null
   }
 

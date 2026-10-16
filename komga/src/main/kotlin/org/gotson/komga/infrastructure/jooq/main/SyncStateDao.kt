@@ -5,6 +5,7 @@ import org.gotson.komga.domain.persistence.SyncStateRepository
 import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
 import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.language.toCurrentTimeZone
+import org.gotson.komga.language.toUTC
 import org.jooq.DSLContext
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
@@ -19,16 +20,29 @@ class SyncStateDao(
   SyncStateRepository {
   private val ss = Tables.SYNC_STATE
 
-  override fun findBySeriesIdAndTracker(
+  override fun findByUserIdAndSeriesIdAndTracker(
+    userId: String,
     seriesId: String,
     tracker: String,
   ): SyncState? =
     dslRO
       .selectFrom(ss)
-      .where(ss.SERIES_ID.eq(seriesId))
+      .where(ss.USER_ID.eq(userId))
+      .and(ss.SERIES_ID.eq(seriesId))
       .and(ss.TRACKER.eq(tracker))
       .fetchOne()
       ?.toDomain()
+
+  override fun findByUserIdAndTracker(
+    userId: String,
+    tracker: String,
+  ): Collection<SyncState> =
+    dslRO
+      .selectFrom(ss)
+      .where(ss.USER_ID.eq(userId))
+      .and(ss.TRACKER.eq(tracker))
+      .fetch()
+      .map { it.toDomain() }
 
   override fun findByTracker(tracker: String): Collection<SyncState> =
     dslRO
@@ -44,7 +58,7 @@ class SyncStateDao(
     dslRO
       .selectFrom(ss)
       .where(ss.TRACKER.eq(tracker))
-      .and(ss.LAST_UPDATE_TIMESTAMP.greaterOrEqual(since))
+      .and(ss.LAST_UPDATE_TIMESTAMP.greaterOrEqual(since.toUTC()))
       .fetch()
       .map { it.toDomain() }
 
@@ -53,6 +67,7 @@ class SyncStateDao(
       .insertInto(
         ss,
         ss.ID,
+        ss.USER_ID,
         ss.BOOK_ID,
         ss.SERIES_ID,
         ss.TRACKER,
@@ -63,14 +78,15 @@ class SyncStateDao(
         ss.LAST_UPDATE_TIMESTAMP,
       ).values(
         state.id,
+        state.userId,
         state.bookId,
         state.seriesId,
         state.tracker,
         state.progress,
         state.status,
         state.score,
-        state.lastSyncTimestamp,
-        state.lastUpdateTimestamp,
+        state.lastSyncTimestamp?.toUTC(),
+        state.lastUpdateTimestamp?.toUTC(),
       ).execute()
   }
 
@@ -81,8 +97,8 @@ class SyncStateDao(
       .set(ss.PROGRESS, state.progress)
       .set(ss.STATUS, state.status)
       .set(ss.SCORE, state.score)
-      .set(ss.LAST_SYNC_TIMESTAMP, state.lastSyncTimestamp)
-      .set(ss.LAST_UPDATE_TIMESTAMP, state.lastUpdateTimestamp)
+      .set(ss.LAST_SYNC_TIMESTAMP, state.lastSyncTimestamp?.toUTC())
+      .set(ss.LAST_UPDATE_TIMESTAMP, state.lastUpdateTimestamp?.toUTC())
       .set(ss.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z")))
       .where(ss.ID.eq(state.id))
       .execute()
@@ -105,6 +121,7 @@ class SyncStateDao(
   private fun org.gotson.komga.jooq.main.tables.records.SyncStateRecord.toDomain() =
     SyncState(
       id = id,
+      userId = userId,
       bookId = bookId,
       seriesId = seriesId,
       tracker = tracker,

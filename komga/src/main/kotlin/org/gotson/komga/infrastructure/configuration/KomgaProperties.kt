@@ -22,6 +22,7 @@ class KomgaProperties {
     try {
       Path(database.file).parent.createDirectories()
       Path(tasksDb.file).parent.createDirectories()
+      Path(thumbnailsDb.file).parent.createDirectories()
     } catch (_: Exception) {
     }
   }
@@ -36,9 +37,15 @@ class KomgaProperties {
 
   var oidcEmailVerification: Boolean = true
 
+  var jdbcSessionEnabled: Boolean = false
+
   var database = Database()
 
   var tasksDb = Database()
+
+  var thumbnailsDb = Database()
+
+  var sessionsDb = Database()
 
   var cors = Cors()
 

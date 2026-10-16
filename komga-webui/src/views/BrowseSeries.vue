@@ -1040,7 +1040,7 @@ export default Vue.extend({
     async loadSeries(seriesId: string, route?: any) {
       this.series = await this.$komgaSeries.getOneSeries(seriesId)
       if (this.series.oneshot) {
-        this.$router.replace({name: 'browse-oneshot', params: {seriesId: this.seriesId}})
+        this.$router.replace({name: 'browse-oneshot', params: {seriesId: seriesId}})
         return
       }
 

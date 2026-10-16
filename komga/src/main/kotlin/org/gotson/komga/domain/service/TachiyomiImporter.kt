@@ -63,14 +63,18 @@ class TachiyomiImporter(
     val urlsToAdd = mutableListOf<String>()
 
     // Load existing URLs from the DB follow list to avoid duplicates
-    val existingUrls = followLifecycle.getAll(targetLibrary.id).map { it.url }.toSet()
+    val existingUrls =
+      followLifecycle
+        .getAll(targetLibrary.id)
+        .map { it.url }
+        .toMutableSet()
 
     mangaDexManga.forEach { manga ->
       try {
         val mangaDexUrl = convertToMangaDexUrl(manga.url)
 
         if (mangaDexUrl != null) {
-          if (existingUrls.contains(mangaDexUrl)) {
+          if (!existingUrls.add(mangaDexUrl)) {
             skipped.add(manga.title)
             logger.debug { "Skipped (already exists): ${manga.title}" }
           } else {
@@ -181,7 +185,7 @@ class TachiyomiImporter(
   private fun convertToMangaDexUrl(tachiyomiUrl: String): String? {
     // UUID pattern: 8-4-4-4-12 hex digits
     val uuidPattern = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", RegexOption.IGNORE_CASE)
-    val uuid = uuidPattern.find(tachiyomiUrl)?.value
+    val uuid = uuidPattern.find(tachiyomiUrl)?.value?.lowercase()
 
     return uuid?.let { "https://mangadex.org/title/$it" }
   }

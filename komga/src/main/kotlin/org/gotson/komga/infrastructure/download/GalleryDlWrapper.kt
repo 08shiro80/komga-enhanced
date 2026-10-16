@@ -1,7 +1,6 @@
 package org.gotson.komga.infrastructure.download
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
@@ -22,15 +21,15 @@ private val logger = KotlinLogging.logger {}
 @Service
 class GalleryDlWrapper(
   private val pluginConfigRepository: org.gotson.komga.domain.persistence.PluginConfigRepository,
-  private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
   private val blacklistedChapterRepository: org.gotson.komga.domain.persistence.BlacklistedChapterRepository,
   private val chapterUrlRepository: org.gotson.komga.domain.persistence.ChapterUrlRepository,
   private val mangaDexApiClient: MangaDexApiClient,
   private val comicInfoGenerator: ComicInfoGenerator,
   private val galleryDlProcess: GalleryDlProcess,
   private val chapterMatcher: ChapterMatcher,
+  private val objectMapper: ObjectMapper,
+  private val eventPublisher: org.springframework.context.ApplicationEventPublisher,
 ) {
-  private val objectMapper: ObjectMapper = jacksonObjectMapper()
   private val pluginId = "gallery-dl-downloader"
 
   @Volatile
@@ -54,12 +53,21 @@ class GalleryDlWrapper(
     if (cached != null && System.currentTimeMillis() - cached.second < configCacheTtlMs) {
       return cached.first
     }
-    val config =
-      pluginConfigRepository
-        .findByPluginId(pluginId)
-        .associate { it.configKey to it.configValue }
-    pluginConfigCache = config to System.currentTimeMillis()
-    return config
+    // Miss path under a lock with a re-check: avoids two threads both hitting the DB and briefly
+    // publishing different config snapshots (the volatile read above still serves >99% of calls lock-free).
+    return synchronized(this) {
+      val current = pluginConfigCache
+      if (current != null && System.currentTimeMillis() - current.second < configCacheTtlMs) {
+        current.first
+      } else {
+        val config =
+          pluginConfigRepository
+            .findByPluginId(pluginId)
+            .associate { it.configKey to it.configValue }
+        pluginConfigCache = config to System.currentTimeMillis()
+        config
+      }
+    }
   }
 
   private fun getDefaultLanguage(): String =
@@ -86,8 +94,14 @@ class GalleryDlWrapper(
     var target = File(destDir, source.name)
     if (target.exists()) {
       val existingChapterId = chapterMatcher.extractChapterId(target.toPath())
-      if (incomingChapterId != null && existingChapterId != null && existingChapterId != incomingChapterId) {
-        target = disambiguateTarget(destDir, source.nameWithoutExtension, source.extension, incomingChapterId)
+      val sameChapter = incomingChapterId != null && existingChapterId == incomingChapterId
+      if (!sameChapter) {
+        target =
+          if (incomingChapterId != null) {
+            disambiguateTarget(destDir, source.nameWithoutExtension, source.extension, incomingChapterId)
+          } else {
+            disambiguateNumbered(destDir, source.nameWithoutExtension, source.extension)
+          }
       }
     }
     try {
@@ -111,6 +125,19 @@ class GalleryDlWrapper(
       val suffix = if (attempt == 0) " [$shortId]" else " [$shortId-${attempt + 1}]"
       val candidate = buildBoundedName(destDir, baseName, suffix, extension)
       if (!candidate.exists() || chapterMatcher.extractChapterId(candidate.toPath()) == chapterId) return candidate
+      attempt++
+    }
+  }
+
+  private fun disambiguateNumbered(
+    destDir: File,
+    baseName: String,
+    extension: String,
+  ): File {
+    var attempt = 2
+    while (true) {
+      val candidate = buildBoundedName(destDir, baseName, " ($attempt)", extension)
+      if (!candidate.exists()) return candidate
       attempt++
     }
   }
@@ -186,11 +213,12 @@ class GalleryDlWrapper(
     try {
       val command =
         galleryDlProcess.getCommand(getGalleryDlPath()).toMutableList().apply {
-          add(url)
           add("-j")
           add("--simulate")
           add("--config")
           add(configFile.absolutePath)
+          add("--")
+          add(url)
         }
 
       logger.debug { "Executing getChapterInfo: ${command.joinToString(" ")}" }
@@ -292,11 +320,12 @@ class GalleryDlWrapper(
     try {
       val command =
         galleryDlProcess.getCommand(getGalleryDlPath()).toMutableList().apply {
-          add(url)
           add("-j")
           add("--simulate")
           add("--config")
           add(configFile.absolutePath)
+          add("--")
+          add(url)
         }
 
       val process =
@@ -435,7 +464,6 @@ class GalleryDlWrapper(
       val gdlPath = getGalleryDlPath()
       val command =
         galleryDlProcess.getCommand(gdlPath).toMutableList().apply {
-          add(url)
           add("-d")
           add(destinationPath.toString())
           add("--config")
@@ -452,10 +480,13 @@ class GalleryDlWrapper(
             add("--chapter-filter")
             add(chapterFilterExpr)
           }
+          add("--")
+          add(url)
         }
 
       try {
-        if (mangaDexId != null && mangaInfo.coverFilename != null) {
+        val coverFilename = mangaInfo.coverFilename
+        if (mangaDexId != null && coverFilename != null) {
           val existingCoverFile =
             destDir.listFiles()?.find {
               it.name.startsWith("cover.") && it.isFile
@@ -464,16 +495,18 @@ class GalleryDlWrapper(
           @Suppress("UNCHECKED_CAST")
           val storedCoverFilename =
             (seriesJson?.get("metadata") as? Map<String, Any?>)?.get("cover_filename") as? String
-          val coverChanged = storedCoverFilename != mangaInfo.coverFilename
+          val coverChanged = storedCoverFilename != coverFilename
 
           if (existingCoverFile != null && !coverChanged) {
             logger.debug { "Cover already exists and unchanged, skipping download" }
           } else {
             logger.debug { "Downloading cover image" }
-            mangaDexApiClient.downloadMangaCover(mangaDexId, mangaInfo.coverFilename!!, destinationPath)
+            if (mangaDexApiClient.downloadMangaCover(mangaDexId, coverFilename, destinationPath)) {
+              updateSeriesJsonCoverFilename(destinationPath, coverFilename)
+            }
           }
         } else {
-          logger.warn { "Cannot download cover: mangaDexId=$mangaDexId, coverFilename=${mangaInfo.coverFilename}" }
+          logger.warn { "Cannot download cover: mangaDexId=$mangaDexId, coverFilename=$coverFilename" }
         }
       } catch (e: Exception) {
         logger.warn(e) { "Failed to download cover image (non-fatal)" }
@@ -509,7 +542,7 @@ class GalleryDlWrapper(
         if (komgaSeriesId != null) {
           blacklistedChapterRepository.findUrlsBySeriesId(komgaSeriesId)
         } else {
-          blacklistedChapterRepository.findAll().map { it.chapterUrl }.toSet()
+          blacklistedChapterRepository.findAllUrls()
         }
 
       val chapters =
@@ -548,6 +581,14 @@ class GalleryDlWrapper(
                 ),
               )
               logger.warn { "Auto-blacklisted same-group duplicate: ch.${old.chapterNumber} [${old.scanlationGroup}] ${old.chapterUrl}" }
+              eventPublisher.publishEvent(
+                org.gotson.komga.domain.model.DomainEvent.ChapterAutoBlacklisted(
+                  seriesId = komgaSeriesId,
+                  chapterUrl = old.chapterUrl,
+                  chapterNumber = old.chapterNumber,
+                  reason = "same-group-duplicate",
+                ),
+              )
             } catch (e: Exception) {
               logger.debug(e) { "Blacklist insert failed (likely duplicate): ${old.chapterUrl}" }
             }
@@ -674,9 +715,12 @@ class GalleryDlWrapper(
                 logger.debug { "gallery-dl stderr: $line" }
 
                 val progress = parseGalleryDlProgress(line, chaptersCompleted.get())
-                if (progress != null && progress.percent > lastProgress) {
-                  lastProgress = progress.percent
-                  onProgress(progress)
+                if (progress != null) {
+                  if (progress.percent < lastProgress) lastProgress = 0
+                  if (progress.percent > lastProgress) {
+                    lastProgress = progress.percent
+                    onProgress(progress)
+                  }
                 }
               }
             }
@@ -719,11 +763,9 @@ class GalleryDlWrapper(
         if (cbzFilesInSubdirs.isNotEmpty()) {
           logger.debug { "Found ${cbzFilesInSubdirs.size} CBZ files in subdirectories, moving to root" }
           cbzFilesInSubdirs.forEach { cbzFile ->
-            val target = File(destDir, cbzFile.name)
-            if (!target.exists()) {
-              Files.move(cbzFile.toPath(), target.toPath())
-              logger.debug { "Moved ${cbzFile.relativeTo(destDir).path} -> ${target.name}" }
-            }
+            val sourceRelPath = cbzFile.relativeTo(destDir).path
+            val moved = moveIntoSeriesFolder(cbzFile, destDir, chapterMatcher.extractChapterId(cbzFile.toPath()))
+            logger.debug { "Moved $sourceRelPath -> ${moved.name}" }
           }
           allFiles.filter { it.isDirectory && it != destDir && it.listFiles()?.isEmpty() == true }.forEach { deleteQuietly(it) }
         }
@@ -785,6 +827,14 @@ class GalleryDlWrapper(
                   ),
                 )
                 logger.warn { "Auto-blacklisted external redirect chapter $chapterNum (pages=0): ${chapter.chapterUrl}" }
+                eventPublisher.publishEvent(
+                  org.gotson.komga.domain.model.DomainEvent.ChapterAutoBlacklisted(
+                    seriesId = komgaSeriesId,
+                    chapterUrl = chapter.chapterUrl,
+                    chapterNumber = chapter.chapterNumber,
+                    reason = "external-redirect",
+                  ),
+                )
               } catch (e: Exception) {
                 logger.debug(e) { "Blacklist insert failed (likely duplicate): ${chapter.chapterUrl}" }
               }
@@ -811,6 +861,14 @@ class GalleryDlWrapper(
                   ),
                 )
                 logger.warn { "Auto-blacklisted chapter $chapterNum after $failCount failed attempts: ${chapter.chapterUrl}" }
+                eventPublisher.publishEvent(
+                  org.gotson.komga.domain.model.DomainEvent.ChapterAutoBlacklisted(
+                    seriesId = komgaSeriesId,
+                    chapterUrl = chapter.chapterUrl,
+                    chapterNumber = chapter.chapterNumber,
+                    reason = "repeated-failures",
+                  ),
+                )
               } catch (e: Exception) {
                 logger.debug(e) { "Blacklist insert failed (likely duplicate): ${chapter.chapterUrl}" }
               }
@@ -824,17 +882,24 @@ class GalleryDlWrapper(
           logger.debug { "Downloading chapter $chapterNum ($downloadIndex/$totalChapters): ${chapter.chapterUrl}" }
 
           val stagingDir =
-            Files
-              .createTempDirectory(destDir.toPath(), ".dlstg_")
-              .toFile()
+            try {
+              Files
+                .createTempDirectory(destDir.toPath(), ".dlstg_")
+                .toFile()
+            } catch (e: java.io.IOException) {
+              chapterFailures[chapter.chapterUrl] = failCount + 1
+              logger.warn(e) { "Failed to create staging directory for chapter $chapterNum (attempt ${failCount + 1}/3)" }
+              return@forEachIndexed
+            }
 
           val chapterCommand =
             galleryDlProcess.getCommand(gdlPath).toMutableList().apply {
-              add(chapter.chapterUrl)
               add("-d")
               add(stagingDir.absolutePath)
               add("--config")
               add(configFile.absolutePath)
+              add("--")
+              add(chapter.chapterUrl)
             }
 
           try {
@@ -902,13 +967,11 @@ class GalleryDlWrapper(
                 logger.warn { "Chapter $chapterNum: gallery-dl exited 0 but produced no matching CBZ (attempt ${failCount + 1}/3)" }
               } else {
                 val movedCbz = moveIntoSeriesFolder(producedCbz, destDir, chapter.chapterId)
+                chapterFailures.remove(chapter.chapterUrl)
                 filesDownloaded.incrementAndGet()
                 try {
                   if (komgaSeriesId != null && !chapterUrlRepository.existsByUrl(chapter.chapterUrl)) {
-                    val chapterNumVal =
-                      chapter.chapterNumber
-                        ?.toDoubleOrNull()
-                        ?: (index + 1).toDouble()
+                    val chapterNumVal = chapter.chapterNumber?.toDoubleOrNull() ?: 0.0
                     chapterUrlRepository.insert(
                       org.gotson.komga.domain.model.ChapterUrl(
                         id =
@@ -1185,11 +1248,11 @@ class GalleryDlWrapper(
               candidates?.firstOrNull()
             }
 
-          val chapter =
-            chapterByNum ?: run {
-              val chapterId = chapterMatcher.extractChapterId(cbzFile.toPath())
-              if (chapterId != null) chapterUrlMap["https://mangadex.org/chapter/$chapterId"] else null
-            }
+          val chapterById =
+            chapterMatcher
+              .extractChapterId(cbzFile.toPath())
+              ?.let { chapterUrlMap["https://mangadex.org/chapter/$it"] }
+          val chapter = chapterById ?: chapterByNum
 
           if (chapter != null) {
             val chapterInfo =
@@ -1316,6 +1379,8 @@ class GalleryDlWrapper(
       } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
         logger.debug(e) { "Atomic move not supported, falling back to regular move for series.json" }
         Files.move(tempFile.toPath(), seriesJsonFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+      } finally {
+        if (tempFile.exists()) tempFile.delete()
       }
 
       if (!seriesJsonFile.exists()) {
@@ -1363,6 +1428,36 @@ class GalleryDlWrapper(
       }
     } else {
       null
+    }
+  }
+
+  private fun updateSeriesJsonCoverFilename(
+    destinationPath: Path,
+    coverFilename: String,
+  ) {
+    try {
+      val existing = readSeriesJson(destinationPath) ?: return
+
+      @Suppress("UNCHECKED_CAST")
+      val metadata = (existing["metadata"] as? Map<String, Any?>)?.toMutableMap() ?: return
+      if (metadata["cover_filename"] == coverFilename) return
+      metadata["cover_filename"] = coverFilename
+      val updated = existing.toMutableMap().apply { this["metadata"] = metadata }
+
+      val seriesJsonFile = destinationPath.resolve("series.json").toFile()
+      val tempFile = File(seriesJsonFile.parent, ".series.json.tmp")
+      tempFile.writeText(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(updated))
+      try {
+        Files.move(tempFile.toPath(), seriesJsonFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+      } catch (e: AtomicMoveNotSupportedException) {
+        logger.debug(e) { "Atomic move not supported, falling back to regular move for series.json" }
+        Files.move(tempFile.toPath(), seriesJsonFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+      } finally {
+        if (tempFile.exists()) tempFile.delete()
+      }
+      logger.debug { "Updated cover_filename in series.json to $coverFilename" }
+    } catch (e: Exception) {
+      logger.warn(e) { "Failed to update cover_filename in series.json" }
     }
   }
 
@@ -1529,7 +1624,7 @@ class GalleryDlWrapper(
   }
 
   private fun detectLanguageFromTitle(title: String): String {
-    if (title.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' || it in '\u4E00'..'\u9FAF' }) {
+    if (title.any { it in '\u3040'..'\u309F' || it in '\u30A0'..'\u30FF' }) {
       return "ja"
     }
 
@@ -1660,9 +1755,14 @@ data class MangaInfo(
       val url = sourceUrl ?: return "Unknown"
       return try {
         val host = URI(url).host?.removePrefix("www.") ?: return "Unknown"
-        host
-          .substringBeforeLast(".")
-          .replaceFirstChar { it.uppercaseChar() }
+        val parts = host.split('.')
+        val name =
+          if (parts.size >= 3 && parts[parts.size - 2] in setOf("co", "com", "net", "org", "ac", "gov", "edu")) {
+            parts[parts.size - 3]
+          } else {
+            parts[maxOf(0, parts.size - 2)]
+          }
+        name.replaceFirstChar { it.uppercaseChar() }
       } catch (e: Exception) {
         logger.debug(e) { "Failed to derive publisher from URL: $url" }
         "Unknown"

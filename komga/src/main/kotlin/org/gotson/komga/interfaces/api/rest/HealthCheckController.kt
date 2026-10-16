@@ -59,7 +59,7 @@ class HealthCheckController(
     val overallStatus =
       when {
         checks.values.all { it.status == "UP" } -> "UP"
-        checks.values.any { it.status == "DOWN" } -> "DEGRADED"
+        checks.values.any { it.status == "DOWN" || it.status == "WARN" } -> "DEGRADED"
         else -> "UNKNOWN"
       }
 
@@ -186,11 +186,10 @@ class HealthCheckController(
   private fun checkDiskSpace(): ComponentHealth =
     try {
       val configDirFile = File(configDir)
-      val root = configDirFile.toPath().root?.toFile() ?: configDirFile
 
-      val totalSpace = root.totalSpace
-      val freeSpace = root.freeSpace
-      val usableSpace = root.usableSpace
+      val totalSpace = configDirFile.totalSpace
+      val freeSpace = configDirFile.freeSpace
+      val usableSpace = configDirFile.usableSpace
       val usedSpace = totalSpace - freeSpace
       val usedPercent = if (totalSpace > 0) (usedSpace.toDouble() / totalSpace * 100).toInt() else 0
 

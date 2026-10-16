@@ -176,6 +176,46 @@ class SeriesSearchHelper(
           } to emptySet()
         }
 
+      is SearchCondition.NotableEntity ->
+        Tables.SERIES.ID.let { field ->
+          val inner = { name: String?, kind: String? ->
+            DSL
+              .select(Tables.BOOK_METADATA_AGGREGATION_NOTABLE_ENTITIES.SERIES_ID)
+              .from(Tables.BOOK_METADATA_AGGREGATION_NOTABLE_ENTITIES)
+              .where(DSL.noCondition())
+              .apply {
+                if (name != null)
+                  and(
+                    Tables.BOOK_METADATA_AGGREGATION_NOTABLE_ENTITIES.NAME
+                      .unicode1()
+                      .equal(name),
+                  )
+              }.apply {
+                if (kind != null)
+                  and(
+                    Tables.BOOK_METADATA_AGGREGATION_NOTABLE_ENTITIES.KIND
+                      .unicode1()
+                      .equal(kind),
+                  )
+              }
+          }
+          when (searchCondition.operator) {
+            is SearchOperator.Is -> {
+              if (searchCondition.operator.value.name == null && searchCondition.operator.value.kind == null)
+                DSL.noCondition()
+              else
+                field.`in`(inner(searchCondition.operator.value.name, searchCondition.operator.value.kind))
+            }
+
+            is SearchOperator.IsNot -> {
+              if (searchCondition.operator.value.name == null && searchCondition.operator.value.kind == null)
+                DSL.noCondition()
+              else
+                field.notIn(inner(searchCondition.operator.value.name, searchCondition.operator.value.kind))
+            }
+          } to emptySet()
+        }
+
       is SearchCondition.OneShot -> searchCondition.operator.toCondition(Tables.SERIES.ONESHOT) to emptySet()
 
       is SearchCondition.AgeRating -> searchCondition.operator.toCondition(Tables.SERIES_METADATA.AGE_RATING) to setOf(RequiredJoin.SeriesMetadata)

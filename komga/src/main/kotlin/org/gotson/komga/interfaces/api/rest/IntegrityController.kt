@@ -107,18 +107,23 @@ class IntegrityController(
     var stillCorrupt = 0
     var queued = 0
     for (book in errorBooks) {
+      val ext = book.path.toString().lowercase()
       val verifyOk =
-        runCatching {
-          ZipFile(book.path.toFile()).use { zip ->
-            zip.entries().asSequence().forEach { entry ->
-              zip.getInputStream(entry).use { stream ->
-                val buf = ByteArray(8192)
-                while (stream.read(buf) >= 0) Unit
+        if (!ext.endsWith(".cbz") && !ext.endsWith(".zip")) {
+          true
+        } else {
+          runCatching {
+            ZipFile(book.path.toFile()).use { zip ->
+              zip.entries().asSequence().forEach { entry ->
+                zip.getInputStream(entry).use { stream ->
+                  val buf = ByteArray(8192)
+                  while (stream.read(buf) >= 0) Unit
+                }
               }
             }
-          }
-          true
-        }.getOrElse { false }
+            true
+          }.getOrElse { false }
+        }
       if (verifyOk) {
         taskEmitter.analyzeBook(book)
         queued++
@@ -192,6 +197,8 @@ class IntegrityController(
     } catch (e: ZipException) {
       e
     } catch (e: IOException) {
+      e
+    } catch (e: RuntimeException) {
       e
     }
 

@@ -34,7 +34,7 @@ Import your MangaDex library from Tachiyomi, Mihon, or Mihon forks directly into
 ### Via API
 
 ```bash
-curl -X POST http://localhost:25600/api/v1/tachiyomi/import \
+curl -X POST http://localhost:25600/api/v1/import/tachiyomi \
   -F "file=@backup.tachibk" \
   -F "libraryId=your-library-id"
 ```
@@ -115,15 +115,15 @@ The importer automatically:
 
 ```bash
 # 1. Import backup
-curl -X POST http://localhost:25600/api/v1/tachiyomi/import \
+curl -X POST http://localhost:25600/api/v1/import/tachiyomi \
   -F "file=@mihon-backup.tachibk" \
   -F "libraryId=abc123"
 
-# 2. Check follow.txt was updated
-cat /manga/follow.txt
+# 2. Imported titles are added to the library's follow list (stored in the database)
+curl http://localhost:25600/api/v1/downloads/follows/abc123
 
 # 3. Trigger immediate check
-curl -X POST http://localhost:25600/api/v1/downloads/follow-check/abc123
+curl -X POST http://localhost:25600/api/v1/downloads/follows/abc123/check-now
 
 # 4. Monitor downloads
 curl http://localhost:25600/api/v1/downloads

@@ -14,8 +14,7 @@ plugins {
     kotlin("kapt") version kotlinVersion
   }
   id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-  id("com.github.ben-manes.versions") version "0.53.0"
-  id("org.jreleaser") version "1.25.0"
+  id("org.jreleaser") version "1.26.0"
 }
 
 fun isNonStable(version: String): Boolean {
@@ -28,21 +27,20 @@ fun isNonStable(version: String): Boolean {
 
 group = "org.gotson"
 
+tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
+  // disallow release candidates as upgradable versions from stable versions
+  rejectVersionIf {
+    isNonStable(candidate.version) && !isNonStable(currentVersion)
+  }
+  gradleReleaseChannel = "current"
+  checkConstraints = true
+}
+
 allprojects {
   repositories {
     mavenCentral()
   }
   apply(plugin = "org.jlleitschuh.gradle.ktlint")
-  apply(plugin = "com.github.ben-manes.versions")
-
-  tasks.named<DependencyUpdatesTask>("dependencyUpdates").configure {
-    // disallow release candidates as upgradable versions from stable versions
-    rejectVersionIf {
-      isNonStable(candidate.version) && !isNonStable(currentVersion)
-    }
-    gradleReleaseChannel = "current"
-    checkConstraints = true
-  }
 
   configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     version = "1.8.0"
@@ -54,7 +52,7 @@ allprojects {
 }
 
 tasks.wrapper {
-  gradleVersion = "9.6.1"
+  gradleVersion = "9.8.1"
   distributionType = Wrapper.DistributionType.ALL
 }
 
@@ -74,6 +72,7 @@ jreleaser {
       discussionCategoryName = "Announcements"
       skipTag = true
       tagName = "{{projectVersion}}"
+      immutableRelease = true
 
       changelog {
         formatted = Active.ALWAYS

@@ -1,6 +1,6 @@
 <template>
   <v-chip
-    v-if="count"
+    v-if="count !== undefined"
     rounded
     >{{ count }}</v-chip
   >
@@ -11,7 +11,3 @@ const {} = defineProps<{
   count?: number
 }>()
 </script>
-
-<script lang="ts"></script>
-
-<style scoped></style>

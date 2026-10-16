@@ -1,8 +1,6 @@
 import { defineMessage, type MessageDescriptor } from 'vue-intl'
 
-export type SortOption = {
-  // for display
-  label: string
+export type SortDefinition = {
   // sorting key sent to API
   key: string
   // initial order
@@ -11,9 +9,26 @@ export type SortOption = {
   invertible: boolean
 }
 
+export type SortOption = {
+  // for display
+  label: string
+} & SortDefinition
+
 export type SortOrder = 'asc' | 'desc'
 
 export type SortOptionDescriptor = Omit<SortOption, 'label'> & { message: MessageDescriptor }
+
+type ResolveOrder<T extends readonly SortDefinition[]> = {
+  [K in keyof T]: T[K] extends {
+    key: infer KKey extends string
+    initialOrder: infer KOrder
+    invertible: infer KInvert
+  }
+    ? KInvert extends true
+      ? { key: KKey; order: SortOrder }
+      : { key: KKey; order: KOrder }
+    : never
+}[number]
 
 const messages = {
   createdDate: defineMessage({
@@ -33,7 +48,7 @@ const messages = {
   }),
 }
 
-export const sortSeries: SortOptionDescriptor[] = [
+export const sortSeries = [
   {
     message: defineMessage({
       description: 'Sort label: metadata.titleSort',
@@ -102,9 +117,12 @@ export const sortSeries: SortOptionDescriptor[] = [
     initialOrder: 'asc',
     invertible: false,
   },
-]
+] as const satisfies readonly SortOptionDescriptor[]
 
-export const sortBooks: SortOptionDescriptor[] = [
+export type SortKeysSeries = (typeof sortSeries)[number]['key']
+export type SortSeries = ResolveOrder<typeof sortSeries>
+
+export const sortBooks = [
   {
     message: defineMessage({
       description: 'Sort label: series',
@@ -159,7 +177,7 @@ export const sortBooks: SortOptionDescriptor[] = [
   },
   {
     message: messages.readDate,
-    key: 'readDate',
+    key: 'readProgress.readDate',
     initialOrder: 'desc',
     invertible: true,
   },
@@ -190,7 +208,10 @@ export const sortBooks: SortOptionDescriptor[] = [
       id: 'WVblsI',
     }),
     key: 'pagesCount',
-    initialOrder: 'asc',
-    invertible: false,
+    initialOrder: 'desc',
+    invertible: true,
   },
-]
+] as const satisfies readonly SortOptionDescriptor[]
+
+export type SortKeysBook = (typeof sortBooks)[number]['key']
+export type SortBook = ResolveOrder<typeof sortBooks>

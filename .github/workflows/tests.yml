@@ -95,3 +95,28 @@ jobs:
       - name: npm test
         working-directory: komga-webui
         run: npm run test:unit
+
+  next-ui:
+    runs-on: ubuntu-latest
+    name: Test next-ui builds
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: 'next-ui/.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: next-ui/package-lock.json
+      - name: npm ci
+        working-directory: next-ui
+        run: npm ci
+      - name: npm build
+        working-directory: next-ui
+        run: npm run build:with-i18n
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+      - name: type-check
+        working-directory: next-ui
+        run: npm run type-check
+      - name: npm test
+        working-directory: next-ui
+        run: npm run test:unit

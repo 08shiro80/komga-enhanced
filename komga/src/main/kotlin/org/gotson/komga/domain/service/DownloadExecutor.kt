@@ -2,7 +2,6 @@ package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PreDestroy
-import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.DownloadQueue
 import org.gotson.komga.domain.model.DownloadStatus
@@ -10,9 +9,10 @@ import org.gotson.komga.domain.model.SourceType
 import org.gotson.komga.domain.persistence.DownloadQueueRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
+import org.gotson.komga.infrastructure.background.BackgroundJobTracker
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
+import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.ApplicationEventPublisher
-import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -48,21 +48,19 @@ class DownloadExecutor(
   private val galleryDlWrapper: GalleryDlWrapper,
   private val libraryLifecycle: LibraryLifecycle,
   private val libraryContentLifecycle: LibraryContentLifecycle,
-  private val taskEmitter: TaskEmitter,
   private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper,
   private val eventPublisher: ApplicationEventPublisher,
+  private val backgroundJobTracker: BackgroundJobTracker,
 ) {
   private val processing = AtomicBoolean(false)
   private val activeDownloads = ConcurrentHashMap<String, ActiveDownload>()
   private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
-  private val pendingScans = ConcurrentHashMap<String, MutableSet<java.nio.file.Path>>()
-  private val pendingScanLock = Any()
   private val downloadThread =
     Executors.newSingleThreadExecutor { r ->
       Thread(r, "download-worker").apply { isDaemon = true }
     }
 
-  @EventListener(ContextRefreshedEvent::class)
+  @EventListener(ApplicationReadyEvent::class)
   fun recoverStaleDownloads() {
     val stale = downloadQueueRepository.findByStatus(DownloadStatus.DOWNLOADING)
     if (stale.isEmpty()) return
@@ -139,7 +137,7 @@ class DownloadExecutor(
   fun autoRetryFailedDownloads() {
     try {
       val failed = downloadQueueRepository.findByStatus(DownloadStatus.FAILED)
-      val retriable = failed.filter { it.canRetry() }
+      val retriable = failed.filter { it.canRetry() && !it.isPermanentFailure() }
 
       if (retriable.isEmpty()) {
         logger.debug { "No failed downloads to auto-retry" }
@@ -149,7 +147,9 @@ class DownloadExecutor(
       val now = LocalDateTime.now()
       val toRetry =
         retriable.filter { download ->
-          val waitMinutes = (download.retryCount + 1) * 5L
+          // Exponential backoff with a cap: 5, 10, 20, 40, 80, 160, max 240 min — a persistently failing
+          // source no longer re-runs the full gallery-dl pipeline every few minutes.
+          val waitMinutes = minOf((1L shl download.retryCount.coerceAtMost(10)) * 5L, 240L)
           val lastModified = download.lastModifiedDate
           java.time.Duration
             .between(lastModified, now)
@@ -365,6 +365,15 @@ class DownloadExecutor(
 
   fun clearPendingDownloads(): Int = clearDownloadsByStatus(DownloadStatus.PENDING)
 
+  fun cancelAllActive(): Int {
+    val cancellable =
+      listOf(DownloadStatus.DOWNLOADING, DownloadStatus.PENDING, DownloadStatus.PAUSED)
+        .flatMap { downloadQueueRepository.findByStatus(it) }
+    cancellable.forEach { runCatching { cancelDownload(it.id) } }
+    logger.info { "Cancelled ${cancellable.size} active/pending/paused downloads" }
+    return cancellable.size
+  }
+
   fun processFollowList(
     followListPath: java.nio.file.Path,
     libraryId: String?,
@@ -384,7 +393,7 @@ class DownloadExecutor(
 
       logger.info { "Processing follow list: ${urls.size} URLs" }
 
-      val activeStatuses = listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.COMPLETED)
+      val activeStatuses = listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED, DownloadStatus.COMPLETED)
       urls.forEach { url ->
         try {
           if (downloadQueueRepository.existsBySourceUrlAndStatusIn(url, activeStatuses)) {
@@ -411,7 +420,7 @@ class DownloadExecutor(
   fun isUrlAlreadyQueued(url: String): Boolean =
     downloadQueueRepository.existsBySourceUrlAndStatusIn(
       url,
-      listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING),
+      listOf(DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED),
     )
 
   fun setActiveProcess(
@@ -456,13 +465,17 @@ class DownloadExecutor(
             progressPercent = 100,
             errorMessage = "Chapter $targetNumber already exists in series",
           )
+          activeDownloads.remove(download.id)
           return
         }
       }
     }
 
+    val jobName = "Download: ${download.title ?: download.sourceUrl}"
+    var current = download
     try {
-      updateDownloadStatus(download, DownloadStatus.DOWNLOADING, startedDate = LocalDateTime.now())
+      backgroundJobTracker.start(jobName)
+      current = updateDownloadStatus(download, DownloadStatus.DOWNLOADING, startedDate = LocalDateTime.now())
 
       eventPublisher.publishEvent(
         DomainEvent.DownloadStarted(
@@ -571,13 +584,11 @@ class DownloadExecutor(
           val now = System.currentTimeMillis()
           if (now - lastProgressDbWrite >= 5000) {
             lastProgressDbWrite = now
-            downloadQueueRepository.update(
-              download.copy(
-                progressPercent = progress.percent,
-                currentChapter = progress.currentChapter,
-                totalChapters = if (progress.totalChapters > 0) progress.totalChapters else download.totalChapters,
-                lastModifiedDate = LocalDateTime.now(),
-              ),
+            downloadQueueRepository.updateProgressIfDownloading(
+              download.id,
+              progress.percent,
+              progress.currentChapter,
+              progress.totalChapters.takeIf { it > 0 },
             )
           }
 
@@ -623,11 +634,12 @@ class DownloadExecutor(
         // above, we must not overwrite its CANCELLED row with COMPLETED.
         val completed =
           synchronized(activeDownloads) {
-            if (cancelledIds.remove(download.id)) {
+            val row = downloadQueueRepository.findByIdOrNull(download.id)
+            if (cancelledIds.remove(download.id) || row == null || row.status != DownloadStatus.DOWNLOADING) {
               false
             } else {
               updateDownloadStatus(
-                download.copy(
+                current.copy(
                   title = finalTitle,
                   totalChapters = finalTotalChapters,
                   currentChapter = finalCurrentChapter,
@@ -641,7 +653,7 @@ class DownloadExecutor(
             }
           }
         if (!completed) {
-          logger.info { "Download ${download.id} was cancelled just before completion, keeping CANCELLED status" }
+          logger.info { "Download ${download.id} was cancelled or re-queued just before completion, not overwriting its status" }
           return
         }
 
@@ -653,11 +665,6 @@ class DownloadExecutor(
             filesDownloaded = result.filesDownloaded,
           ),
         )
-
-        if (result.newlyDownloaded > 0 && download.libraryId != null) {
-          taskEmitter.scanLibrary(download.libraryId, scanDeep = false)
-          logger.info { "Triggered library scan after download (${result.newlyDownloaded} new files)" }
-        }
 
         if (mangaDexId != null && komgaSeriesId != null && komgaSeriesId.isNotEmpty()) {
           try {
@@ -677,37 +684,28 @@ class DownloadExecutor(
         }
 
         if (library != null && result.filesDownloaded > 0) {
-          synchronized(pendingScanLock) {
-            pendingScans
-              .getOrPut(library.id) { mutableSetOf() }
-              .add(finalPath)
-          }
-
-          val remaining = downloadQueueRepository.findPendingOrdered()
-          if (remaining.isEmpty()) {
-            scanPendingFolders()
-          } else {
-            logger.info { "Deferring scan, ${remaining.size} downloads still pending" }
+          try {
+            libraryContentLifecycle.scanSeriesFolder(library, finalPath)
+          } catch (e: Exception) {
+            logger.warn(e) { "Targeted scan failed for $finalPath" }
           }
         }
 
         logger.info { "Download completed: ${download.id} - ${result.filesDownloaded} files" }
       } else {
-        updateDownloadStatus(
-          download,
-          DownloadStatus.FAILED,
-          errorMessage = result.errorMessage ?: "Download failed",
-        )
+        if (markFailedIfStillDownloading(current, result.errorMessage ?: "Download failed")) {
+          eventPublisher.publishEvent(
+            DomainEvent.DownloadFailed(
+              downloadId = download.id,
+              title = download.title,
+              errorMessage = result.errorMessage ?: "Download failed",
+            ),
+          )
 
-        eventPublisher.publishEvent(
-          DomainEvent.DownloadFailed(
-            downloadId = download.id,
-            title = download.title,
-            errorMessage = result.errorMessage ?: "Download failed",
-          ),
-        )
-
-        logger.error { "Download failed: ${download.id} - ${result.errorMessage}" }
+          logger.error { "Download failed: ${download.id} - ${result.errorMessage}" }
+        } else {
+          logger.info { "Download ${download.id} status changed externally during failure handling, not overwriting with FAILED" }
+        }
       }
     } catch (e: Exception) {
       if (cancelledIds.remove(download.id)) {
@@ -717,20 +715,19 @@ class DownloadExecutor(
 
       logger.error(e) { "Error processing download ${download.id}" }
 
-      updateDownloadStatus(
-        download,
-        DownloadStatus.FAILED,
-        errorMessage = e.message ?: "Unknown error",
-      )
-
-      eventPublisher.publishEvent(
-        DomainEvent.DownloadFailed(
-          downloadId = download.id,
-          title = download.title,
-          errorMessage = e.message ?: "Unknown error",
-        ),
-      )
+      if (markFailedIfStillDownloading(current, e.message ?: "Unknown error")) {
+        eventPublisher.publishEvent(
+          DomainEvent.DownloadFailed(
+            downloadId = download.id,
+            title = download.title,
+            errorMessage = e.message ?: "Unknown error",
+          ),
+        )
+      } else {
+        logger.info { "Download ${download.id} status changed externally during failure handling, not overwriting with FAILED" }
+      }
     } finally {
+      backgroundJobTracker.stop(jobName)
       activeDownloads.remove(download.id)
     }
   }
@@ -743,8 +740,8 @@ class DownloadExecutor(
     progressPercent: Int = download.progressPercent,
     destinationPath: String? = download.destinationPath,
     errorMessage: String? = download.errorMessage,
-  ) {
-    downloadQueueRepository.update(
+  ): DownloadQueue {
+    val updated =
       download.copy(
         status = status,
         startedDate = startedDate,
@@ -753,29 +750,24 @@ class DownloadExecutor(
         destinationPath = destinationPath,
         errorMessage = errorMessage,
         lastModifiedDate = LocalDateTime.now(),
-      ),
-    )
+      )
+    downloadQueueRepository.update(updated)
+    return updated
   }
 
-  private fun scanPendingFolders() {
-    val folders: Map<String, Set<java.nio.file.Path>>
-    synchronized(pendingScanLock) {
-      folders = pendingScans.mapValues { it.value.toSet() }
-      pendingScans.clear()
-    }
-
-    for ((libraryId, paths) in folders) {
-      val library = libraryRepository.findByIdOrNull(libraryId) ?: continue
-      logger.info { "Scanning ${paths.size} downloaded manga folders" }
-      for (path in paths) {
-        try {
-          libraryContentLifecycle.scanSeriesFolder(library, path)
-        } catch (e: Exception) {
-          logger.warn(e) { "Targeted scan failed for $path" }
-        }
+  private fun markFailedIfStillDownloading(
+    download: DownloadQueue,
+    errorMessage: String,
+  ): Boolean =
+    synchronized(activeDownloads) {
+      val row = downloadQueueRepository.findByIdOrNull(download.id)
+      if (row == null || row.status != DownloadStatus.DOWNLOADING) {
+        false
+      } else {
+        updateDownloadStatus(download, DownloadStatus.FAILED, errorMessage = errorMessage)
+        true
       }
     }
-  }
 
   private data class FolderLookupResult(
     val folder: java.io.File,
@@ -801,7 +793,8 @@ class DownloadExecutor(
     val targetFile = downloadedFiles.firstOrNull()?.let { java.io.File(it) } ?: return
     val renamed =
       if (!overrides.customFilename.isNullOrBlank()) {
-        val newName = if (overrides.customFilename.endsWith(".cbz", ignoreCase = true)) overrides.customFilename else "${overrides.customFilename}.cbz"
+        val base = if (overrides.customFilename.endsWith(".cbz", ignoreCase = true)) overrides.customFilename.dropLast(4) else overrides.customFilename
+        val newName = "${sanitizeFileName(base)}.cbz"
         val target = targetFile.parentFile.resolve(newName)
         if (targetFile != target) {
           java.nio.file.Files.move(
@@ -884,7 +877,7 @@ class DownloadExecutor(
         .replace(">", "&gt;")
     val tagRegex = Regex("<$tag>.*?</$tag>", RegexOption.DOT_MATCHES_ALL)
     return if (tagRegex.containsMatchIn(xml)) {
-      tagRegex.replace(xml, "<$tag>$escaped</$tag>")
+      tagRegex.replace(xml) { "<$tag>$escaped</$tag>" }
     } else {
       val end = xml.lastIndexOf("</ComicInfo>")
       if (end < 0) {
@@ -929,7 +922,7 @@ class DownloadExecutor(
     val idWithSpaces = mangaDexId.replace("-", " ")
     val byPath =
       allSeries.firstOrNull { series ->
-        val path = series.url.toString()
+        val path = series.path.toString()
         path.contains(mangaDexId) || path.contains(idWithSpaces)
       }
     if (byPath != null && byPath.path.toFile().exists()) {
@@ -1118,7 +1111,8 @@ class DownloadExecutor(
     name
       .replace(Regex("[\\\\/:*?\"<>|]"), "")
       .trim()
-      .trimEnd('.')
+      .trim('.')
+      .ifBlank { "Unknown" }
 
   companion object {
     private val MANGADEX_UUID_REGEX = Regex("""^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$""")

@@ -8,6 +8,7 @@
     <LayoutAppDrawerMenuServer v-if="isAdmin" />
     <LayoutAppDrawerMenuAccount />
     <LayoutAppDrawerMenuLogout />
+    <LayoutAppDrawerMenuClassicUi />
   </v-list>
 </template>
 

@@ -6,6 +6,7 @@ import org.gotson.komga.domain.model.Series
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
+import org.gotson.komga.infrastructure.download.ChapterInfo
 import org.gotson.komga.infrastructure.download.ChapterMatcher
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.infrastructure.download.MangaDexApiClient
@@ -135,7 +136,11 @@ class ChapterChecker(
           ?: mangaFolder?.let { folder ->
             libraries
               .firstOrNull { lib ->
-                folder.absolutePath.startsWith(lib.path.toFile().absolutePath)
+                folder
+                  .toPath()
+                  .toAbsolutePath()
+                  .normalize()
+                  .startsWith(lib.path.toAbsolutePath().normalize())
               }?.id
           }
       val knownChapterIds = getKnownChapterIds(series)
@@ -243,8 +248,13 @@ class ChapterChecker(
     if (byUuid != null) return byUuid
 
     if (folder == null) return null
+    val folderPath =
+      folder
+        .toPath()
+        .toAbsolutePath()
+        .normalize()
     libraries.forEach { library ->
-      if (folder.absolutePath.startsWith(library.path.toFile().absolutePath)) {
+      if (folderPath.startsWith(library.path.toAbsolutePath().normalize())) {
         val folderUrl = folder.toURI().toURL()
         return seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, folderUrl)
       }
@@ -292,7 +302,10 @@ class ChapterChecker(
         if (seriesJson.exists()) {
           try {
             val content = seriesJson.readText()
-            uuidRegex.find(content)?.value?.let { uuid -> index.putIfAbsent(uuid, dir) }
+            val idMatch =
+              SERIES_JSON_COMICID_REGEX.find(content)
+                ?: SERIES_JSON_TITLE_URL_REGEX.find(content)
+            idMatch?.groupValues?.get(1)?.let { uuid -> index.putIfAbsent(uuid, dir) }
           } catch (e: Exception) {
             logger.warn(e) { "Failed to read series.json in ${dir.name}" }
           }
@@ -328,9 +341,12 @@ class ChapterChecker(
     var seriesScanned = 0
     var totalRemoved = 0
     val details = mutableListOf<DeletedChapterDetail>()
+    // Transient per-run cache: the same MangaDex chapter id can recur across series (and across
+    // multi-group rows within a series); fetch its metadata at most once per scan.
+    val chapterMetadataCache = mutableMapOf<String, ChapterInfo?>()
 
     window.forEach { series ->
-      val outcome = reconcileSeries(series, dryRun)
+      val outcome = reconcileSeries(series, dryRun, chapterMetadataCache)
       if (outcome.scanned) seriesScanned++
       totalRemoved += outcome.removed
       outcome.detail?.let { details.add(it) }
@@ -357,7 +373,7 @@ class ChapterChecker(
       return DeletedChapterScanResult(0, 0, 1, emptyList())
     }
 
-    val outcome = reconcileSeries(series, dryRun)
+    val outcome = reconcileSeries(series, dryRun, mutableMapOf())
     return DeletedChapterScanResult(
       seriesScanned = if (outcome.scanned) 1 else 0,
       entriesRemoved = outcome.removed,
@@ -377,9 +393,50 @@ class ChapterChecker(
     val detail: DeletedChapterDetail?,
   )
 
+  private fun filterRedownloadable(
+    staleEntries: List<org.gotson.komga.domain.model.ChapterUrl>,
+    chapterMetadataCache: MutableMap<String, ChapterInfo?>,
+  ): List<org.gotson.komga.domain.model.ChapterUrl> =
+    staleEntries.filter { entry ->
+      val chapterId = extractChapterIdFromUrl(entry.url)
+      val metadata =
+        when {
+          chapterId == null -> null
+          chapterMetadataCache.containsKey(chapterId) -> chapterMetadataCache[chapterId]
+          else -> mangaDexApiClient.fetchChapterMetadata(chapterId).also { chapterMetadataCache[chapterId] = it }
+        }
+      metadata != null && !(metadata.pages == 0 && metadata.externalUrl != null)
+    }
+
+  private fun removeRedownloadable(
+    series: Series,
+    chapterUrls: List<org.gotson.komga.domain.model.ChapterUrl>,
+    dryRun: Boolean,
+    chapterMetadataCache: MutableMap<String, ChapterInfo?>,
+    cbzCount: Int,
+    reason: String,
+  ): ReconcileOutcome {
+    val verb = if (dryRun) "would remove" else "removed"
+    val deletable = filterRedownloadable(chapterUrls, chapterMetadataCache)
+    val kept = chapterUrls.size - deletable.size
+    if (deletable.isEmpty()) {
+      if (kept > 0) {
+        logger.info { "Deleted chapters scan: '${series.name}' ($reason) — $kept entries KEPT (source gone/unverifiable, not re-downloadable)" }
+      }
+      return ReconcileOutcome(true, 0, null)
+    }
+    if (!dryRun) chapterUrlRepository.deleteByIds(deletable.map { it.id })
+    logger.info {
+      "Deleted chapters scan: $reason for '${series.name}', $verb ${deletable.size} entries" +
+        if (kept > 0) " ($kept KEPT — source gone/unverifiable)" else ""
+    }
+    return ReconcileOutcome(true, deletable.size, DeletedChapterDetail(series.name, deletable.size, kept, cbzCount))
+  }
+
   private fun reconcileSeries(
     series: Series,
     dryRun: Boolean,
+    chapterMetadataCache: MutableMap<String, ChapterInfo?>,
   ): ReconcileOutcome {
     val chapterUrls = chapterUrlRepository.findBySeriesId(series.id)
     if (chapterUrls.isEmpty()) return ReconcileOutcome(false, 0, null)
@@ -388,10 +445,7 @@ class ChapterChecker(
     val seriesDir = series.path.toFile()
 
     if (!seriesDir.exists()) {
-      val count = chapterUrls.size
-      if (!dryRun) chapterUrlRepository.deleteBySeriesId(series.id)
-      logger.info { "Deleted chapters scan: folder missing for '${series.name}', $verb $count entries" }
-      return ReconcileOutcome(true, count, DeletedChapterDetail(series.name, count, 0, 0))
+      return removeRedownloadable(series, chapterUrls, dryRun, chapterMetadataCache, cbzCount = 0, reason = "folder missing")
     }
 
     val files = seriesDir.listFiles()
@@ -402,10 +456,7 @@ class ChapterChecker(
     val cbzCount = files.count { it.isFile && it.extension.lowercase() == "cbz" }
 
     if (cbzCount == 0) {
-      val count = chapterUrls.size
-      if (!dryRun) chapterUrlRepository.deleteBySeriesId(series.id)
-      logger.info { "Deleted chapters scan: no CBZ files in '${series.name}', $verb $count entries" }
-      return ReconcileOutcome(true, count, DeletedChapterDetail(series.name, count, 0, 0))
+      return removeRedownloadable(series, chapterUrls, dryRun, chapterMetadataCache, cbzCount = 0, reason = "no CBZ files")
     }
 
     val perFileUrls = chapterMatcher.extractChapterUrlsPerCbzFile(seriesDir)
@@ -424,18 +475,7 @@ class ChapterChecker(
     val staleEntries = chapterUrls.filter { it.url !in existingUrls }
     if (staleEntries.isEmpty()) return ReconcileOutcome(true, 0, null)
 
-    // Failsafe: only remove a stale entry when its source chapter STILL EXISTS and can actually be
-    // re-downloaded. If the MangaDex chapter is gone (404), unverifiable (network error) or not a MangaDex
-    // URL, KEEP the tracking row — deleting it would trigger no successful re-download and only lose the
-    // "we had this" record. A chapter that still resolves but has no hosted pages (pages==0 && externalUrl
-    // != null, external redirect) is likewise NOT re-downloadable → keep it (consistent with the auto-
-    // blacklist rule). On a MangaDex outage every check returns null → nothing is deleted (safe by default).
-    val deletable =
-      staleEntries.filter { entry ->
-        val chapterId = entry.url.substringAfterLast("/chapter/", "")
-        val metadata = if (chapterId.isNotBlank()) mangaDexApiClient.fetchChapterMetadata(chapterId) else null
-        metadata != null && !(metadata.pages == 0 && metadata.externalUrl != null)
-      }
+    val deletable = filterRedownloadable(staleEntries, chapterMetadataCache)
     val kept = staleEntries.size - deletable.size
     if (deletable.isEmpty()) {
       if (kept > 0) {
@@ -444,7 +484,7 @@ class ChapterChecker(
       return ReconcileOutcome(true, 0, null)
     }
 
-    if (!dryRun) deletable.forEach { chapterUrlRepository.delete(it.id) }
+    if (!dryRun) chapterUrlRepository.deleteByIds(deletable.map { it.id })
     val remaining = chapterUrls.size - deletable.size
     logger.info {
       "Deleted chapters scan: '${series.name}' had ${chapterUrls.size} DB entries, $cbzCount files, $verb ${deletable.size} stale entries" +
@@ -455,6 +495,8 @@ class ChapterChecker(
 
   companion object {
     private val CHAPTER_ID_REGEX = Regex("mangadex\\.org/chapter/([0-9a-f-]+)")
+    private val SERIES_JSON_COMICID_REGEX = Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""")
+    private val SERIES_JSON_TITLE_URL_REGEX = Regex("""mangadex\.org/title/([a-f0-9-]{36})""")
   }
 }
 

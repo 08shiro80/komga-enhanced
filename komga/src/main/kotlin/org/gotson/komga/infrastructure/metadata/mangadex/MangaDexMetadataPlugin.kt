@@ -205,7 +205,8 @@ class MangaDexMetadataPlugin(
                   ?.asText()
                 ?: nameNode
                   ?.fields()
-                  ?.next()
+                  ?.asSequence()
+                  ?.firstOrNull()
                   ?.value
                   ?.asText()
             }?.filter { it.isNotEmpty() } ?: emptyList()
@@ -348,33 +349,46 @@ class MangaDexMetadataPlugin(
     language: String,
   ): Boolean? {
     try {
-      val response =
-        restClient
-          .get()
-          .uri { builder ->
-            builder.path("/manga/$mangaId/feed")
-            builder.queryParam("translatedLanguage[]", language)
-            builder.queryParam("contentRating[]", "safe")
-            builder.queryParam("contentRating[]", "suggestive")
-            builder.queryParam("contentRating[]", "erotica")
-            builder.queryParam("contentRating[]", "pornographic")
-            builder.queryParam("limit", 100)
-            builder.queryParam("order[chapter]", "asc")
-            builder.build()
-          }.retrieve()
-          .body(String::class.java) ?: return false
-      val data = objectMapper.readTree(response).get("data") ?: return false
-      if (!data.isArray) return false
-      return data.any { item ->
-        val attrs = item.get("attributes")
-        if (attrs == null) {
-          false
-        } else {
-          val hasExternalUrl = attrs.hasNonNull("externalUrl") && attrs.get("externalUrl").asText().isNotBlank()
-          val pages = attrs.get("pages")?.asInt() ?: 0
-          !hasExternalUrl && pages > 0
-        }
+      var offset = 0
+      val limit = 100
+      while (offset + limit <= 10000) {
+        val currentOffset = offset
+        val response =
+          restClient
+            .get()
+            .uri { builder ->
+              builder.path("/manga/$mangaId/feed")
+              builder.queryParam("translatedLanguage[]", language)
+              builder.queryParam("contentRating[]", "safe")
+              builder.queryParam("contentRating[]", "suggestive")
+              builder.queryParam("contentRating[]", "erotica")
+              builder.queryParam("contentRating[]", "pornographic")
+              builder.queryParam("limit", limit)
+              builder.queryParam("offset", currentOffset)
+              builder.queryParam("order[chapter]", "asc")
+              builder.build()
+            }.retrieve()
+            .body(String::class.java) ?: return false
+        val root = objectMapper.readTree(response)
+        val data = root.get("data") ?: return false
+        if (!data.isArray) return false
+        val found =
+          data.any { item ->
+            val attrs = item.get("attributes")
+            if (attrs == null) {
+              false
+            } else {
+              val hasExternalUrl = attrs.hasNonNull("externalUrl") && attrs.get("externalUrl").asText().isNotBlank()
+              val pages = attrs.get("pages")?.asInt() ?: 0
+              !hasExternalUrl && pages > 0
+            }
+          }
+        if (found) return true
+        val total = root.get("total")?.asInt() ?: 0
+        offset += limit
+        if (data.isEmpty || offset >= total) return false
       }
+      return false
     } catch (e: Exception) {
       logger.warn(e) { "downloadable-check failed for $mangaId ($language) — assuming false (not cached)" }
       return null
@@ -409,7 +423,8 @@ class MangaDexMetadataPlugin(
                 ?: attrs
                   .get("name")
                   ?.fields()
-                  ?.next()
+                  ?.asSequence()
+                  ?.firstOrNull()
                   ?.value
                   ?.asText()
                 ?: return@mapNotNull null
@@ -454,7 +469,8 @@ class MangaDexMetadataPlugin(
                 ?.asText()
               ?: nameNode
                 ?.fields()
-                ?.next()
+                ?.asSequence()
+                ?.firstOrNull()
                 ?.value
                 ?.asText()
           }?.filter { it.isNotEmpty() } ?: emptyList()
@@ -525,7 +541,8 @@ class MangaDexMetadataPlugin(
               ?.asText()
             ?: nameNode
               ?.fields()
-              ?.next()
+              ?.asSequence()
+              ?.firstOrNull()
               ?.value
               ?.asText()
         } ?: emptyList()
@@ -567,12 +584,12 @@ class MangaDexMetadataPlugin(
         summary = description,
         publisher = null,
         ageRating =
-          if (contentRating == "safe")
-            0
-          else if (contentRating == "suggestive")
-            13
-          else
-            18,
+          when (contentRating) {
+            "safe" -> 0
+            "suggestive" -> 13
+            "erotica", "pornographic" -> 18
+            else -> null
+          },
         releaseDate = year?.toString(),
         authors = authors,
         tags = tags,

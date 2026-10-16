@@ -149,11 +149,12 @@ function search() {
 }
 
 async function fill(result: MetadataSearchResult) {
-  if (!selectedPlugin.value) return
+  const resultPluginId = searchParams.value?.pluginId
+  if (!resultPluginId) return
   fillingId.value = result.externalId
   try {
     const md = await komgaGetMetadata({
-      path: { id: selectedPlugin.value, externalId: result.externalId },
+      path: { id: resultPluginId, externalId: result.externalId },
     })
     // Only fill fields the user has not locked, and don't force new locks — let the user decide
     // (matches the webui behaviour). alternativeTitles maps title -> language code.

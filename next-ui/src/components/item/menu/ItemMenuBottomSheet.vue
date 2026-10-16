@@ -5,7 +5,10 @@
   >
     <v-list>
       <template v-if="title">
-        <v-list-item :title="title" />
+        <v-list-item
+          :title="title"
+          :subtitle="subtitle"
+        />
         <v-divider />
       </template>
       <v-list-item
@@ -34,9 +37,6 @@ const { actions = [], manageActions = [] } = defineProps<{
   actions?: Action<unknown>[]
   manageActions?: Action<unknown>[]
   title?: string
+  subtitle?: string
 }>()
 </script>
-
-<script lang="ts"></script>
-
-<style scoped></style>

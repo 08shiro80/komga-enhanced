@@ -131,6 +131,7 @@ export type BookMetadataAggregationDto = {
     authors: Array<AuthorDto>;
     created: Date;
     lastModified: Date;
+    notableEntities: Array<NotableEntityDto>;
     releaseDate?: Date;
     summary: string;
     summaryNumber: string;
@@ -146,6 +147,8 @@ export type BookMetadataDto = {
     lastModified: Date;
     links: Array<WebLinkDto>;
     linksLock: boolean;
+    notableEntities: Array<NotableEntityDto>;
+    notableEntitiesLock: boolean;
     number: string;
     numberLock: boolean;
     numberSort: number;
@@ -170,6 +173,8 @@ export type BookMetadataUpdateDto = {
     isbnLock?: boolean;
     links?: Array<WebLinkUpdateDto>;
     linksLock?: boolean;
+    notableEntities?: Array<NotableEntityUpdateDto>;
+    notableEntitiesLock?: boolean;
     number?: string;
     numberLock?: boolean;
     numberSort?: number;
@@ -505,27 +510,80 @@ export type IgnoredPageKeyDto = {
     pageNumber: number;
 };
 
+export type ItemAuthorDto = {
+    /**
+     * Author's name
+     */
+    name?: string;
+    /**
+     * URL of a site owned by the author
+     */
+    url?: string;
+};
+
 export type ItemDto = {
+    /**
+     * Additional fields for the item
+     */
     _komga?: KomgaExtensionDto;
-    author?: AuthorDto;
+    /**
+     * Author of the item
+     */
+    author?: ItemAuthorDto;
+    /**
+     * HTML of the item
+     */
     content_html?: string;
+    /**
+     * Modification date in RFC 3339 format
+     */
     date_modified?: Date;
+    /**
+     * Unique for that item for that feed over time
+     */
     id: string;
+    /**
+     * A plain text sentence or two describing the item
+     */
     summary?: string;
+    /**
+     * Tags describing the item
+     */
     tags: Array<string>;
+    /**
+     * Plain text title
+     */
     title?: string;
+    /**
+     * URL of the resource described by the item
+     */
     url?: string;
 };
 
 export type JsonFeedDto = {
+    /**
+     * Provides more detail on what the feed is about
+     */
     description?: string;
+    /**
+     * URL of the resource that the feed describes
+     */
     home_page_url?: string;
     items: Array<ItemDto>;
+    /**
+     * Name of the feed
+     */
     title: string;
+    /**
+     * URL of the version of the format the feed uses
+     */
     version: string;
 };
 
 export type KomgaExtensionDto = {
+    /**
+     * Whether the current item has been marked read by the current user
+     */
     read: boolean;
 };
 
@@ -745,6 +803,16 @@ export type NewChaptersResponse = {
     newChapters: Array<NewChapterDto>;
     newCount: number;
     seriesId: string;
+};
+
+export type NotableEntityDto = {
+    kind: string;
+    name: string;
+};
+
+export type NotableEntityUpdateDto = {
+    kind: string;
+    name: string;
 };
 
 export type OAuth2ClientDto = {
@@ -973,6 +1041,74 @@ export type PageReadListDto = {
     sort?: SortObject;
     totalElements?: number;
     totalPages?: number;
+};
+
+/**
+ * Paginated API response container
+ */
+export type PageResponseNotableEntityDto = {
+    /**
+     * List of items contained in the current page
+     */
+    content: Array<NotableEntityDto>;
+    /**
+     * Indicates if the current page is the first page
+     */
+    first: boolean;
+    /**
+     * Indicates if the current page is the last page
+     */
+    last: boolean;
+    /**
+     * Zero-based page index (0..N)
+     */
+    page: number;
+    /**
+     * Number of items requested per page
+     */
+    size: number;
+    /**
+     * Total number of elements across all pages
+     */
+    totalElements: number;
+    /**
+     * Total number of calculated pages
+     */
+    totalPages: number;
+};
+
+/**
+ * Paginated API response container
+ */
+export type PageResponseString = {
+    /**
+     * List of items contained in the current page
+     */
+    content: Array<string>;
+    /**
+     * Indicates if the current page is the first page
+     */
+    first: boolean;
+    /**
+     * Indicates if the current page is the last page
+     */
+    last: boolean;
+    /**
+     * Zero-based page index (0..N)
+     */
+    page: number;
+    /**
+     * Number of items requested per page
+     */
+    size: number;
+    /**
+     * Total number of elements across all pages
+     */
+    totalElements: number;
+    /**
+     * Total number of calculated pages
+     */
+    totalPages: number;
 };
 
 export type PageSeriesDto = {
@@ -1249,7 +1385,7 @@ export type SearchConditionAuthor = {
     author: SearchOperatorEqualityAuthorMatch;
 };
 
-export type SearchConditionBook = SearchConditionAnyOfBook | SearchConditionAllOfBook | SearchConditionLibraryId | SearchConditionReadListId | SearchConditionSeriesId | SearchConditionDeleted | SearchConditionOneShot | SearchConditionTitle | SearchConditionReleaseDate | SearchConditionTag | SearchConditionNumberSort | SearchConditionReadStatus | SearchConditionMediaStatus | SearchConditionMediaProfile | SearchConditionAuthor | SearchConditionPoster;
+export type SearchConditionBook = SearchConditionAnyOfBook | SearchConditionAllOfBook | SearchConditionLibraryId | SearchConditionReadListId | SearchConditionSeriesId | SearchConditionDeleted | SearchConditionOneShot | SearchConditionTitle | SearchConditionReleaseDate | SearchConditionTag | SearchConditionNumberSort | SearchConditionReadStatus | SearchConditionMediaStatus | SearchConditionMediaProfile | SearchConditionAuthor | SearchConditionNotableEntity | SearchConditionPoster;
 
 export type SearchConditionCollectionId = {
     collectionId: SearchOperatorEqualityString;
@@ -1283,6 +1419,10 @@ export type SearchConditionMediaStatus = {
     mediaStatus: SearchOperatorEqualityStatus;
 };
 
+export type SearchConditionNotableEntity = {
+    notableEntity: SearchOperatorEqualityNotableEntityMatch;
+};
+
 export type SearchConditionNumberSort = {
     numberSort: SearchOperatorNumericTFloat;
 };
@@ -1311,7 +1451,7 @@ export type SearchConditionReleaseDate = {
     releaseDate: SearchOperatorDate;
 };
 
-export type SearchConditionSeries = SearchConditionAnyOfSeries | SearchConditionAllOfSeries | SearchConditionLibraryId | SearchConditionCollectionId | SearchConditionDeleted | SearchConditionComplete | SearchConditionOneShot | SearchConditionTitle | SearchConditionTitleSort | SearchConditionReleaseDate | SearchConditionTag | SearchConditionSharingLabel | SearchConditionPublisher | SearchConditionLanguage | SearchConditionGenre | SearchConditionAgeRating | SearchConditionReadStatus | SearchConditionSeriesStatus | SearchConditionAuthor;
+export type SearchConditionSeries = SearchConditionAnyOfSeries | SearchConditionAllOfSeries | SearchConditionLibraryId | SearchConditionCollectionId | SearchConditionDeleted | SearchConditionComplete | SearchConditionOneShot | SearchConditionTitle | SearchConditionTitleSort | SearchConditionReleaseDate | SearchConditionTag | SearchConditionSharingLabel | SearchConditionPublisher | SearchConditionLanguage | SearchConditionGenre | SearchConditionAgeRating | SearchConditionReadStatus | SearchConditionSeriesStatus | SearchConditionAuthor | SearchConditionNotableEntity;
 
 export type SearchConditionSeriesId = {
     seriesId: SearchOperatorEqualityString;
@@ -1382,6 +1522,10 @@ export type SearchOperatorEqualityAuthorMatch = (SearchOperatorIs | SearchOperat
 };
 
 export type SearchOperatorEqualityMediaProfile = (SearchOperatorIs | SearchOperatorIsNot) & {
+    operator: string;
+};
+
+export type SearchOperatorEqualityNotableEntityMatch = (SearchOperatorIs | SearchOperatorIsNot) & {
     operator: string;
 };
 
@@ -1556,29 +1700,30 @@ export type SeriesSearch = {
 };
 
 export type SettingMultiSourceInteger = {
-    configurationSource: number;
-    databaseSource: number;
-    effectiveValue: number;
+    configurationSource?: number;
+    databaseSource?: number;
+    effectiveValue?: number;
 };
 
 export type SettingMultiSourceString = {
-    configurationSource: string;
-    databaseSource: string;
-    effectiveValue: string;
+    configurationSource?: string;
+    databaseSource?: string;
+    effectiveValue?: string;
 };
 
 export type SettingsDto = {
-    deleteEmptyCollections: boolean;
-    deleteEmptyReadLists: boolean;
-    kepubifyPath: SettingMultiSourceString;
+    deleteEmptyCollections?: boolean;
+    deleteEmptyReadLists?: boolean;
+    kepubifyPath?: SettingMultiSourceString;
     koboPort?: number;
-    koboProxy: boolean;
-    rememberMeDurationDays: number;
-    serverContextPath: SettingMultiSourceString;
-    serverPort: SettingMultiSourceInteger;
-    taskPoolSize: number;
-    thumbnailSize: ThumbnailSizeEnum;
+    koboProxy?: boolean;
     maxUploadFileSizeBytes?: number;
+    nextUiAsDefault?: boolean;
+    rememberMeDurationDays?: number;
+    serverContextPath?: SettingMultiSourceString;
+    serverPort?: SettingMultiSourceInteger;
+    taskPoolSize?: number;
+    thumbnailSize?: ThumbnailSizeEnum;
 };
 
 /**
@@ -1595,6 +1740,7 @@ export type SettingsUpdateDto = {
     kepubifyPath?: string;
     koboPort?: number;
     koboProxy?: boolean;
+    nextUiAsDefault?: boolean;
     rememberMeDurationDays?: number;
     renewRememberMeKey?: boolean;
     serverContextPath?: string;
@@ -1748,6 +1894,11 @@ export type ThumbnailSeriesDto = {
     width: number;
 };
 
+export type TrackerCheckResultDto = {
+    message: string;
+    success: boolean;
+};
+
 export type TransientBookDto = {
     comment: string;
     fileLastModified: Date;
@@ -1783,6 +1934,23 @@ export type UserDto = {
     roles: Array<string>;
     sharedAllLibraries: boolean;
     sharedLibrariesIds: Array<string>;
+};
+
+export type UserTrackerDto = {
+    enabled: boolean;
+    linked: boolean;
+    secretsSet: Array<string>;
+    settings: {
+        [key: string]: string;
+    };
+    tracker: string;
+};
+
+export type UserTrackerUpdateDto = {
+    enabled?: boolean;
+    settings?: {
+        [key: string]: string;
+    };
 };
 
 export type UserUpdateDto = {
@@ -8653,6 +8821,112 @@ export type EmptyTaskQueueResponses = {
 
 export type EmptyTaskQueueResponse = EmptyTaskQueueResponses[keyof EmptyTaskQueueResponses];
 
+export type GetTrackersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/trackers';
+};
+
+export type GetTrackersErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type GetTrackersError = GetTrackersErrors[keyof GetTrackersErrors];
+
+export type GetTrackersResponses = {
+    /**
+     * OK
+     */
+    200: Array<UserTrackerDto>;
+};
+
+export type GetTrackersResponse = GetTrackersResponses[keyof GetTrackersResponses];
+
+export type DeleteTrackerData = {
+    body?: never;
+    path: {
+        tracker: string;
+    };
+    query?: never;
+    url: '/api/v1/trackers/{tracker}';
+};
+
+export type DeleteTrackerErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type DeleteTrackerError = DeleteTrackerErrors[keyof DeleteTrackerErrors];
+
+export type DeleteTrackerResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteTrackerResponse = DeleteTrackerResponses[keyof DeleteTrackerResponses];
+
+export type UpdateTrackerData = {
+    body: UserTrackerUpdateDto;
+    path: {
+        tracker: string;
+    };
+    query?: never;
+    url: '/api/v1/trackers/{tracker}';
+};
+
+export type UpdateTrackerErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type UpdateTrackerError = UpdateTrackerErrors[keyof UpdateTrackerErrors];
+
+export type UpdateTrackerResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type UpdateTrackerResponse = UpdateTrackerResponses[keyof UpdateTrackerResponses];
+
+export type TestTrackerData = {
+    body?: never;
+    path: {
+        tracker: string;
+    };
+    query?: never;
+    url: '/api/v1/trackers/{tracker}/test';
+};
+
+export type TestTrackerErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type TestTrackerError = TestTrackerErrors[keyof TestTrackerErrors];
+
+export type TestTrackerResponses = {
+    /**
+     * OK
+     */
+    200: TrackerCheckResultDto;
+};
+
+export type TestTrackerResponse = TestTrackerResponses[keyof TestTrackerResponses];
+
 export type ScanTransientBooksData = {
     body: ScanRequestDto;
     path?: never;
@@ -9541,3 +9815,124 @@ export type UpdatePasswordByUserIdResponses = {
 };
 
 export type UpdatePasswordByUserIdResponse = UpdatePasswordByUserIdResponses[keyof UpdatePasswordByUserIdResponses];
+
+export type GetNotableEntitiesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        kind?: string;
+        library_id?: Array<string>;
+        collection_id?: Array<string>;
+        series_id?: Array<string>;
+        readlist_id?: Array<string>;
+        unpaged?: boolean;
+        /**
+         * Zero-based page index (0..N)
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         */
+        size?: number;
+    };
+    url: '/api/v3/notable-entities';
+};
+
+export type GetNotableEntitiesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type GetNotableEntitiesError = GetNotableEntitiesErrors[keyof GetNotableEntitiesErrors];
+
+export type GetNotableEntitiesResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseNotableEntityDto;
+};
+
+export type GetNotableEntitiesResponse = GetNotableEntitiesResponses[keyof GetNotableEntitiesResponses];
+
+export type GetNotableEntitiesKindsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: Array<string>;
+        collection_id?: Array<string>;
+        series_id?: Array<string>;
+        readlist_id?: Array<string>;
+        unpaged?: boolean;
+        /**
+         * Zero-based page index (0..N)
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         */
+        size?: number;
+    };
+    url: '/api/v3/notable-entities/kinds';
+};
+
+export type GetNotableEntitiesKindsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type GetNotableEntitiesKindsError = GetNotableEntitiesKindsErrors[keyof GetNotableEntitiesKindsErrors];
+
+export type GetNotableEntitiesKindsResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseString;
+};
+
+export type GetNotableEntitiesKindsResponse = GetNotableEntitiesKindsResponses[keyof GetNotableEntitiesKindsResponses];
+
+export type GetNotableEntitiesNamesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        kind?: string;
+        library_id?: Array<string>;
+        collection_id?: Array<string>;
+        series_id?: Array<string>;
+        readlist_id?: Array<string>;
+        unpaged?: boolean;
+        /**
+         * Zero-based page index (0..N)
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         */
+        size?: number;
+    };
+    url: '/api/v3/notable-entities/names';
+};
+
+export type GetNotableEntitiesNamesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationErrorResponse;
+};
+
+export type GetNotableEntitiesNamesError = GetNotableEntitiesNamesErrors[keyof GetNotableEntitiesNamesErrors];
+
+export type GetNotableEntitiesNamesResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseString;
+};
+
+export type GetNotableEntitiesNamesResponse = GetNotableEntitiesNamesResponses[keyof GetNotableEntitiesNamesResponses];

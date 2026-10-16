@@ -123,12 +123,16 @@ class MediaDao(
       ).from(p)
       .join(b)
       .on(p.BOOK_ID.eq(b.ID))
+      .join(m)
+      .on(p.BOOK_ID.eq(m.BOOK_ID))
       .leftJoin(s)
       .on(b.SERIES_ID.eq(s.ID))
       .leftJoin(sm)
       .on(b.SERIES_ID.eq(sm.SERIES_ID))
       .where(p.WIDTH.ge(minDimension))
       .and(p.HEIGHT.ge(minDimension))
+      .and(m.STATUS.eq(Media.Status.READY.name))
+      .and(b.DELETED_DATE.isNull)
       .fetch()
       .map { r ->
         OversizedPageCandidate(

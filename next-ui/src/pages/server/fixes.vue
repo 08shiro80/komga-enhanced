@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-1">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Fixes view: title',
@@ -9,7 +9,7 @@
             id: 'fork/fixes/title',
           })
         }}
-      </span>
+      </h1>
     </div>
     <p class="text-body-2 text-medium-emphasis mb-4">
       {{
@@ -404,14 +404,40 @@ async function runScan() {
 let comicPoll: ReturnType<typeof setInterval> | null = null
 let scanPoll: ReturnType<typeof setInterval> | null = null
 
+function stopComicPolling() {
+  comicRunning.value = false
+  if (comicPoll) {
+    clearInterval(comicPoll)
+    comicPoll = null
+  }
+}
+
+function stopScanPolling() {
+  scanRunning.value = false
+  if (scanPoll) {
+    clearInterval(scanPoll)
+    scanPoll = null
+  }
+}
+
 function startComicPolling() {
   if (comicPoll) return
-  comicPoll = setInterval(() => void refetchComic(), 2000)
+  comicPoll = setInterval(() => {
+    void refetchComic().then(() => {
+      // the watch below only fires on value changes — a job that finished before the first
+      // poll never changes `running` back, so the poll itself must also stop on a final status
+      if (!comicStatus.value?.running && comicRunning.value) stopComicPolling()
+    })
+  }, 2000)
 }
 
 function startScanPolling() {
   if (scanPoll) return
-  scanPoll = setInterval(() => void refetchScan(), 2000)
+  scanPoll = setInterval(() => {
+    void refetchScan().then(() => {
+      if (!scanStatus.value?.running && scanRunning.value) stopScanPolling()
+    })
+  }, 2000)
 }
 
 watch(
@@ -424,11 +450,7 @@ watch(
       }
       startComicPolling()
     } else if (comicRunning.value) {
-      comicRunning.value = false
-      if (comicPoll) {
-        clearInterval(comicPoll)
-        comicPoll = null
-      }
+      stopComicPolling()
     }
   },
 )
@@ -443,11 +465,7 @@ watch(
       }
       startScanPolling()
     } else if (scanRunning.value) {
-      scanRunning.value = false
-      if (scanPoll) {
-        clearInterval(scanPoll)
-        scanPoll = null
-      }
+      stopScanPolling()
     }
   },
 )
@@ -506,6 +524,9 @@ async function runFix(fix: Fix) {
   result[fix.id] = null
   try {
     let url = fix.endpoint
+    if (!url.startsWith('/api/v1/')) {
+      throw new Error(`Refusing to call non-API endpoint: ${url}`)
+    }
     const query: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(state[fix.id] ?? {})) {
       const placeholder = `{${key}}`
@@ -570,7 +591,7 @@ const comicForceLabel = defineMessage({
   defaultMessage: 'Force (re-inject even if ComicInfo already exists)',
   id: 'fork/fixes/comic/force',
 })
-const comicResultLabel = defineMessage({
+const comicResultLabel = defineMessage<{ repaired: number; skipped: number; processed: number; total: number }>({
   description: 'Fixes view: comicinfo result',
   defaultMessage: 'Repaired: {repaired} · Skipped: {skipped} · Processed: {processed}/{total}',
   id: 'fork/fixes/comic/result',
@@ -591,7 +612,7 @@ const scanDryRunLabel = defineMessage({
   defaultMessage: 'Preview (dry-run — no changes)',
   id: 'fork/fixes/scan/dryRun',
 })
-const scanResultLabel = defineMessage({
+const scanResultLabel = defineMessage<{ dryRun: number; removed: number; scanned: number; total: number }>({
   description: 'Fixes view: deleted-scan result',
   defaultMessage:
     '{dryRun, select, 1 {Would remove} other {Removed}}: {removed} orphaned entries · Series scanned: {scanned}/{total}',

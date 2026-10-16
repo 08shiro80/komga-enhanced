@@ -6,15 +6,15 @@ import com.github.f4b6a3.tsid.TsidCreator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.LogLevel
-import org.gotson.komga.domain.model.PluginConfig
 import org.gotson.komga.domain.model.SyncState
+import org.gotson.komga.domain.model.UserTracker
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
-import org.gotson.komga.domain.persistence.PluginLogRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.domain.persistence.SyncStateRepository
+import org.gotson.komga.domain.persistence.UserTrackerRepository
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.http.MediaType
@@ -24,14 +24,10 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestClientResponseException
 import java.net.URI
-import java.net.URLEncoder
 import java.time.Duration
-import java.time.Instant
 import java.time.LocalDateTime
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import kotlin.math.max
 
 private val logger = KotlinLogging.logger {}
 
@@ -39,12 +35,13 @@ private val logger = KotlinLogging.logger {}
 class MangaScrobblerPlugin(
   private val pluginRepository: PluginRepository,
   private val pluginConfigRepository: PluginConfigRepository,
-  private val pluginLogRepository: PluginLogRepository,
   private val bookRepository: BookRepository,
   private val bookMetadataRepository: BookMetadataRepository,
   private val seriesMetadataRepository: SeriesMetadataRepository,
   private val syncStateRepository: SyncStateRepository,
+  private val userTrackerRepository: UserTrackerRepository,
   private val trackerIdResolver: TrackerIdResolver,
+  private val trackerTokenProvider: TrackerTokenProvider,
   private val objectMapper: ObjectMapper,
 ) {
   private val pluginId = "manga-scrobbler"
@@ -87,21 +84,9 @@ class MangaScrobblerPlugin(
       Thread(r, "scrobbler-worker").apply { isDaemon = true }
     }
 
-  // In-memory dedupe: seriesId -> highest synced chapter number.
+  // In-memory dedupe: "userId:seriesId:tracker" -> highest chapter number synced to that tracker.
   // Cleared on JVM restart; AniList/MAL updates are idempotent so this is purely an optimization.
   private val lastSynced = ConcurrentHashMap<String, Int>()
-
-  // In-memory token cache with expiry (avoids unnecessary refresh calls)
-  private val refreshClients by lazy {
-    RestClient.builder().requestFactory(timeoutClient).build()
-  }
-  private var malAccessToken: String? = null
-  private var malTokenExpiry: Instant? = null
-  private var kitsuAccessToken: String? = null
-  private var kitsuTokenExpiry: Instant? = null
-  private var mangadexAccessToken: String? = null
-  private var mangadexRefreshToken: String? = null
-  private var mangadexTokenExpiry: Instant? = null
 
   @EventListener(ApplicationReadyEvent::class)
   fun init() {
@@ -118,11 +103,10 @@ class MangaScrobblerPlugin(
 
   /** After restart, avoid redundant API calls: max chapter already recorded per Komga series. */
   private fun hydrateLastSyncedFromSyncState() {
-    val trackers = listOf("anilist", "mal", "kitsu", "mangadex")
-    for (t in trackers) {
+    for (t in UserTracker.mangaTrackers) {
       try {
         for (state in syncStateRepository.findByTracker(t)) {
-          lastSynced.merge(state.seriesId, state.progress, ::maxOf)
+          lastSynced.merge(dedupeKey(state.userId, state.seriesId, t), state.progress, ::maxOf)
         }
       } catch (e: Exception) {
         logger.warn(e) { "Manga scrobbler: failed to hydrate cache from sync_state (tracker=$t)" }
@@ -155,9 +139,13 @@ class MangaScrobblerPlugin(
   ) {
     val config = loadConfig()
 
-    val filterUserId = config["sync_user_id"]?.takeIf { it.isNotBlank() }
-    if (filterUserId != null && filterUserId != userId) {
-      logger.debug { "Skipping scrobble for user $userId (filter=$filterUserId)" }
+    val accounts =
+      userTrackerRepository
+        .findByUserId(userId)
+        .filter { it.tracker in UserTracker.mangaTrackers && it.active }
+        .associateBy { it.tracker }
+    if (accounts.isEmpty()) {
+      logger.debug { "Skipping scrobble for user $userId: no linked manga tracker" }
       return
     }
 
@@ -191,10 +179,13 @@ class MangaScrobblerPlugin(
       return
     }
 
-    // Dedupe: only update if this chapter is higher than what we last synced.
-    val previous = lastSynced[book.seriesId] ?: 0
-    if (chapterNumber <= previous) {
-      logger.debug { "Already synced chapter $chapterNumber or higher for '${seriesMeta.title}'" }
+    // Dedupe per tracker: only update a tracker if this chapter is higher than what it last got.
+    val pendingTrackers =
+      accounts.keys.filter { tracker ->
+        chapterNumber > (lastSynced[dedupeKey(userId, book.seriesId, tracker)] ?: 0)
+      }
+    if (pendingTrackers.isEmpty()) {
+      logger.debug { "Already synced chapter $chapterNumber or higher for '${seriesMeta.title}' (user $userId)" }
       return
     }
 
@@ -204,41 +195,44 @@ class MangaScrobblerPlugin(
       return
     }
 
-    val tracker = config["tracker"] ?: "both"
-    var anySuccess = false
-
-    if (tracker in listOf("anilist", "both", "both_kitsu", "all") && ids.anilistId != null) {
-      if (updateAnilist(ids.anilistId, chapterNumber, config["anilist_token"] ?: "", seriesMeta.title)) {
-        recordSync(book.seriesId, "anilist", chapterNumber, bookId)
-        anySuccess = true
+    val anilist = accounts[UserTracker.ANILIST]
+    if (anilist != null && ids.anilistId != null && UserTracker.ANILIST in pendingTrackers) {
+      if (updateAnilist(ids.anilistId, chapterNumber, anilist[UserTracker.KEY_TOKEN] ?: "", seriesMeta.title)) {
+        recordSync(userId, book.seriesId, UserTracker.ANILIST, chapterNumber, bookId)
+        lastSynced[dedupeKey(userId, book.seriesId, UserTracker.ANILIST)] = chapterNumber
       }
     }
 
-    if (tracker in listOf("mal", "both", "both_kitsu", "all") && ids.malId != null) {
-      if (updateMal(ids.malId, chapterNumber, config, seriesMeta.title)) {
-        recordSync(book.seriesId, "mal", chapterNumber, bookId)
-        anySuccess = true
+    val mal = accounts[UserTracker.MAL]
+    if (mal != null && ids.malId != null && UserTracker.MAL in pendingTrackers) {
+      if (updateMal(ids.malId, chapterNumber, mal, seriesMeta.title)) {
+        recordSync(userId, book.seriesId, UserTracker.MAL, chapterNumber, bookId)
+        lastSynced[dedupeKey(userId, book.seriesId, UserTracker.MAL)] = chapterNumber
       }
     }
 
-    if (tracker in listOf("kitsu", "both_kitsu", "all") && ids.kitsuId != null) {
-      if (updateKitsu(ids.kitsuId, chapterNumber, config, seriesMeta.title)) {
-        recordSync(book.seriesId, "kitsu", chapterNumber, bookId)
-        anySuccess = true
+    val kitsu = accounts[UserTracker.KITSU]
+    if (kitsu != null && ids.kitsuId != null && UserTracker.KITSU in pendingTrackers) {
+      if (updateKitsu(ids.kitsuId, chapterNumber, kitsu, seriesMeta.title)) {
+        recordSync(userId, book.seriesId, UserTracker.KITSU, chapterNumber, bookId)
+        lastSynced[dedupeKey(userId, book.seriesId, UserTracker.KITSU)] = chapterNumber
       }
     }
 
-    if (tracker in listOf("mangadex", "all") && ids.mangadexId != null) {
-      if (updateMangaDex(ids.mangadexId, chapterNumber, config, seriesMeta.title)) {
-        recordSync(book.seriesId, "mangadex", chapterNumber, bookId)
-        anySuccess = true
+    val mangadex = accounts[UserTracker.MANGADEX]
+    if (mangadex != null && ids.mangadexId != null && UserTracker.MANGADEX in pendingTrackers) {
+      if (updateMangaDex(ids.mangadexId, chapterNumber, mangadex, seriesMeta.title)) {
+        recordSync(userId, book.seriesId, UserTracker.MANGADEX, chapterNumber, bookId)
+        lastSynced[dedupeKey(userId, book.seriesId, UserTracker.MANGADEX)] = chapterNumber
       }
-    }
-
-    if (anySuccess) {
-      lastSynced[book.seriesId] = max(previous, chapterNumber)
     }
   }
+
+  private fun dedupeKey(
+    userId: String,
+    seriesId: String,
+    tracker: String,
+  ) = "$userId:$seriesId:$tracker"
 
   private fun updateAnilist(
     mediaId: Int,
@@ -291,10 +285,10 @@ class MangaScrobblerPlugin(
   private fun updateMal(
     mediaId: Int,
     progress: Int,
-    config: Map<String, String?>,
+    account: UserTracker,
     title: String,
   ): Boolean {
-    val token = getValidMalToken(config) ?: return false
+    val token = trackerTokenProvider.malToken(account) ?: return false
     return try {
       malClient
         .patch()
@@ -310,7 +304,7 @@ class MangaScrobblerPlugin(
     } catch (e: RestClientException) {
       if (isUnauthorized(e)) {
         log(LogLevel.WARN, "MAL token expired, attempting refresh for '$title'")
-        val refreshed = refreshMalToken(config)
+        val refreshed = trackerTokenProvider.refreshMal(account)
         if (refreshed != null) {
           try {
             malClient
@@ -339,20 +333,19 @@ class MangaScrobblerPlugin(
   private fun updateKitsu(
     mediaId: Int,
     progress: Int,
-    config: Map<String, String?>,
+    account: UserTracker,
     title: String,
   ): Boolean {
-    val token = getValidKitsuToken(config) ?: return false
+    val token = trackerTokenProvider.kitsuToken(account) ?: return false
     return try {
-      kitsuScrobble(mediaId, progress, token, title)
+      kitsuScrobble(account, mediaId, progress, token, title)
     } catch (e: RestClientException) {
       if (isUnauthorized(e)) {
         log(LogLevel.WARN, "Kitsu token expired, attempting refresh for '$title'")
-        val refreshed = refreshKitsuToken(config)
+        val refreshed = trackerTokenProvider.refreshKitsu(account)
         if (refreshed != null) {
           try {
-            kitsuScrobble(mediaId, progress, refreshed, title)
-            return true
+            return kitsuScrobble(account, mediaId, progress, refreshed, title)
           } catch (e2: RestClientException) {
             log(LogLevel.ERROR, "Kitsu request failed after token refresh for '$title': ${e2.message}", e2)
           }
@@ -367,15 +360,21 @@ class MangaScrobblerPlugin(
   }
 
   private fun kitsuScrobble(
+    account: UserTracker,
     mediaId: Int,
     progress: Int,
     token: String,
     title: String,
   ): Boolean {
+    val kitsuUserId = trackerTokenProvider.kitsuUserId(account, token)
+    if (kitsuUserId == null) {
+      log(LogLevel.ERROR, "Kitsu: could not resolve own user id for '$title' — skipping scrobble")
+      return false
+    }
     val searchResponse =
       kitsuClient
         .get()
-        .uri("/library-entries?filter[mangaId]=$mediaId&page[limit]=1")
+        .uri("/library-entries?filter[userId]=$kitsuUserId&filter[mangaId]=$mediaId&page[limit]=1")
         .header("Authorization", "Bearer $token")
         .header("Accept", "application/vnd.api+json")
         .retrieve()
@@ -448,10 +447,10 @@ class MangaScrobblerPlugin(
   private fun updateMangaDex(
     mangaId: String,
     progress: Int,
-    config: Map<String, String?>,
+    account: UserTracker,
     title: String,
   ): Boolean {
-    val token = getValidMangaDexToken(config)
+    val token = trackerTokenProvider.mangadexToken(account)
     if (token == null) {
       log(LogLevel.WARN, "MangaDex auth failed for '$title'")
       return false
@@ -460,7 +459,13 @@ class MangaScrobblerPlugin(
     // MangaDex has no "read up to chapter N" concept: POST /manga/{id}/read takes chapterIdsRead (UUID
     // arrays). Resolve the chapter UUIDs up to the read chapter number from the manga feed, then mark them.
     // The feed is filtered by the configured max content rating, so higher-rated manga return no chapters.
-    val chapterIds = fetchMangaDexReadChapterIds(mangaId, progress, allowedContentRatings(config))
+    val chapterIds =
+      try {
+        fetchMangaDexReadChapterIds(mangaId, progress, allowedContentRatings(account))
+      } catch (e: Exception) {
+        log(LogLevel.ERROR, "MangaDex feed request failed for '$title' (id=$mangaId): ${e.message}", e)
+        return false
+      }
     if (chapterIds.isEmpty()) {
       log(LogLevel.WARN, "MangaDex: no EN chapters up to $progress within content rating for '$title' (id=$mangaId) — nothing marked read")
       return false
@@ -473,9 +478,8 @@ class MangaScrobblerPlugin(
     } catch (e: RestClientException) {
       if (isUnauthorized(e)) {
         log(LogLevel.WARN, "MangaDex token expired, re-authenticating for '$title'")
-        mangadexAccessToken = null
-        mangadexTokenExpiry = null
-        val retryToken = getValidMangaDexToken(config)
+        trackerTokenProvider.invalidate(account)
+        val retryToken = trackerTokenProvider.mangadexToken(account)
         if (retryToken != null) {
           try {
             postMangaDexRead(mangaId, chapterIds, retryToken)
@@ -507,9 +511,9 @@ class MangaScrobblerPlugin(
       .body(String::class.java)
   }
 
-  private fun allowedContentRatings(config: Map<String, String?>): List<String> {
+  private fun allowedContentRatings(account: UserTracker): List<String> {
     val order = listOf("safe", "suggestive", "erotica", "pornographic")
-    val max = config["mangadex_max_content_rating"]?.takeIf { it.isNotBlank() } ?: "pornographic"
+    val max = account[UserTracker.KEY_MAX_CONTENT_RATING] ?: "pornographic"
     val maxIndex = order.indexOf(max).takeIf { it >= 0 } ?: order.lastIndex
     return order.take(maxIndex + 1)
   }
@@ -556,143 +560,17 @@ class MangaScrobblerPlugin(
     return ids
   }
 
-  private fun getValidMangaDexToken(config: Map<String, String?>): String? {
-    if (mangadexAccessToken != null && mangadexTokenExpiry != null && Instant.now().isBefore(mangadexTokenExpiry)) {
-      return mangadexAccessToken
-    }
-    val galleryDl by lazy {
-      pluginConfigRepository
-        .findByPluginId("gallery-dl-downloader")
-        .associate { it.configKey to it.configValue }
-    }
-    val subscription by lazy {
-      pluginConfigRepository
-        .findByPluginId("mangadex-subscription")
-        .associate { it.configKey to it.configValue }
-    }
-
-    fun resolve(
-      scrobblerKey: String,
-      galleryDlKey: String,
-      subscriptionKey: String,
-    ): String? =
-      config[scrobblerKey].takeUnless { it.isNullOrBlank() }
-        ?: galleryDl[galleryDlKey].takeUnless { it.isNullOrBlank() }
-        ?: subscription[subscriptionKey].takeUnless { it.isNullOrBlank() }
-
-    val username = resolve("mangadex_username", "mangadex_username", "username")
-    val password = resolve("mangadex_password", "mangadex_password", "password")
-    val clientId = resolve("mangadex_client_id", "mangadex_client_id", "client_id")
-    val clientSecret = resolve("mangadex_client_secret", "mangadex_client_secret", "client_secret")
-    if (username.isNullOrBlank() || password.isNullOrBlank() || clientId.isNullOrBlank() || clientSecret.isNullOrBlank()) {
-      log(LogLevel.WARN, "MangaDex credentials not configured in scrobbler, gallery-dl Downloader, or MangaDex Subscription Sync (need username, password, client_id, client_secret)")
-      return null
-    }
-    return authenticateMangaDex(username, password, clientId, clientSecret)
-  }
-
-  private fun authenticateMangaDex(
-    username: String,
-    password: String,
-    clientId: String,
-    clientSecret: String,
-  ): String? {
-    // Try refreshing first if we have a refresh token
-    val refreshTkn = mangadexRefreshToken
-    if (refreshTkn != null) {
-      val refreshed = refreshMangaDexToken(clientId, clientSecret, refreshTkn)
-      if (refreshed != null) return refreshed
-    }
-    // Password grant
-    return try {
-      val body =
-        "grant_type=password" +
-          "&username=${encode(username)}" +
-          "&password=${encode(password)}" +
-          "&client_id=${encode(clientId)}" +
-          "&client_secret=${encode(clientSecret)}"
-
-      val response =
-        refreshClients
-          .post()
-          .uri("https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token")
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(body)
-          .retrieve()
-          .body(String::class.java)
-
-      val json = response?.let { objectMapper.readTree(it) }
-      val accessTkn = json?.get("access_token")?.asText()
-      val newRefresh = json?.get("refresh_token")?.asText()
-      val expiresIn = json?.get("expires_in")?.asInt() ?: 0
-
-      if (accessTkn != null) {
-        mangadexAccessToken = accessTkn
-        mangadexRefreshToken = newRefresh
-        mangadexTokenExpiry = Instant.now().plusSeconds(expiresIn.toLong() - 60)
-        log(LogLevel.INFO, "MangaDex authentication successful (expires in ${expiresIn}s)")
-        accessTkn
-      } else {
-        log(LogLevel.ERROR, "MangaDex auth response missing access_token")
-        null
-      }
-    } catch (e: Exception) {
-      log(LogLevel.ERROR, "MangaDex authentication failed: ${e.message}", e)
-      null
-    }
-  }
-
-  private fun refreshMangaDexToken(
-    clientId: String,
-    clientSecret: String,
-    refreshTkn: String,
-  ): String? =
-    try {
-      val body =
-        "grant_type=refresh_token" +
-          "&refresh_token=${encode(refreshTkn)}" +
-          "&client_id=${encode(clientId)}" +
-          "&client_secret=${encode(clientSecret)}"
-
-      val response =
-        refreshClients
-          .post()
-          .uri("https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token")
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(body)
-          .retrieve()
-          .body(String::class.java)
-
-      val json = response?.let { objectMapper.readTree(it) }
-      val newAccess = json?.get("access_token")?.asText()
-      val newRefresh = json?.get("refresh_token")?.asText()
-      val expiresIn = json?.get("expires_in")?.asInt() ?: 0
-
-      if (newAccess != null) {
-        mangadexAccessToken = newAccess
-        mangadexRefreshToken = newRefresh
-        mangadexTokenExpiry = Instant.now().plusSeconds(expiresIn.toLong() - 60)
-        log(LogLevel.INFO, "MangaDex token refreshed (expires in ${expiresIn}s)")
-        newAccess
-      } else {
-        log(LogLevel.WARN, "MangaDex token refresh failed, will fall back to password grant")
-        null
-      }
-    } catch (e: Exception) {
-      log(LogLevel.WARN, "MangaDex token refresh failed, will fall back to password grant: ${e.message}")
-      null
-    }
-
   // --- Sync state recording ---
 
   private fun recordSync(
+    userId: String,
     seriesId: String,
     tracker: String,
     progress: Int,
     bookId: String,
   ) {
     try {
-      val existing = syncStateRepository.findBySeriesIdAndTracker(seriesId, tracker)
+      val existing = syncStateRepository.findByUserIdAndSeriesIdAndTracker(userId, seriesId, tracker)
       val now = LocalDateTime.now()
       if (existing != null) {
         syncStateRepository.update(
@@ -708,6 +586,7 @@ class MangaScrobblerPlugin(
           syncStateRepository.insert(
             SyncState(
               id = TsidCreator.getTsid256().toString(),
+              userId = userId,
               bookId = bookId,
               seriesId = seriesId,
               tracker = tracker,
@@ -716,10 +595,10 @@ class MangaScrobblerPlugin(
             ),
           )
         } catch (e: Exception) {
-          // A concurrent insert won the unique(series_id, tracker) race — update the existing row
+          // A concurrent insert won the unique(user_id, series_id, tracker) race — update the existing row
           // instead of losing this sync. Preserves pull-side fields (status/score/lastUpdate) via copy.
           val raced =
-            syncStateRepository.findBySeriesIdAndTracker(seriesId, tracker)
+            syncStateRepository.findByUserIdAndSeriesIdAndTracker(userId, seriesId, tracker)
               ?: throw e
           syncStateRepository.update(
             raced.copy(
@@ -732,130 +611,7 @@ class MangaScrobblerPlugin(
         }
       }
     } catch (e: Exception) {
-      logger.warn(e) { "Failed to record sync state for series $seriesId tracker $tracker" }
-    }
-  }
-
-  // --- Token management ---
-
-  private fun getValidMalToken(config: Map<String, String?>): String? {
-    if (malAccessToken != null && malTokenExpiry != null && Instant.now().isBefore(malTokenExpiry)) {
-      return malAccessToken
-    }
-    val stored = config["mal_access_token"]
-    if (stored.isNullOrBlank()) return null
-
-    val refreshTkn = config["mal_refresh_token"]
-    val clientId = config["mal_client_id"]
-    val clientSecret = config["mal_client_secret"]
-    if (!refreshTkn.isNullOrBlank() && !clientId.isNullOrBlank() && !clientSecret.isNullOrBlank()) {
-      val refreshed = refreshMalToken(config)
-      if (refreshed != null) return refreshed
-    }
-    // No refresh configured or refresh failed — use stored token (may 401 later)
-    malAccessToken = stored
-    return stored
-  }
-
-  private fun getValidKitsuToken(config: Map<String, String?>): String? {
-    if (kitsuAccessToken != null && kitsuTokenExpiry != null && Instant.now().isBefore(kitsuTokenExpiry)) {
-      return kitsuAccessToken
-    }
-    val stored = config["kitsu_token"]
-    if (stored.isNullOrBlank()) return null
-
-    val refreshTkn = config["kitsu_refresh_token"]
-    val clientId = config["kitsu_client_id"]
-    val clientSecret = config["kitsu_client_secret"]
-    if (!refreshTkn.isNullOrBlank() && !clientId.isNullOrBlank() && !clientSecret.isNullOrBlank()) {
-      val refreshed = refreshKitsuToken(config)
-      if (refreshed != null) return refreshed
-    }
-    kitsuAccessToken = stored
-    return stored
-  }
-
-  private fun refreshMalToken(config: Map<String, String?>): String? {
-    val refreshTkn = config["mal_refresh_token"]?.takeIf { it.isNotBlank() } ?: return null
-    val clientId = config["mal_client_id"]?.takeIf { it.isNotBlank() } ?: return null
-    val clientSecret = config["mal_client_secret"]?.takeIf { it.isNotBlank() } ?: return null
-    return try {
-      val body =
-        "grant_type=refresh_token" +
-          "&refresh_token=${encode(refreshTkn)}" +
-          "&client_id=${encode(clientId)}" +
-          "&client_secret=${encode(clientSecret)}"
-
-      val response =
-        refreshClients
-          .post()
-          .uri("https://myanimelist.net/v1/oauth2/token")
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(body)
-          .retrieve()
-          .body(String::class.java)
-
-      val json = response?.let { objectMapper.readTree(it) }
-      val newAccess = json?.get("access_token")?.asText()
-      val newRefresh = json?.get("refresh_token")?.asText()
-      val expiresIn = json?.get("expires_in")?.asInt() ?: 0
-
-      if (newAccess != null) {
-        malAccessToken = newAccess
-        malTokenExpiry = Instant.now().plusSeconds(expiresIn.toLong() - 60)
-        saveConfigValue("mal_access_token", newAccess)
-        if (newRefresh != null) saveConfigValue("mal_refresh_token", newRefresh)
-        log(LogLevel.INFO, "MAL token refreshed (expires in ${expiresIn}s)")
-        newAccess
-      } else {
-        log(LogLevel.ERROR, "MAL token refresh response missing access_token")
-        null
-      }
-    } catch (e: Exception) {
-      log(LogLevel.ERROR, "MAL token refresh failed: ${e.message}", e)
-      null
-    }
-  }
-
-  private fun refreshKitsuToken(config: Map<String, String?>): String? {
-    val refreshTkn = config["kitsu_refresh_token"]?.takeIf { it.isNotBlank() } ?: return null
-    val clientId = config["kitsu_client_id"]?.takeIf { it.isNotBlank() } ?: return null
-    val clientSecret = config["kitsu_client_secret"]?.takeIf { it.isNotBlank() } ?: return null
-    return try {
-      val body =
-        "grant_type=refresh_token" +
-          "&refresh_token=${encode(refreshTkn)}" +
-          "&client_id=${encode(clientId)}" +
-          "&client_secret=${encode(clientSecret)}"
-
-      val response =
-        refreshClients
-          .post()
-          .uri("https://kitsu.app/api/oauth/token")
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(body)
-          .retrieve()
-          .body(String::class.java)
-
-      val json = response?.let { objectMapper.readTree(it) }
-      val newAccess = json?.get("access_token")?.asText()
-      val newRefresh = json?.get("refresh_token")?.asText()
-      val expiresIn = json?.get("expires_in")?.asInt() ?: 0
-
-      if (newAccess != null) {
-        kitsuAccessToken = newAccess
-        kitsuTokenExpiry = Instant.now().plusSeconds(expiresIn.toLong() - 60)
-        saveConfigValue("kitsu_token", newAccess)
-        if (newRefresh != null) saveConfigValue("kitsu_refresh_token", newRefresh)
-        log(LogLevel.INFO, "Kitsu token refreshed (expires in ${expiresIn}s)")
-        newAccess
-      } else {
-        log(LogLevel.ERROR, "Kitsu token refresh response missing access_token")
-        null
-      }
-    } catch (e: Exception) {
-      log(LogLevel.ERROR, "Kitsu token refresh failed: ${e.message}", e)
-      null
+      logger.warn(e) { "Failed to record sync state for user $userId series $seriesId tracker $tracker" }
     }
   }
 
@@ -864,27 +620,6 @@ class MangaScrobblerPlugin(
       return e.statusCode.value() == 401 || e.statusCode.value() == 403
     }
     return false
-  }
-
-  private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
-
-  private fun saveConfigValue(
-    key: String,
-    value: String,
-  ) {
-    val existing = pluginConfigRepository.findByPluginIdAndKey(pluginId, key)
-    if (existing != null) {
-      pluginConfigRepository.update(existing.copy(configValue = value))
-    } else {
-      pluginConfigRepository.insert(
-        PluginConfig(
-          id = UUID.randomUUID().toString(),
-          pluginId = pluginId,
-          configKey = key,
-          configValue = value,
-        ),
-      )
-    }
   }
 
   private fun isEnabled(): Boolean =

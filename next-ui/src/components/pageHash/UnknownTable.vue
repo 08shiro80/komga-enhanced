@@ -412,6 +412,7 @@ async function updateHashAction(
     if (invalidateCache)
       void queryCache.invalidateQueries({ key: QUERY_KEYS_PAGE_HASHES.unknown() })
   } catch (e) {
+    delete updateRequests.value[pageHash.hash]
     messagesStore.messages.push((e as Error)?.message ?? intl.formatMessage(commonMessages.networkError))
   }
 }
@@ -461,12 +462,12 @@ const altMsg = defineMessage({
   defaultMessage: 'Duplicate page',
   id: 'IXhDH6',
 })
-const matchesMsg = defineMessage({
+const matchesMsg = defineMessage<{ count: number }>({
   description: 'Unknown Duplicate Page: number of matching books',
   defaultMessage: '{count, plural, one {# book} other {# books}}',
   id: 'fork.pageHash.matchesCount',
 })
-const selectedCountMsg = defineMessage({
+const selectedCountMsg = defineMessage<{ count: number }>({
   description: 'Unknown Duplicate Page: number of selected items',
   defaultMessage: '{count} selected',
   id: 'fork.pageHash.selectedCount',
@@ -486,7 +487,7 @@ const unknownSizeMsg = defineMessage({
   defaultMessage: 'Size unknown',
   id: 'fork.pageHash.unknownSize',
 })
-const saveMsg = defineMessage({
+const saveMsg = defineMessage<{ size: string | undefined }>({
   description: 'Unknown Duplicate Page: potential space saved by deleting',
   defaultMessage: '~{size} to save',
   id: 'fork.pageHash.spaceSave',

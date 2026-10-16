@@ -145,66 +145,14 @@ Response:
 }
 ```
 
-## Scheduler API
+## Follow Schedule API (per Library)
 
-### Get Scheduler Settings
+Each library has its own follow-list check schedule.
 
-```http
-GET /api/v1/downloads/scheduler
-```
-
-Response:
-
-```json
-{
-  "enabled": true,
-  "intervalHours": 24,
-  "scheduleMode": "fixed_time",
-  "checkTime": "16:00",
-  "lastCheckTime": "2024-01-15T10:00:00"
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `enabled` | boolean | Whether the scheduler is active |
-| `intervalHours` | int | Hours between checks (used in `interval` mode) |
-| `scheduleMode` | string | `"interval"` or `"fixed_time"` |
-| `checkTime` | string? | Time in HH:mm format (used in `fixed_time` mode) |
-| `lastCheckTime` | string? | Timestamp of last check |
-
-### Update Scheduler Settings
+### Get Schedule
 
 ```http
-POST /api/v1/downloads/scheduler
-Content-Type: application/json
-
-{
-  "enabled": true,
-  "intervalHours": 24,
-  "scheduleMode": "fixed_time",
-  "checkTime": "16:00"
-}
-```
-
-Response: Updated scheduler settings
-
-### Trigger Immediate Check
-
-```http
-POST /api/v1/downloads/scheduler/check-now
-```
-
-Response: 204 No Content
-
-## Follow Text API (per Library)
-
-Per-library follow.txt management. Each library can have its own `follow.txt` file with URLs.
-
-### Get Follow Text
-
-```http
-GET /api/v1/downloads/follow-txt/{libraryId}
+GET /api/v1/downloads/follows/{libraryId}/schedule
 ```
 
 Response:
@@ -212,44 +160,99 @@ Response:
 ```json
 {
   "libraryId": "lib123",
-  "libraryName": "Manga",
-  "content": "https://mangadex.org/title/...\nhttps://mangadex.org/title/..."
+  "enabled": true,
+  "scheduleMode": "interval",
+  "intervalHours": 24,
+  "checkTime": "16:00",
+  "lastCheckTime": "2024-01-15T10:00:00"
 }
 ```
 
-### Update Follow Text
+| Field | Type | Description |
+|-------|------|-------------|
+| `enabled` | boolean | Whether scheduled checks run for this library |
+| `scheduleMode` | string | `"interval"` or `"fixed_time"` |
+| `intervalHours` | int | Hours between checks (used in `interval` mode) |
+| `checkTime` | string? | Time in HH:mm format (used in `fixed_time` mode) |
+| `lastCheckTime` | string? | Timestamp of last check |
+
+### Update Schedule
 
 ```http
-PUT /api/v1/downloads/follow-txt/{libraryId}
+PUT /api/v1/downloads/follows/{libraryId}/schedule
 Content-Type: application/json
 
 {
-  "content": "https://mangadex.org/title/...\nhttps://mangadex.org/title/..."
+  "enabled": true,
+  "scheduleMode": "interval",
+  "intervalHours": 24,
+  "checkTime": null
 }
 ```
 
-Response: 204 No Content
-
-### Trigger Library Check
+### Trigger Immediate Check
 
 ```http
-POST /api/v1/downloads/follow-txt/{libraryId}/check-now
+POST /api/v1/downloads/follows/{libraryId}/check-now
+```
+
+Response: `{ "queued": <int> }`
+
+## Follow List API (per Library)
+
+The follow list is stored in the database, per library. (`follow.txt` in the library root is only a one-time legacy import source — see *Import follow.txt* below.)
+
+### List Follows
+
+```http
+GET /api/v1/downloads/follows/{libraryId}
+GET /api/v1/downloads/follows/by-series/{seriesId}
+```
+
+### Add a Follow
+
+```http
+POST /api/v1/downloads/follows/{libraryId}
+Content-Type: application/json
+
+{ "url": "https://mangadex.org/title/...", "title": "Optional", "seriesId": null }
+```
+
+### Add Follows in Bulk
+
+```http
+POST /api/v1/downloads/follows/{libraryId}/batch
+Content-Type: application/json
+
+{ "urls": ["https://mangadex.org/title/...", "https://mangadex.org/title/..."] }
+```
+
+Response: `{ "added": <int>, "skipped": <int> }`
+
+### Update / Delete a Follow
+
+```http
+PATCH  /api/v1/downloads/follows/{libraryId}/{id}
+DELETE /api/v1/downloads/follows/{libraryId}/{id}
+DELETE /api/v1/downloads/follows/{libraryId}/batch
+```
+
+PATCH body: `{ "title": "...", "enabled": true }` · batch-delete body: `{ "ids": ["...", "..."] }`
+
+### Import follow.txt (legacy, one-time)
+
+Imports URLs from the library root's `follow.txt` into the database follow list.
+
+```http
+POST /api/v1/downloads/follows/{libraryId}/import-follow-txt
 ```
 
 ### Sync to MangaDex
 
-Upload follow.txt MangaDex URLs to your MangaDex follows list.
+Push this library's MangaDex follow URLs to your MangaDex account follow list.
 
 ```http
-POST /api/v1/downloads/follow-txt/{libraryId}/sync-to-mangadex
-```
-
-### Check New Chapters
-
-Check for new chapters across all followed manga.
-
-```http
-POST /api/v1/downloads/check-new
+POST /api/v1/downloads/follows/{libraryId}/sync-to-mangadex
 ```
 
 ### MangaDex Account — Follow List
@@ -421,7 +424,7 @@ Response:
 ### Import Backup
 
 ```http
-POST /api/v1/tachiyomi/import
+POST /api/v1/import/tachiyomi
 Content-Type: multipart/form-data
 
 file: <backup file>
@@ -447,7 +450,7 @@ Response:
 ### Check URLs
 
 ```http
-POST /api/v1/chapter-urls/check
+POST /api/v1/check-urls
 Content-Type: application/json
 
 {
@@ -472,7 +475,7 @@ Response:
 ### Clear Chapter URLs
 
 ```http
-DELETE /api/v1/chapter-urls/series/{seriesId}
+DELETE /api/v1/series/{seriesId}/chapter-urls
 ```
 
 ## Health API

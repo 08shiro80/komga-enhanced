@@ -87,7 +87,9 @@ class SeriesLifecycle(
     logger.debug { "Sorted books: $sorted" }
 
     bookRepository.update(
-      sorted.mapIndexed { index, (book, _) -> book.copy(number = index + 1) },
+      sorted.mapIndexedNotNull { index, (book, _) ->
+        if (book.number == index + 1) null else book.copy(number = index + 1)
+      },
     )
 
     val oldToNew =
@@ -104,7 +106,11 @@ class SeriesLifecycle(
             ),
           )
       }
-    bookMetadataRepository.update(oldToNew.map { it.third })
+    bookMetadataRepository.update(
+      oldToNew
+        .filter { (_, old, new) -> old.number != new.number || old.numberSort != new.numberSort }
+        .map { it.third },
+    )
 
     // refresh metadata to reimport book number, else the series resorting would overwrite it
     oldToNew.forEach { (book, old, new) ->
@@ -175,14 +181,25 @@ class SeriesLifecycle(
     logger.info { "Soft delete series: $series" }
     val deletedDate = LocalDateTime.now()
 
+    val books = bookRepository.findAllBySeriesIds(series.map { it.id })
+    val protectedSeriesIds =
+      books
+        .filter { it.protectedFromDeletion }
+        .map { it.seriesId }
+        .toSet()
+    if (protectedSeriesIds.isNotEmpty()) {
+      logger.info { "Skipping soft delete for ${protectedSeriesIds.size} series containing protected books: $protectedSeriesIds" }
+    }
+    val deletableSeries = series.filter { it.id !in protectedSeriesIds }
+
     transactionTemplate.executeWithoutResult {
-      bookLifecycle.softDeleteMany(bookRepository.findAllBySeriesIds(series.map { it.id }))
-      series.forEach {
+      bookLifecycle.softDeleteMany(books)
+      deletableSeries.forEach {
         seriesRepository.update(it.copy(deletedDate = deletedDate))
       }
     }
 
-    series.forEach { eventPublisher.publishEvent(DomainEvent.SeriesUpdated(it)) }
+    deletableSeries.forEach { eventPublisher.publishEvent(DomainEvent.SeriesUpdated(it)) }
   }
 
   fun deleteMany(series: Collection<Series>) {

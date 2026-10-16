@@ -20,8 +20,12 @@ class ImageAnalyzer {
         val readers = ImageIO.getImageReaders(fis)
         if (readers.hasNext()) {
           val reader = readers.next()
-          reader.input = fis
-          Dimension(reader.getWidth(0), reader.getHeight(0))
+          try {
+            reader.input = fis
+            Dimension(reader.getWidth(0), reader.getHeight(0))
+          } finally {
+            reader.dispose()
+          }
         } else {
           logger.warn { "no reader found" }
           null

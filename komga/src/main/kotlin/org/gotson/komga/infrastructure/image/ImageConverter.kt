@@ -2,6 +2,9 @@ package org.gotson.komga.infrastructure.image
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import net.coobird.thumbnailator.Thumbnails
+import net.coobird.thumbnailator.util.exif.ExifFilterUtils
+import net.coobird.thumbnailator.util.exif.ExifUtils
+import net.coobird.thumbnailator.util.exif.Orientation
 import org.gotson.komga.infrastructure.mediacontainer.ContentDetector
 import org.springframework.stereotype.Service
 import java.awt.Color
@@ -187,9 +190,21 @@ class ImageConverter(
           reader.input = ciis
           val factor = max(1, sourceLongestEdge / (targetSize * 2))
           if (factor < 2) return null
+          val orientation =
+            try {
+              ExifUtils.getExifOrientation(reader, 0)
+            } catch (e: Exception) {
+              logger.debug(e) { "Could not read EXIF orientation, assuming none" }
+              null
+            }
           val param = reader.defaultReadParam
           param.setSourceSubsampling(factor, factor, 0, 0)
-          reader.read(0, param)
+          val image = reader.read(0, param)
+          if (orientation != null && orientation != Orientation.TOP_LEFT) {
+            ExifFilterUtils.getFilterForOrientation(orientation).apply(image)
+          } else {
+            image
+          }
         } finally {
           reader.dispose()
         }

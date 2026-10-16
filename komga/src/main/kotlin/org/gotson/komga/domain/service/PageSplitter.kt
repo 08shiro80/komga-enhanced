@@ -4,16 +4,19 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.io.FilenameUtils
+import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.Book
 import org.gotson.komga.domain.model.BookWithMedia
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.HistoricalEvent
 import org.gotson.komga.domain.model.Media
+import org.gotson.komga.domain.model.restoreHashFrom
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.HistoricalEventRepository
 import org.gotson.komga.domain.persistence.LibraryRepository
 import org.gotson.komga.domain.persistence.MediaRepository
 import org.gotson.komga.infrastructure.image.ImageSplitter
+import org.gotson.komga.language.notEquals
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -47,6 +50,7 @@ class PageSplitter(
   private val transactionTemplate: TransactionTemplate,
   private val eventPublisher: ApplicationEventPublisher,
   private val historicalEventRepository: HistoricalEventRepository,
+  private val taskEmitter: TaskEmitter,
 ) {
   companion object {
     const val MIN_VALID_DIMENSION = 50
@@ -93,6 +97,12 @@ class PageSplitter(
   ): SplitResult {
     if (book.path.exists().not()) {
       throw FileNotFoundException("File not found: ${book.path}")
+    }
+
+    fileSystemScanner.scanFile(book.path)?.let { scannedBook ->
+      if (scannedBook.fileLastModified.notEquals(book.fileLastModified)) {
+        throw IllegalStateException("Book file changed on disk since the last scan, scan the library before splitting: ${book.path}")
+      }
     }
 
     val media = mediaRepository.findById(book.id)
@@ -257,7 +267,8 @@ class PageSplitter(
           libraryId = book.libraryId,
         ) ?: throw IllegalStateException("Could not scan updated book")
 
-      val updatedMedia = bookAnalyzer.analyze(updatedBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
+      val analyzedMedia = bookAnalyzer.analyze(updatedBook, libraryRepository.findById(book.libraryId).analyzeDimensions)
+      val updatedMedia = analyzedMedia.copy(pages = analyzedMedia.pages.restoreHashFrom(media.pages))
 
       transactionTemplate.executeWithoutResult {
         bookRepository.update(updatedBook)
@@ -271,6 +282,10 @@ class PageSplitter(
         HistoricalEvent.BookConverted(updatedBook, book),
       )
       eventPublisher.publishEvent(DomainEvent.BookUpdated(updatedBook))
+
+      if (pagesToSplit.any { it.pageIndex == 0 }) {
+        taskEmitter.generateBookThumbnail(book.id)
+      }
 
       return SplitResult(
         bookId = book.id,

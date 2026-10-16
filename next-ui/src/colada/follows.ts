@@ -13,6 +13,7 @@ import {
   type FollowScheduleUpdateDto,
   type FollowUpdateDto,
 } from '@/generated/openapi'
+import { QUERY_KEYS_MANGADEX } from '@/colada/mangadex'
 import { STALE_TIME } from '@/types/time'
 import type { Ref } from 'vue'
 
@@ -70,11 +71,14 @@ export const useDeleteFollow = defineMutation(() => {
   })
 })
 
-export const useCheckFollowsNow = defineMutation(() =>
-  useMutation({
+export const useCheckFollowsNow = defineMutation(() => {
+  const queryCache = useQueryCache()
+  return useMutation({
     mutation: (libraryId: string) => komgaCheckFollowsNow({ path: { libraryId } }),
-  }),
-)
+    onSuccess: (_data, libraryId) =>
+      void queryCache.invalidateQueries({ key: QUERY_KEYS_FOLLOWS.byLibrary(libraryId) }),
+  })
+})
 
 export const useImportFollowTxt = defineMutation(() => {
   const queryCache = useQueryCache()
@@ -85,11 +89,16 @@ export const useImportFollowTxt = defineMutation(() => {
   })
 })
 
-export const useSyncFollowsToMangaDex = defineMutation(() =>
-  useMutation({
+export const useSyncFollowsToMangaDex = defineMutation(() => {
+  const queryCache = useQueryCache()
+  return useMutation({
     mutation: (libraryId: string) => komgaSyncFollowsToMangaDex({ path: { libraryId } }),
-  }),
-)
+    onSuccess: (_data, libraryId) => {
+      void queryCache.invalidateQueries({ key: QUERY_KEYS_FOLLOWS.byLibrary(libraryId) })
+      void queryCache.invalidateQueries({ key: QUERY_KEYS_MANGADEX.follows })
+    },
+  })
+})
 
 export const useUpdateFollowSchedule = defineMutation(() => {
   const queryCache = useQueryCache()

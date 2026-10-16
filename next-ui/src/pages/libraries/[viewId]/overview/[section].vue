@@ -23,6 +23,7 @@
         :selected="isSelected"
         :pre-select="preSelect"
         :width="display.xs.value ? 'auto' : appStore.gridCardWidth"
+        :sort-active="sort"
         @selection="(_val, event) => toggleSelect(event as MouseEvent)"
       />
       <BookCard
@@ -33,6 +34,7 @@
         :selected="isSelected"
         :pre-select="preSelect"
         :width="display.xs.value ? 'auto' : appStore.gridCardWidth"
+        :sort-active="sort"
         @selection="(_val, event) => toggleSelect(event as MouseEvent)"
       />
     </template>
@@ -51,7 +53,7 @@ import { useOverviewSection } from '@/composables/section'
 import { useGetLibrariesByViewId } from '@/composables/libraries'
 import { useInfiniteQuery } from '@pinia/colada'
 import type { BookDto, PageBookDto, PageSeriesDto, SeriesDto } from '@/generated/openapi'
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationObject } from '@/types/route'
 
 definePage({
   beforeEnter: (to) => {
@@ -72,7 +74,7 @@ const libraryViewId = route.params.viewId
 const { libraryIds } = useGetLibrariesByViewId(libraryViewId)
 const section = route.params.section as OverviewSection
 
-const { queryOptions, kind } = useOverviewSection(section, libraryIds)
+const { queryOptions, sort, kind } = useOverviewSection(section, libraryIds)
 
 const { data, hasNextPage, loadNextPage } = useInfiniteQuery(() => queryOptions.value as never)
 
@@ -81,7 +83,7 @@ const items = computed(() => {
   return pages?.flatMap((it) => (it?.content as (BookDto | SeriesDto)[]) ?? []) ?? []
 })
 
-const parentRoute = computed<RouteLocationRaw>(() => ({
+const parentRoute = computed<RouteLocationObject>(() => ({
   name: '/libraries/[viewId]/overview',
   params: { viewId: libraryViewId },
 }))

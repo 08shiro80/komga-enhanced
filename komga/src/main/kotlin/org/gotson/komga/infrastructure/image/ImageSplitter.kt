@@ -134,6 +134,8 @@ class ImageSplitter(
   ): Int =
     when {
       format == "jpg" || format == "jpeg" -> BufferedImage.TYPE_INT_RGB
+      image.type == BufferedImage.TYPE_BYTE_INDEXED || image.type == BufferedImage.TYPE_BYTE_BINARY ->
+        if (image.colorModel.hasAlpha()) BufferedImage.TYPE_INT_ARGB else BufferedImage.TYPE_INT_RGB
       image.type != BufferedImage.TYPE_CUSTOM -> image.type
       image.colorModel.hasAlpha() -> BufferedImage.TYPE_INT_ARGB
       else -> BufferedImage.TYPE_INT_RGB

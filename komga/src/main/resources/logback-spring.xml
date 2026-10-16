@@ -3,4 +3,59 @@
   <include resource="org/springframework/boot/logging/logback/base.xml"/>
   <!-- Suppress client connection reset IOExceptions (Windows: "Eine bestehende Verbindung wurde softwaregesteuert abgebrochen") -->
   <logger name="org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/].[dispatcherServlet]" level="OFF"/>
+
+  <!--
+    Plugin / downloader logging goes to a dedicated plugins.log next to komga.log.
+    The plugin loggers below carry NO explicit level, so they inherit from
+    org.gotson.komga — which means the runtime log-level toggle (LogController,
+    POST /api/v1/logs/level) switches gallery-dl and plugin logging together with
+    the core level. additivity="false" keeps this (DEBUG-heavy) output out of
+    komga.log and the console.
+  -->
+  <springProperty scope="context" name="PLUGIN_LOG_DIR" source="komga.config-dir"/>
+  <appender name="PLUGINS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${PLUGIN_LOG_DIR}/logs/plugins.log</file>
+    <encoder>
+      <pattern>${FILE_LOG_PATTERN}</pattern>
+      <charset>${FILE_LOG_CHARSET}</charset>
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${PLUGIN_LOG_DIR}/logs/plugins.log.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+      <maxFileSize>10MB</maxFileSize>
+      <maxHistory>7</maxHistory>
+      <totalSizeCap>1GB</totalSizeCap>
+      <cleanHistoryOnStart>true</cleanHistoryOnStart>
+    </rollingPolicy>
+  </appender>
+
+  <logger name="org.gotson.komga.infrastructure.download" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.infrastructure.scrobbler" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.infrastructure.comicscrobbler" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.infrastructure.metadata.mangadex" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.domain.service.DownloadExecutor" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.domain.service.ChapterUrlImporter" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.domain.service.ChapterChecker" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.domain.service.DeletedChapterScanRunner" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.domain.service.FollowLifecycle" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
+  <logger name="org.gotson.komga.domain.service.FollowScheduleLifecycle" additivity="false">
+    <appender-ref ref="PLUGINS"/>
+  </logger>
 </configuration>

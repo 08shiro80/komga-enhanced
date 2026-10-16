@@ -101,7 +101,7 @@
 </template>
 
 <script lang="ts" setup>
-import { defineMessage } from 'vue-intl'
+import { defineMessage, useIntl } from 'vue-intl'
 import {
   useFollowSchedule,
   useSyncFollowsToMangaDex,
@@ -171,10 +171,25 @@ async function syncNow() {
   }
 }
 
-const modeItems = [
-  { title: 'Interval', value: 'interval' },
-  { title: 'Fixed time', value: 'fixed_time' },
-]
+const intl = useIntl()
+const modeItems = computed(() => [
+  {
+    title: intl.formatMessage({
+      description: 'Follow schedule mode: interval',
+      defaultMessage: 'Interval',
+      id: 'fork/followSchedule/mode/interval',
+    }),
+    value: 'interval',
+  },
+  {
+    title: intl.formatMessage({
+      description: 'Follow schedule mode: fixed time',
+      defaultMessage: 'Fixed time',
+      id: 'fork/followSchedule/mode/fixedTime',
+    }),
+    value: 'fixed_time',
+  },
+])
 
 const enabledLabel = defineMessage({
   description: 'Follow schedule: enabled switch',

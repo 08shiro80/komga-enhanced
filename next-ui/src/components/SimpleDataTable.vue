@@ -35,10 +35,10 @@
               rounded
               color="primary"
               class="me-1 mb-1"
-              :append-icon="item.href ? 'i-mdi:open-in-new' : undefined"
-              :href="item.href"
-              :rel="item.href ? 'noreferrer' : undefined"
-              :target="item.href ? '_blank' : undefined"
+              :append-icon="safeExternalHref(item.href) ? 'i-mdi:open-in-new' : undefined"
+              :href="safeExternalHref(item.href)"
+              :rel="safeExternalHref(item.href) ? 'noreferrer' : undefined"
+              :target="safeExternalHref(item.href) ? '_blank' : undefined"
               >{{ item.text }}
             </v-chip>
           </template>
@@ -74,6 +74,7 @@
 <script setup lang="ts">
 import { WrapClamp } from 'vue-clamp'
 import { commonMessages } from '@/utils/i18n/common-messages'
+import { safeExternalHref } from '@/utils/sanitize'
 
 const { uppercaseHeaders = true } = defineProps<{
   rows: TableRow[]
@@ -82,7 +83,7 @@ const { uppercaseHeaders = true } = defineProps<{
 </script>
 
 <script lang="ts">
-import type { RouteLocation } from 'vue-router'
+import type { RouteLocationObject } from '@/types/route'
 
 export type TableRow = {
   header: string
@@ -92,7 +93,7 @@ export type TableRow = {
 
 export type TableValue = {
   text: string
-  to?: RouteLocation
+  to?: RouteLocationObject | undefined
   href?: string
 }
 </script>

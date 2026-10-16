@@ -63,15 +63,6 @@ data class PluginConfig(
   override val lastModifiedDate: LocalDateTime = LocalDateTime.now(),
 ) : Auditable
 
-data class PluginLog(
-  val id: String,
-  val pluginId: String,
-  val logLevel: LogLevel,
-  val message: String,
-  val exceptionTrace: String?,
-  val createdDate: LocalDateTime = LocalDateTime.now(),
-)
-
 enum class LogLevel {
   DEBUG,
   INFO,

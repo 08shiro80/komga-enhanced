@@ -17,6 +17,7 @@
           :selected="isSelected"
           :pre-select="preSelect"
           :width="cardWidth"
+          :sort-active="sort"
           @selection="toggleSelect"
         />
         <BookCard
@@ -27,6 +28,7 @@
           :selected="isSelected"
           :pre-select="preSelect"
           :width="cardWidth"
+          :sort-active="sort"
           @selection="toggleSelect"
         />
       </div>
@@ -44,7 +46,7 @@ import { overviewSectionMessages } from '@/types/OverviewSection'
 import { useAppStore } from '@/stores/app'
 import { useDisplay } from 'vuetify'
 import type { ClientSettingUserOverviewSection } from '@/types/ClientSettingsUser'
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationObject } from '@/types/route'
 
 const props = defineProps<{
   section: ClientSettingUserOverviewSection
@@ -57,7 +59,7 @@ const { libraryIds } = useGetLibrariesByViewId(props.libraryViewId)
 
 const cardWidth = computed(() => (display.smAndUp.value ? appStore.gridCardWidth : 130))
 
-const { queryOptions, kind } = useOverviewSection(props.section.section, libraryIds)
+const { queryOptions, sort, kind } = useOverviewSection(props.section.section, libraryIds)
 
 const { data, hasNextPage, loadNextPage, isPending } = useInfiniteQuery(
   () => queryOptions.value as never,
@@ -80,7 +82,7 @@ defineExpose({
   isPending,
 })
 
-const routeTo = computed<RouteLocationRaw>(() => ({
+const routeTo = computed<RouteLocationObject>(() => ({
   name: '/libraries/[viewId]/overview/[section]',
   params: { viewId: props.libraryViewId, section: props.section.section },
 }))

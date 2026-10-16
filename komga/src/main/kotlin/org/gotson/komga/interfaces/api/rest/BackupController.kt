@@ -171,8 +171,9 @@ class BackupController(
     @Parameter(description = "Number of backups to keep (default: 10)")
     @RequestParam(defaultValue = "10")
     keep: Int,
-  ): ResponseEntity<CleanupResultDto> =
-    try {
+  ): ResponseEntity<CleanupResultDto> {
+    if (keep < 1) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "keep must be at least 1")
+    return try {
       val deleted = backupLifecycle.cleanOldBackups(keep)
       logger.info { "Cleaned $deleted old backups via API" }
 
@@ -187,6 +188,7 @@ class BackupController(
       logger.error(e) { "Failed to clean old backups" }
       throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to clean backups: ${e.message}")
     }
+  }
 
   @PostMapping("/restore/{fileName}")
   @Operation(

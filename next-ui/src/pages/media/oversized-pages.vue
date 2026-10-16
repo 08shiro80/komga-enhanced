@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-3">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Oversized pages view: title',
@@ -9,7 +9,7 @@
             id: 'fork/oversized/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
       <v-btn
         icon="i-mdi:refresh"
@@ -424,7 +424,7 @@
         v-if="(data?.totalPages ?? 1) > 1"
         v-model="page"
         :length="data?.totalPages ?? 1"
-        :total-visible="7"
+        :total-visible="display.xs.value ? 3 : 7"
         class="mt-4"
       />
     </template>
@@ -636,6 +636,7 @@
 <script lang="ts" setup>
 import { defineMessage } from 'vue-intl'
 import { useLocalStorage } from '@vueuse/core'
+import { useDisplay } from 'vuetify'
 import {
   useDeleteOversizedPage,
   useDeleteOversizedPagesBatch,
@@ -655,6 +656,7 @@ import type { OversizedPageDto, SplitResultDto } from '@/generated/openapi'
 type OversizedRow = OversizedPageDto & { rowKey: string }
 
 const messagesStore = useMessagesStore()
+const display = useDisplay()
 
 const PRESETS = [
   { key: 'webtoon', label: 'Webtoon / Long strip', mode: 'tall', detect: 3, split: 1.5 },
@@ -735,6 +737,7 @@ const allSelected = computed(
 function apply() {
   page.value = 1
   selected.value = new Set()
+  lastIndex = -1
   params.value = buildParams()
 }
 
@@ -915,7 +918,10 @@ async function executeDelete() {
 
 async function splitAll() {
   confirmSplitAll.value = false
+  splitAllRunning.value = true
+  messagesStore.messages.push({ message: splitAllStartedMessage })
   try {
+    // the backend runs split-all synchronously: when the call returns, the run is over
     await splitAllPages({
       mode: mode.value,
       minRatio: detectRatio.value,
@@ -923,10 +929,12 @@ async function splitAll() {
       includeIgnored: includeIgnored.value,
       search: search.value || undefined,
     })
-    splitAllRunning.value = true
-    messagesStore.messages.push({ message: splitAllStartedMessage })
   } catch (e) {
     messagesStore.messages.push({ message: (e as Error).message, color: 'error' })
+  } finally {
+    splitAllRunning.value = false
+    stopPolling()
+    void refetch()
     void refetchSplitAll()
   }
 }
@@ -935,7 +943,16 @@ let pollHandle: ReturnType<typeof setInterval> | null = null
 
 function startPolling() {
   if (pollHandle) return
-  pollHandle = setInterval(() => void refetchSplitAll(), 3000)
+  pollHandle = setInterval(() => {
+    void refetchSplitAll().then(() => {
+      const inProgress = (splitAllStatus.value as { inProgress?: boolean } | undefined)?.inProgress
+      if (!inProgress && splitAllRunning.value) {
+        splitAllRunning.value = false
+        stopPolling()
+        void refetch()
+      }
+    })
+  }, 3000)
 }
 
 function stopPolling() {
@@ -1012,7 +1029,7 @@ const previewActionLabel = defineMessage({ description: 'Oversized: preview acti
 const splitActionLabel = defineMessage({ description: 'Oversized: split action', defaultMessage: 'Split page', id: 'fork/oversized/action/split' })
 const ignoreActionLabel = defineMessage({ description: 'Oversized: ignore action', defaultMessage: 'Ignore', id: 'fork/oversized/action/ignore' })
 const deleteActionLabel = defineMessage({ description: 'Oversized: delete action', defaultMessage: 'Delete', id: 'fork/oversized/action/delete' })
-const deleteTitleLabel = defineMessage({ description: 'Oversized: delete dialog title', defaultMessage: 'Delete {count, plural, one {# page} other {# pages}}?', id: 'fork/oversized/delete/title' })
+const deleteTitleLabel = defineMessage<{ count: number }>({ description: 'Oversized: delete dialog title', defaultMessage: 'Delete {count, plural, one {# page} other {# pages}}?', id: 'fork/oversized/delete/title' })
 const cancelLabel = defineMessage({ description: 'Oversized: cancel', defaultMessage: 'Cancel', id: 'fork/oversized/cancel' })
 const closeLabel = defineMessage({ description: 'Oversized: close', defaultMessage: 'Close', id: 'fork/oversized/close' })
 const splitAllStartedMessage = defineMessage({ description: 'Oversized: split all started', defaultMessage: 'Splitting started in the background', id: 'fork/oversized/splitAll/started' })

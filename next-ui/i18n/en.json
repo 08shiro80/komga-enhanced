@@ -1,4 +1,8 @@
 {
+  "+6DtMH": {
+    "defaultMessage": "User interface",
+    "description": "Server settings: section header for UI settings"
+  },
   "+6YDzS": {
     "defaultMessage": "No data found",
     "description": "Known Duplicate Page Table: shown when table has no data"
@@ -87,6 +91,10 @@
     "defaultMessage": "IETF BCP 47 language tag",
     "description": "Form edit series: General - language, hint"
   },
+  "0ESsC0": {
+    "defaultMessage": "Continue with {provider}",
+    "description": "Login screen: oauth2 provider login button"
+  },
   "0ILHru": {
     "defaultMessage": "OK",
     "description": "Import reading list table filter: OK"
@@ -143,6 +151,10 @@
     "defaultMessage": "Rebuild search index",
     "description": "Task name: RebuildIndex"
   },
+  "13nnQg": {
+    "defaultMessage": "Use the new NextUI as default for this server",
+    "description": "Server settings: checkbox to use NextUI as the default UI"
+  },
   "14/Uh8": {
     "defaultMessage": "Import mode",
     "description": "Import books table: bottom bar: import mode selection dropdown label"
@@ -150,6 +162,10 @@
   "18OKhZ": {
     "defaultMessage": "Find books to convert",
     "description": "Task name: FindBooksToConvert"
+  },
+  "1A8Mc1": {
+    "defaultMessage": "Notable entities",
+    "description": "Form edit book: Notable Entities"
   },
   "1E0Duw": {
     "defaultMessage": "File size",
@@ -166,6 +182,10 @@
   "1bxWGd": {
     "defaultMessage": "Edit series metadata",
     "description": "Edit series metadata dialog title"
+  },
+  "1hsKmu": {
+    "defaultMessage": "Character",
+    "description": "Notable entity kind: character"
   },
   "1qIfds": {
     "defaultMessage": "Pinned",
@@ -243,6 +263,10 @@
     "defaultMessage": "library menu",
     "description": "Library menu button: aria label"
   },
+  "3lLmfX": {
+    "defaultMessage": "Collection",
+    "description": "Browsing context: collection"
+  },
   "3qQjnw": {
     "defaultMessage": "Language",
     "description": "Filter panel: Language"
@@ -250,6 +274,10 @@
   "3rNj7/": {
     "defaultMessage": "Click to confirm",
     "description": "Confirmation dialog: default checkbox label"
+  },
+  "40HXjy": {
+    "defaultMessage": "Cancel",
+    "description": "Metadata edition: add role dialog - cancel button"
   },
   "464rk3": {
     "defaultMessage": "Select series",
@@ -323,9 +351,21 @@
     "defaultMessage": "Epub",
     "description": "Form add/edit library: Scanner - file types: epub"
   },
+  "5Xt1ke": {
+    "defaultMessage": "Team",
+    "description": "Notable entity kind: team"
+  },
+  "5Zw5Zt": {
+    "defaultMessage": "Go to next series within collection",
+    "description": "Navigation within collection: next button tootlip"
+  },
   "5b2A0u": {
     "defaultMessage": "You will be redirected to the home page",
     "description": "Page not found view: error message subtitle"
+  },
+  "5nswuX": {
+    "defaultMessage": "Open classic UI",
+    "description": "Drawer menu for webui link"
   },
   "5rziSG": {
     "defaultMessage": "Unavailable",
@@ -358,6 +398,10 @@
   "6WDISV": {
     "defaultMessage": "Page not found",
     "description": "Page not found view: error message title"
+  },
+  "6eAECF": {
+    "defaultMessage": "Library",
+    "description": "Library bottom sheet, subtitle"
   },
   "6nCIPn": {
     "defaultMessage": "Type",
@@ -399,6 +443,10 @@
     "defaultMessage": "All",
     "description": "Library tab navigation: library selection: all"
   },
+  "811PxA": {
+    "defaultMessage": "or",
+    "description": "Login screen: divider between login fields and oauth2 provider list"
+  },
   "81BMAQ": {
     "defaultMessage": "Import book metadata",
     "description": "Form add/edit library: Metadata - epub book metadata"
@@ -419,6 +467,10 @@
     "defaultMessage": "Tags",
     "description": "Combobox tags: label"
   },
+  "8LT9D4": {
+    "defaultMessage": "Cancel",
+    "description": "Metadata edition: add kind dialog - cancel button"
+  },
   "8NDqor": {
     "defaultMessage": "Letterer",
     "description": "Author role: letterer"
@@ -430,6 +482,10 @@
   "8P7Yn+": {
     "defaultMessage": "Age rating",
     "description": "Filter panel: Age rating"
+  },
+  "8Yd/3a": {
+    "defaultMessage": "Role name",
+    "description": "Metadata edition: add role dialog - input field label"
   },
   "8hC76W": {
     "defaultMessage": "Tasks",
@@ -479,6 +535,10 @@
     "defaultMessage": "User uploaded",
     "description": "Poster card: type - user uploaded"
   },
+  "9mujmD": {
+    "defaultMessage": "No release date",
+    "description": "Card subtitle: no release date"
+  },
   "9oA9gw": {
     "defaultMessage": "Unpinned",
     "description": "Library tab navigation: library selection: unpinned"
@@ -494,6 +554,10 @@
   "ALGXT9": {
     "defaultMessage": "Duplicate",
     "description": "Import reading list table filter: duplicate"
+  },
+  "AMQANB": {
+    "defaultMessage": "Add Custom Kind",
+    "description": "Metadata edition: add kind dialog title"
   },
   "AeA9Ka": {
     "defaultMessage": "No restriction",
@@ -671,6 +735,10 @@
     "defaultMessage": "Delete files",
     "description": "Series delete dialog: confirm button"
   },
+  "DgXStw": {
+    "defaultMessage": "Go to previous series within collection",
+    "description": "Navigation within collection: previous button tootlip"
+  },
   "Dn4qvV": {
     "defaultMessage": "Restore defaults",
     "description": "Reorder sections: restore defaults button"
@@ -702,6 +770,10 @@
   "EIYfj+": {
     "defaultMessage": "Number",
     "description": "Book picker dialog: series books table header: number"
+  },
+  "ELl0N9": {
+    "defaultMessage": "Books with missing posters can now be filtered directly in the main library view.",
+    "description": "Missing posters: text"
   },
   "ELttw/": {
     "defaultMessage": "Empty trash",
@@ -799,6 +871,10 @@
     "defaultMessage": "Use local artwork",
     "description": "Form add/edit library: Metadata - local artwork"
   },
+  "Gwmnm6": {
+    "defaultMessage": "Series",
+    "description": "Series bottom sheet, subtitle"
+  },
   "GyRV+/": {
     "defaultMessage": "You should enable this if the library is hosted on Google Drive",
     "description": "Form add/edit library: Scanner - Force directory modified time - information tooltip"
@@ -851,6 +927,10 @@
     "defaultMessage": "Close",
     "description": "Generate API key dialog: close button"
   },
+  "HaF+a6": {
+    "defaultMessage": "Libraries",
+    "description": "Libraries bottom sheet, subtitle"
+  },
   "HaWCi3": {
     "defaultMessage": "Settings",
     "description": "Drawer menu for Server > Settings"
@@ -870,6 +950,10 @@
   "Hyz5su": {
     "defaultMessage": "Import book",
     "description": "Task name: ImportBook"
+  },
+  "I75Xgh": {
+    "defaultMessage": "Go to next book within series",
+    "description": "Book navigation within series: next button tootlip"
   },
   "I9L5Ag": {
     "defaultMessage": "SORT",
@@ -927,6 +1011,10 @@
     "defaultMessage": "Status",
     "description": "Import reading list table header: status message"
   },
+  "J8l62K": {
+    "defaultMessage": "Add",
+    "description": "Metadata edition: add kind dialog - add button"
+  },
   "J8rAqm": {
     "defaultMessage": "Release year",
     "description": "Sort label: booksMetadata.releaseDate"
@@ -966,6 +1054,10 @@
   "KBLD9U": {
     "defaultMessage": "Age rating",
     "description": "Filter by age rating: select placeholder"
+  },
+  "KTifVk": {
+    "defaultMessage": "All notable entities",
+    "description": "Notable entity filter: any kind"
   },
   "Kie8HQ": {
     "defaultMessage": "Book",
@@ -1055,6 +1147,10 @@
     "defaultMessage": "Kobo sync forced: {apiKeyComment}",
     "description": "Snackbar notification shown upon successful API key force sync"
   },
+  "Nahedl": {
+    "defaultMessage": "Add",
+    "description": "Metadata edition: add role dialog - add button"
+  },
   "NasBHg": {
     "defaultMessage": "Date read",
     "description": "Sort label: readDate"
@@ -1135,6 +1231,10 @@
     "defaultMessage": "Book metadata updated: {book}",
     "description": "Snackbar notification shown upon successful book metadata update"
   },
+  "P9B8fE": {
+    "defaultMessage": "Go to previous book within series",
+    "description": "Book navigation within series: previous button tootlip"
+  },
   "PTr5Wc": {
     "defaultMessage": "Check that your Komga server is running",
     "description": "Server unreachable error view: error message subtitle"
@@ -1147,6 +1247,10 @@
     "defaultMessage": "Required for detecting duplicate pages",
     "description": "Form add/edit library: Options - hash pages - information tooltip"
   },
+  "Po0Z4Z": {
+    "defaultMessage": "Read list",
+    "description": "Read list bottom sheet, subtitle"
+  },
   "Pp3+1S": {
     "defaultMessage": "Status",
     "description": "Filter panel: Series status"
@@ -1154,6 +1258,10 @@
   "PvKF7E": {
     "defaultMessage": "Library deleted: {library}",
     "description": "Snackbar notification shown upon successful library deletion"
+  },
+  "Q7tJAG": {
+    "defaultMessage": "Read list",
+    "description": "Container chip, subtitle for read list"
   },
   "QALnuE": {
     "defaultMessage": "File type",
@@ -1199,17 +1307,33 @@
     "defaultMessage": "Expand sidebar",
     "description": "Sidebar button: tooltip expand"
   },
+  "RcbD73": {
+    "defaultMessage": "Book {number}",
+    "description": "Book navigation siblings menu: book number in series"
+  },
   "Rm52xk": {
     "defaultMessage": "Welcome to Komga",
     "description": "No libraries view: title"
+  },
+  "Rw2Iwj": {
+    "defaultMessage": "Go to next book within read list",
+    "description": "Book navigation within read list: next button tootlip"
   },
   "RwuMl5": {
     "defaultMessage": "Automatically repair incorrect file extensions",
     "description": "Form add/edit library: Options - repair extensions"
   },
+  "S1/qO0": {
+    "defaultMessage": "Collection",
+    "description": "Collection bottom sheet, subtitle"
+  },
   "S39lnB": {
     "defaultMessage": "Year rating",
     "description": "Filter by release year: select placeholder"
+  },
+  "S9SjlA": {
+    "defaultMessage": "Selected",
+    "description": "Poster filter: subheader for selected section"
   },
   "SIfmpC": {
     "defaultMessage": "Select series",
@@ -1355,6 +1479,10 @@
     "defaultMessage": "Duplicate page",
     "description": "Duplicate Page Hash Matches Table: alt description for thumbnail"
   },
+  "V8tkJa": {
+    "defaultMessage": "Automatic OAuth2 login",
+    "description": "Server settings: checkbox to set automatic OAuth2 login"
+  },
   "VHe28r": {
     "defaultMessage": "Date updated",
     "description": "Sort label: lastModifiedDate"
@@ -1414,10 +1542,6 @@
   "WLwQG8": {
     "defaultMessage": "No API keys created yet",
     "description": "API Key table: shown when table has no data"
-  },
-  "WNY0pu": {
-    "defaultMessage": "The latest version of Komga is already installed",
-    "description": "Updates view: banner shown at the top"
   },
   "WPxleH": {
     "defaultMessage": "The book files will be deleted<ul><li>Book media file will be deleted from disk.</li><li>Book sidecar files will be deleted from disk.</li><li>Book will de deleted, along with its metadata and read progress.</li></ul><b>This action cannot be undone.</b>",
@@ -1499,6 +1623,10 @@
     "defaultMessage": "Please type <b>{validateText}</b> to confirm.",
     "description": "Confirmation dialog: default hint to retype validation text"
   },
+  "Xq4kkn": {
+    "defaultMessage": "Go to previous book within read list",
+    "description": "Book navigation within read list: previous button tootlip"
+  },
   "XuqK4C": {
     "defaultMessage": "Unknown Duplicates",
     "description": "Unknown Duplicate Page Table global header"
@@ -1506,6 +1634,10 @@
   "Xx+ITC": {
     "defaultMessage": "My activity",
     "description": "Drawer menu for My Account > Activity"
+  },
+  "Xxk+hl": {
+    "defaultMessage": "Appears in",
+    "description": "Container chip, showing in what collection/readlist a series or book appears"
   },
   "Xxu514": {
     "defaultMessage": "Delete series files",
@@ -1543,9 +1675,21 @@
     "defaultMessage": "Edit collection",
     "description": "Edit collection dialog title"
   },
+  "YaCWYs": {
+    "defaultMessage": "Media analysis has moved",
+    "description": "Media analysis: title"
+  },
   "YbkrN9": {
     "defaultMessage": "IP",
     "description": "Authentication Activity table header: IP address"
+  },
+  "YeFgyc": {
+    "defaultMessage": "Books in error can now be filtered directly in the main library view.",
+    "description": "Media analysis: text"
+  },
+  "YeUvoE": {
+    "defaultMessage": "Custom role...",
+    "description": "Metadata edition: add role menu - custom role"
   },
   "Yf4DJ2": {
     "defaultMessage": "User Interface",
@@ -1575,6 +1719,10 @@
     "defaultMessage": "Complete",
     "description": "Filter: complete"
   },
+  "ZGppaw": {
+    "defaultMessage": "Series",
+    "description": "Browsing context: series"
+  },
   "ZPuFVu": {
     "defaultMessage": "General",
     "description": "Form edit series: General"
@@ -1594,6 +1742,10 @@
   "Zh8AOV": {
     "defaultMessage": "Edit User",
     "description": "Edit user dialog title"
+  },
+  "ZiTv+F": {
+    "defaultMessage": "Missing posters has moved",
+    "description": "Missing posters: title"
   },
   "ZnjyI3": {
     "defaultMessage": "Show less",
@@ -1839,6 +1991,10 @@
     "defaultMessage": "Book",
     "description": "Duplicate Page Hash Matches Table header: book file name"
   },
+  "bRAV2F": {
+    "defaultMessage": "Location",
+    "description": "Notable entity kind: location"
+  },
   "bRxSgh": {
     "defaultMessage": "Manually",
     "description": "Form edit read list: General - books ordering: manually"
@@ -1846,6 +2002,10 @@
   "bSoeY6": {
     "defaultMessage": "Destination name",
     "description": "Import books table header: destination name"
+  },
+  "bWiqyw": {
+    "defaultMessage": "Kind name",
+    "description": "Metadata edition: add kind dialog - input field label"
   },
   "bk1tX8": {
     "defaultMessage": "The library will be deleted from this server.<ul><li>Series and books will be deleted, along with their metadata and read progress.</li><li>Media files will not be deleted from disk.</li></ul><b>This action cannot be undone.</b>",
@@ -1934,6 +2094,10 @@
   "dLE2PW": {
     "defaultMessage": "No activity",
     "description": "Task Indicator menu: no activity"
+  },
+  "dN5GoW": {
+    "defaultMessage": "Book",
+    "description": "Book bottom sheet, subtitle"
   },
   "dP6SpT": {
     "defaultMessage": "By name",
@@ -2267,6 +2431,1722 @@
     "defaultMessage": "Deep scan",
     "description": "Library menu: manage > deep scan"
   },
+  "fork.login.browseAsGuest": {
+    "defaultMessage": "Browse as guest",
+    "description": "Login screen: Browse as guest button"
+  },
+  "fork.pageHash.clearSelection": {
+    "defaultMessage": "Clear selection",
+    "description": "Unknown Duplicate Page: clear selection"
+  },
+  "fork.pageHash.matchesCount": {
+    "defaultMessage": "{count, plural, one {# book} other {# books}}",
+    "description": "Unknown Duplicate Page: number of matching books"
+  },
+  "fork.pageHash.removeAllKnown": {
+    "defaultMessage": "Remove all",
+    "description": "Known Duplicate Page: remove all button"
+  },
+  "fork.pageHash.removeAllKnown.confirm": {
+    "defaultMessage": "Remove all",
+    "description": "Known Duplicate Page: remove all confirm button"
+  },
+  "fork.pageHash.removeAllKnown.title": {
+    "defaultMessage": "Remove all known duplicates",
+    "description": "Known Duplicate Page: remove all dialog title"
+  },
+  "fork.pageHash.removeAllKnown.warning": {
+    "defaultMessage": "This clears all {count} known duplicate page hashes. Already-deleted pages are not restored.",
+    "description": "Known Duplicate Page: remove all warning"
+  },
+  "fork.pageHash.removeKnown": {
+    "defaultMessage": "Remove this hash",
+    "description": "Known Duplicate Page: remove single hash button"
+  },
+  "fork.pageHash.selectAll": {
+    "defaultMessage": "Select all on page",
+    "description": "Unknown Duplicate Page: select all on page"
+  },
+  "fork.pageHash.selectedCount": {
+    "defaultMessage": "{count} selected",
+    "description": "Unknown Duplicate Page: number of selected items"
+  },
+  "fork.pageHash.sort.matchCount": {
+    "defaultMessage": "Most matches",
+    "description": "Unknown Duplicate Page sort: matches"
+  },
+  "fork.pageHash.sort.size": {
+    "defaultMessage": "Largest page",
+    "description": "Unknown Duplicate Page sort: page size"
+  },
+  "fork.pageHash.sort.totalSize": {
+    "defaultMessage": "Most space saved",
+    "description": "Unknown Duplicate Page sort: potential space saved"
+  },
+  "fork.pageHash.spaceSave": {
+    "defaultMessage": "~{size} to save",
+    "description": "Unknown Duplicate Page: potential space saved by deleting"
+  },
+  "fork.pageHash.unknownSize": {
+    "defaultMessage": "Size unknown",
+    "description": "Unknown Duplicate Page: unknown page size"
+  },
+  "fork.sse.downloadCompleted": {
+    "defaultMessage": "Download completed",
+    "description": "Download notification: completed: title"
+  },
+  "fork.sse.downloadFailed": {
+    "defaultMessage": "Download failed",
+    "description": "Download notification: failed: title"
+  },
+  "fork/account/trackers/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Account trackers: cancel button"
+  },
+  "fork/account/trackers/confirmUnlink": {
+    "defaultMessage": "Remove your {name} account and its saved credentials?",
+    "description": "Account trackers: unlink confirmation"
+  },
+  "fork/account/trackers/enabled": {
+    "defaultMessage": "Active",
+    "description": "Account trackers: active switch"
+  },
+  "fork/account/trackers/field/accessToken": {
+    "defaultMessage": "Access token",
+    "description": "Account trackers: access token field"
+  },
+  "fork/account/trackers/field/clientId": {
+    "defaultMessage": "Client ID",
+    "description": "Account trackers: client id field"
+  },
+  "fork/account/trackers/field/clientSecret": {
+    "defaultMessage": "Client secret",
+    "description": "Account trackers: client secret field"
+  },
+  "fork/account/trackers/field/maxContentRating": {
+    "defaultMessage": "Max content rating to sync",
+    "description": "Account trackers: MangaDex max content rating field"
+  },
+  "fork/account/trackers/field/password": {
+    "defaultMessage": "Password",
+    "description": "Account trackers: password field"
+  },
+  "fork/account/trackers/field/refreshToken": {
+    "defaultMessage": "Refresh token",
+    "description": "Account trackers: refresh token field"
+  },
+  "fork/account/trackers/field/token": {
+    "defaultMessage": "Access token",
+    "description": "Account trackers: token field"
+  },
+  "fork/account/trackers/field/username": {
+    "defaultMessage": "Username",
+    "description": "Account trackers: username field"
+  },
+  "fork/account/trackers/hint/anilist": {
+    "defaultMessage": "Personal access token from anilist.co/api/v2/oauth/pin (implicit grant of your own AniList API client).",
+    "description": "Account trackers: AniList hint"
+  },
+  "fork/account/trackers/hint/kitsu": {
+    "defaultMessage": "OAuth2 tokens from kitsu.app/api/oauth/token. With refresh token, client ID and client secret the access token is renewed automatically.",
+    "description": "Account trackers: Kitsu hint"
+  },
+  "fork/account/trackers/hint/mal": {
+    "defaultMessage": "OAuth2 tokens of your own MyAnimeList API client. With refresh token, client ID and client secret the access token is renewed automatically.",
+    "description": "Account trackers: MyAnimeList hint"
+  },
+  "fork/account/trackers/hint/mangadex": {
+    "defaultMessage": "Your MangaDex account and personal API client (mangadex.org/settings → API Clients).",
+    "description": "Account trackers: MangaDex hint"
+  },
+  "fork/account/trackers/hint/metron": {
+    "defaultMessage": "Your Metron (metron.cloud) account. Used by the Comic Scrobbler.",
+    "description": "Account trackers: Metron hint"
+  },
+  "fork/account/trackers/linked": {
+    "defaultMessage": "Linked",
+    "description": "Account trackers: linked chip"
+  },
+  "fork/account/trackers/menu": {
+    "defaultMessage": "Trackers",
+    "description": "Drawer menu for My Account > Trackers"
+  },
+  "fork/account/trackers/notLinked": {
+    "defaultMessage": "Not linked",
+    "description": "Account trackers: not linked chip"
+  },
+  "fork/account/trackers/save": {
+    "defaultMessage": "Save",
+    "description": "Account trackers: save button"
+  },
+  "fork/account/trackers/saved": {
+    "defaultMessage": "Tracker saved",
+    "description": "Account trackers: saved notification"
+  },
+  "fork/account/trackers/secretSet": {
+    "defaultMessage": "Saved — leave empty to keep",
+    "description": "Account trackers: placeholder for a stored secret"
+  },
+  "fork/account/trackers/subtitle": {
+    "defaultMessage": "Link your own tracker accounts. When you finish a book, your progress is synced only to the accounts linked here. Scrobbling must be enabled by an administrator (Manga Scrobbler / Comic Scrobbler plugin).",
+    "description": "Account trackers: page explanation"
+  },
+  "fork/account/trackers/test": {
+    "defaultMessage": "Test connection",
+    "description": "Account trackers: test connection button"
+  },
+  "fork/account/trackers/unlink": {
+    "defaultMessage": "Unlink",
+    "description": "Account trackers: unlink button"
+  },
+  "fork/account/trackers/unlinked": {
+    "defaultMessage": "Tracker unlinked",
+    "description": "Account trackers: unlinked notification"
+  },
+  "fork/addchapter/add": {
+    "defaultMessage": "Add download",
+    "description": "Add chapter download: add button"
+  },
+  "fork/addchapter/chapterNumber": {
+    "defaultMessage": "Chapter number",
+    "description": "Add chapter download: chapter number"
+  },
+  "fork/addchapter/chapterTitle": {
+    "defaultMessage": "Chapter title (optional)",
+    "description": "Add chapter download: chapter title"
+  },
+  "fork/addchapter/customNaming": {
+    "defaultMessage": "Custom naming",
+    "description": "Add chapter download: custom naming"
+  },
+  "fork/addchapter/filename": {
+    "defaultMessage": "Filename",
+    "description": "Add chapter download: filename"
+  },
+  "fork/addchapter/queued": {
+    "defaultMessage": "Download queued",
+    "description": "Add chapter download: queued"
+  },
+  "fork/addchapter/range": {
+    "defaultMessage": "Range (from series URL)",
+    "description": "Add chapter download: range mode"
+  },
+  "fork/addchapter/rangeField": {
+    "defaultMessage": "Chapter range",
+    "description": "Add chapter download: range field"
+  },
+  "fork/addchapter/series": {
+    "defaultMessage": "Series:",
+    "description": "Add chapter download: series"
+  },
+  "fork/addchapter/single": {
+    "defaultMessage": "Single chapter",
+    "description": "Add chapter download: single mode"
+  },
+  "fork/addchapter/skip": {
+    "defaultMessage": "Skip if chapter already exists",
+    "description": "Add chapter download: skip"
+  },
+  "fork/addchapter/title": {
+    "defaultMessage": "Add chapter download",
+    "description": "Add chapter download dialog title"
+  },
+  "fork/addchapter/url": {
+    "defaultMessage": "Source URL",
+    "description": "Add chapter download: url"
+  },
+  "fork/addchapter/volume": {
+    "defaultMessage": "Volume (optional)",
+    "description": "Add chapter download: volume"
+  },
+  "fork/backup/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Backup view: cancel"
+  },
+  "fork/backup/clean": {
+    "defaultMessage": "Clean old",
+    "description": "Backup view: clean old backups"
+  },
+  "fork/backup/clean/body": {
+    "defaultMessage": "Keep the most recent backups and delete the rest.",
+    "description": "Backup view: clean dialog body"
+  },
+  "fork/backup/clean/confirm": {
+    "defaultMessage": "Clean",
+    "description": "Backup view: clean confirm"
+  },
+  "fork/backup/clean/keep": {
+    "defaultMessage": "Backups to keep",
+    "description": "Backup view: keep count field"
+  },
+  "fork/backup/clean/title": {
+    "defaultMessage": "Clean old backups",
+    "description": "Backup view: clean dialog title"
+  },
+  "fork/backup/cleaned": {
+    "defaultMessage": "Old backups cleaned",
+    "description": "Backup view: cleaned"
+  },
+  "fork/backup/col/actions": {
+    "defaultMessage": "Actions",
+    "description": "Backup view: column actions"
+  },
+  "fork/backup/col/date": {
+    "defaultMessage": "Created",
+    "description": "Backup view: column date"
+  },
+  "fork/backup/col/name": {
+    "defaultMessage": "File",
+    "description": "Backup view: column file name"
+  },
+  "fork/backup/col/size": {
+    "defaultMessage": "Size",
+    "description": "Backup view: column size"
+  },
+  "fork/backup/col/type": {
+    "defaultMessage": "Type",
+    "description": "Backup view: column type"
+  },
+  "fork/backup/create": {
+    "defaultMessage": "Database backup",
+    "description": "Backup view: create db backup"
+  },
+  "fork/backup/createFull": {
+    "defaultMessage": "Full backup",
+    "description": "Backup view: create full backup"
+  },
+  "fork/backup/created": {
+    "defaultMessage": "Backup created",
+    "description": "Backup view: created"
+  },
+  "fork/backup/delete": {
+    "defaultMessage": "Delete",
+    "description": "Backup view: delete"
+  },
+  "fork/backup/delete/body": {
+    "defaultMessage": "This permanently deletes the backup file. This cannot be undone.",
+    "description": "Backup view: delete dialog body"
+  },
+  "fork/backup/delete/title": {
+    "defaultMessage": "Delete this backup?",
+    "description": "Backup view: delete dialog title"
+  },
+  "fork/backup/download": {
+    "defaultMessage": "Download",
+    "description": "Backup view: download"
+  },
+  "fork/backup/empty": {
+    "defaultMessage": "No backups yet.",
+    "description": "Backup view: empty"
+  },
+  "fork/backup/restore": {
+    "defaultMessage": "Restore",
+    "description": "Backup view: restore"
+  },
+  "fork/backup/restore/confirm": {
+    "defaultMessage": "Restore",
+    "description": "Backup view: restore confirm"
+  },
+  "fork/backup/restore/title": {
+    "defaultMessage": "Restore this backup?",
+    "description": "Backup view: restore dialog title"
+  },
+  "fork/backup/restore/warning": {
+    "defaultMessage": "Restoring will overwrite the current database and requires a server restart. This cannot be undone.",
+    "description": "Backup view: restore warning"
+  },
+  "fork/backup/restored": {
+    "defaultMessage": "Backup restored — restart the server to apply",
+    "description": "Backup view: restored"
+  },
+  "fork/backup/title": {
+    "defaultMessage": "Backups",
+    "description": "Backup view: title"
+  },
+  "fork/blacklist/add": {
+    "defaultMessage": "Blacklist",
+    "description": "Blacklist manager: add button"
+  },
+  "fork/blacklist/empty": {
+    "defaultMessage": "No blacklisted chapters. Blacklisted chapters are skipped during follow checks.",
+    "description": "Blacklist manager: empty"
+  },
+  "fork/blacklist/remove": {
+    "defaultMessage": "Remove",
+    "description": "Blacklist manager: remove entry"
+  },
+  "fork/blacklist/title": {
+    "defaultMessage": "Chapter blacklist",
+    "description": "Blacklist dialog title"
+  },
+  "fork/blacklist/url": {
+    "defaultMessage": "MangaDex chapter URL to blacklist",
+    "description": "Blacklist manager: chapter URL field"
+  },
+  "fork/blacklisted/col/actions": {
+    "defaultMessage": "Actions",
+    "description": "Blacklisted: col actions"
+  },
+  "fork/blacklisted/col/chapter": {
+    "defaultMessage": "Chapter",
+    "description": "Blacklisted: col chapter"
+  },
+  "fork/blacklisted/col/date": {
+    "defaultMessage": "Blacklisted at",
+    "description": "Blacklisted: col date"
+  },
+  "fork/blacklisted/col/url": {
+    "defaultMessage": "URL",
+    "description": "Blacklisted: col url"
+  },
+  "fork/blacklisted/empty": {
+    "defaultMessage": "No blacklisted chapters.",
+    "description": "Blacklisted view: empty"
+  },
+  "fork/blacklisted/filter": {
+    "defaultMessage": "Filter by series, chapter or URL",
+    "description": "Blacklisted: filter"
+  },
+  "fork/blacklisted/refresh": {
+    "defaultMessage": "Refresh",
+    "description": "Blacklisted: refresh"
+  },
+  "fork/blacklisted/remove": {
+    "defaultMessage": "Remove from blacklist",
+    "description": "Blacklisted: remove"
+  },
+  "fork/blacklisted/subtitle": {
+    "defaultMessage": "Chapters that were skipped or auto-blacklisted, grouped by series. Remove an entry to allow it to be downloaded again.",
+    "description": "Blacklisted view: subtitle"
+  },
+  "fork/blacklisted/title": {
+    "defaultMessage": "Blacklisted chapters",
+    "description": "Blacklisted view: title"
+  },
+  "fork/book/blacklist/confirm": {
+    "defaultMessage": "Blacklist & delete",
+    "description": "Book blacklist dialog: confirm"
+  },
+  "fork/book/blacklist/success": {
+    "defaultMessage": "Blacklisted and deleted: {book}",
+    "description": "Book blacklist: success"
+  },
+  "fork/book/blacklist/title": {
+    "defaultMessage": "Blacklist & delete",
+    "description": "Book blacklist dialog: title"
+  },
+  "fork/book/blacklist/warning": {
+    "defaultMessage": "This blacklists the chapter source URL (so it will not be downloaded again) and deletes the book files. This cannot be undone.",
+    "description": "Book blacklist dialog: warning"
+  },
+  "fork/dashboard/active": {
+    "defaultMessage": "Active downloads",
+    "description": "Download dashboard: active downloads section"
+  },
+  "fork/dashboard/active/empty": {
+    "defaultMessage": "Nothing downloading right now.",
+    "description": "Download dashboard: no active downloads"
+  },
+  "fork/dashboard/link/blacklisted": {
+    "defaultMessage": "Blacklisted",
+    "description": "Download dashboard: link blacklisted"
+  },
+  "fork/dashboard/link/discover": {
+    "defaultMessage": "Discover",
+    "description": "Download dashboard: link discover"
+  },
+  "fork/dashboard/link/followed": {
+    "defaultMessage": "Followed series",
+    "description": "Download dashboard: link followed"
+  },
+  "fork/dashboard/link/queue": {
+    "defaultMessage": "Queue",
+    "description": "Download dashboard: link queue"
+  },
+  "fork/dashboard/queue": {
+    "defaultMessage": "Full queue",
+    "description": "Download dashboard: open full queue"
+  },
+  "fork/dashboard/stat/active": {
+    "defaultMessage": "Downloading",
+    "description": "Download dashboard: stat active"
+  },
+  "fork/dashboard/stat/completed": {
+    "defaultMessage": "Completed",
+    "description": "Download dashboard: stat completed"
+  },
+  "fork/dashboard/stat/failed": {
+    "defaultMessage": "Failed",
+    "description": "Download dashboard: stat failed"
+  },
+  "fork/dashboard/stat/pending": {
+    "defaultMessage": "Pending",
+    "description": "Download dashboard: stat pending"
+  },
+  "fork/dashboard/title": {
+    "defaultMessage": "Download dashboard",
+    "description": "Download dashboard: page title"
+  },
+  "fork/discover/library": {
+    "defaultMessage": "Library",
+    "description": "Discover: library selector"
+  },
+  "fork/discover/noLibrary": {
+    "defaultMessage": "Select a library to download discovered series into.",
+    "description": "Discover view: no library"
+  },
+  "fork/discover/subtitle": {
+    "defaultMessage": "Search MangaDex and download or follow series into the selected library.",
+    "description": "Discover view: subtitle"
+  },
+  "fork/discover/title": {
+    "defaultMessage": "Discover on MangaDex",
+    "description": "Discover view: title"
+  },
+  "fork/downloads/action/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Downloads view: cancel action"
+  },
+  "fork/downloads/action/delete": {
+    "defaultMessage": "Delete",
+    "description": "Downloads view: delete action"
+  },
+  "fork/downloads/action/pause": {
+    "defaultMessage": "Pause",
+    "description": "Downloads view: pause action"
+  },
+  "fork/downloads/action/resume": {
+    "defaultMessage": "Resume",
+    "description": "Downloads view: resume action"
+  },
+  "fork/downloads/action/retry": {
+    "defaultMessage": "Retry",
+    "description": "Downloads view: retry action"
+  },
+  "fork/downloads/add": {
+    "defaultMessage": "Add download",
+    "description": "Downloads view: add download button"
+  },
+  "fork/downloads/cancelAllActive": {
+    "defaultMessage": "Cancel all",
+    "description": "Downloads view: cancel all active button"
+  },
+  "fork/downloads/clear": {
+    "defaultMessage": "Clear",
+    "description": "Downloads view: clear menu button"
+  },
+  "fork/downloads/clear/cancelled": {
+    "defaultMessage": "Clear cancelled",
+    "description": "Downloads view: clear cancelled"
+  },
+  "fork/downloads/clear/completed": {
+    "defaultMessage": "Clear completed",
+    "description": "Downloads view: clear completed"
+  },
+  "fork/downloads/clear/failed": {
+    "defaultMessage": "Clear failed",
+    "description": "Downloads view: clear failed"
+  },
+  "fork/downloads/clear/pending": {
+    "defaultMessage": "Clear pending",
+    "description": "Downloads view: clear pending"
+  },
+  "fork/downloads/dialog/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Downloads view: dialog cancel"
+  },
+  "fork/downloads/dialog/confirm": {
+    "defaultMessage": "Add",
+    "description": "Downloads view: dialog confirm"
+  },
+  "fork/downloads/dialog/title": {
+    "defaultMessage": "Add download",
+    "description": "Downloads view: add dialog title"
+  },
+  "fork/downloads/empty": {
+    "defaultMessage": "No downloads in the queue.",
+    "description": "Downloads view: empty state"
+  },
+  "fork/downloads/field/library": {
+    "defaultMessage": "Library (optional)",
+    "description": "Downloads view: library field"
+  },
+  "fork/downloads/field/priority": {
+    "defaultMessage": "Priority",
+    "description": "Downloads view: priority field"
+  },
+  "fork/downloads/field/url": {
+    "defaultMessage": "Source URL",
+    "description": "Downloads view: source URL field"
+  },
+  "fork/downloads/filter": {
+    "defaultMessage": "Filter by title or URL",
+    "description": "Downloads view: text filter"
+  },
+  "fork/downloads/folder": {
+    "defaultMessage": "Downloads folder",
+    "description": "Downloads view: default downloads folder label"
+  },
+  "fork/downloads/noMatch": {
+    "defaultMessage": "No downloads match the current filter.",
+    "description": "Downloads view: no filter match"
+  },
+  "fork/downloads/retryAllFailed": {
+    "defaultMessage": "Retry all failed",
+    "description": "Downloads view: retry all failed button"
+  },
+  "fork/downloads/tab/all": {
+    "defaultMessage": "All",
+    "description": "Downloads tab: all"
+  },
+  "fork/downloads/tab/cancelled": {
+    "defaultMessage": "Cancelled",
+    "description": "Downloads tab: cancelled"
+  },
+  "fork/downloads/tab/completed": {
+    "defaultMessage": "Completed",
+    "description": "Downloads tab: completed"
+  },
+  "fork/downloads/tab/downloading": {
+    "defaultMessage": "Downloading",
+    "description": "Downloads tab: downloading"
+  },
+  "fork/downloads/tab/failed": {
+    "defaultMessage": "Failed",
+    "description": "Downloads tab: failed"
+  },
+  "fork/downloads/tab/paused": {
+    "defaultMessage": "Paused",
+    "description": "Downloads tab: paused"
+  },
+  "fork/downloads/tab/pending": {
+    "defaultMessage": "Pending",
+    "description": "Downloads tab: pending"
+  },
+  "fork/downloads/title": {
+    "defaultMessage": "Downloads",
+    "description": "Downloads view: page title"
+  },
+  "fork/drawer/backup": {
+    "defaultMessage": "Backups",
+    "description": "Drawer menu for Server > Backups"
+  },
+  "fork/drawer/downloadsBlacklisted": {
+    "defaultMessage": "Blacklisted chapters",
+    "description": "Drawer menu for Downloads > Blacklisted"
+  },
+  "fork/drawer/downloadsDashboard": {
+    "defaultMessage": "Dashboard",
+    "description": "Drawer menu for Downloads > Dashboard"
+  },
+  "fork/drawer/downloadsDiscover": {
+    "defaultMessage": "Discover",
+    "description": "Drawer menu for Downloads > Discover"
+  },
+  "fork/drawer/downloadsFollowed": {
+    "defaultMessage": "Followed series",
+    "description": "Drawer menu for Downloads > Followed"
+  },
+  "fork/drawer/downloadsGroup": {
+    "defaultMessage": "Downloads",
+    "description": "Drawer menu for Downloads"
+  },
+  "fork/drawer/downloadsQueue": {
+    "defaultMessage": "Queue",
+    "description": "Drawer menu for Downloads > Queue"
+  },
+  "fork/drawer/fixes": {
+    "defaultMessage": "Maintenance & fixes",
+    "description": "Drawer menu for Server > Maintenance and fixes"
+  },
+  "fork/drawer/importTachiyomi": {
+    "defaultMessage": "Tachiyomi / Mihon",
+    "description": "Drawer menu for Import > Tachiyomi"
+  },
+  "fork/drawer/logs": {
+    "defaultMessage": "Logs",
+    "description": "Drawer menu for Server > Logs"
+  },
+  "fork/drawer/mediaIntegrity": {
+    "defaultMessage": "Media Integrity",
+    "description": "Drawer menu for Media > Media Integrity"
+  },
+  "fork/drawer/oversizedMedia": {
+    "defaultMessage": "Oversized Pages",
+    "description": "Drawer menu for Media > Oversized pages"
+  },
+  "fork/drawer/plugins": {
+    "defaultMessage": "Plugins",
+    "description": "Drawer menu for Server > Plugins"
+  },
+  "fork/fixes/automated": {
+    "defaultMessage": "Automated fixes",
+    "description": "Fixes view: automated section"
+  },
+  "fork/fixes/comic/description": {
+    "defaultMessage": "Re-generates ComicInfo.xml and series.json for every CBZ in the selected library from MangaDex metadata. Enable Force to overwrite existing ComicInfo.xml.",
+    "description": "Fixes view: comicinfo description"
+  },
+  "fork/fixes/comic/force": {
+    "defaultMessage": "Force (re-inject even if ComicInfo already exists)",
+    "description": "Fixes view: comicinfo force"
+  },
+  "fork/fixes/comic/result": {
+    "defaultMessage": "Repaired: {repaired} · Skipped: {skipped} · Processed: {processed}/{total}",
+    "description": "Fixes view: comicinfo result"
+  },
+  "fork/fixes/comic/title": {
+    "defaultMessage": "Re-inject ComicInfo.xml",
+    "description": "Fixes view: comicinfo title"
+  },
+  "fork/fixes/empty": {
+    "defaultMessage": "No automated maintenance actions available.",
+    "description": "Fixes view: none"
+  },
+  "fork/fixes/library": {
+    "defaultMessage": "Library",
+    "description": "Fixes view: library select"
+  },
+  "fork/fixes/run": {
+    "defaultMessage": "Run",
+    "description": "Fixes view: run button"
+  },
+  "fork/fixes/running": {
+    "defaultMessage": "Running in the background…",
+    "description": "Fixes view: running in background"
+  },
+  "fork/fixes/scan/description": {
+    "defaultMessage": "Finds tracked chapter URLs whose CBZ file is gone (orphans). Preview (dry-run) changes nothing. When Preview is off, orphaned entries whose source chapter still exists are removed so they can be re-downloaded; entries whose source is gone are kept.",
+    "description": "Fixes view: deleted-scan description"
+  },
+  "fork/fixes/scan/dryRun": {
+    "defaultMessage": "Preview (dry-run — no changes)",
+    "description": "Fixes view: deleted-scan dry-run"
+  },
+  "fork/fixes/scan/result": {
+    "defaultMessage": "{dryRun, select, 1 {Would remove} other {Removed}}: {removed} orphaned entries · Series scanned: {scanned}/{total}",
+    "description": "Fixes view: deleted-scan result"
+  },
+  "fork/fixes/scan/title": {
+    "defaultMessage": "Deleted-chapters scan",
+    "description": "Fixes view: deleted-scan title"
+  },
+  "fork/fixes/subtitle": {
+    "defaultMessage": "One-time maintenance actions. Long-running fixes keep running in the background — you can leave this page and come back for the result.",
+    "description": "Fixes view: subtitle"
+  },
+  "fork/fixes/title": {
+    "defaultMessage": "Maintenance & fixes",
+    "description": "Fixes view: title"
+  },
+  "fork/followSchedule/mode/fixedTime": {
+    "defaultMessage": "Fixed time",
+    "description": "Follow schedule mode: fixed time"
+  },
+  "fork/followSchedule/mode/interval": {
+    "defaultMessage": "Interval",
+    "description": "Follow schedule mode: interval"
+  },
+  "fork/followed/add": {
+    "defaultMessage": "Follow",
+    "description": "Followed: add button"
+  },
+  "fork/followed/check": {
+    "defaultMessage": "Check now",
+    "description": "Followed: check now"
+  },
+  "fork/followed/checkResult": {
+    "defaultMessage": "{count} chapters queued for download",
+    "description": "Followed: check result"
+  },
+  "fork/followed/empty": {
+    "defaultMessage": "No followed series in this library.",
+    "description": "Followed: empty"
+  },
+  "fork/followed/import": {
+    "defaultMessage": "Import follow.txt",
+    "description": "Followed: import follow.txt"
+  },
+  "fork/followed/library": {
+    "defaultMessage": "Library",
+    "description": "Followed: library selector"
+  },
+  "fork/followed/noLibrary": {
+    "defaultMessage": "Select a library to manage its followed series.",
+    "description": "Followed: no library"
+  },
+  "fork/followed/title": {
+    "defaultMessage": "Followed series",
+    "description": "Followed series view: title"
+  },
+  "fork/followed/unfollow": {
+    "defaultMessage": "Unfollow",
+    "description": "Followed: unfollow"
+  },
+  "fork/followed/url": {
+    "defaultMessage": "Series URL to follow",
+    "description": "Followed: add follow url"
+  },
+  "fork/history/viewKnownHashes": {
+    "defaultMessage": "View known page hashes",
+    "description": "History Table, deleted page: link to known page hashes"
+  },
+  "fork/import/tachiyomi/errorsList": {
+    "defaultMessage": "Errors ({count})",
+    "description": "Tachiyomi import: errors list"
+  },
+  "fork/import/tachiyomi/file": {
+    "defaultMessage": "Backup file (.proto.gz, .tachibk, .json)",
+    "description": "Tachiyomi import: file"
+  },
+  "fork/import/tachiyomi/import": {
+    "defaultMessage": "Import",
+    "description": "Tachiyomi import: import button"
+  },
+  "fork/import/tachiyomi/importedList": {
+    "defaultMessage": "Imported ({count})",
+    "description": "Tachiyomi import: imported list"
+  },
+  "fork/import/tachiyomi/library": {
+    "defaultMessage": "Target library",
+    "description": "Tachiyomi import: library"
+  },
+  "fork/import/tachiyomi/result": {
+    "defaultMessage": "Import result",
+    "description": "Tachiyomi import: result title"
+  },
+  "fork/import/tachiyomi/stat/errors": {
+    "defaultMessage": "Errors",
+    "description": "Tachiyomi import: errors"
+  },
+  "fork/import/tachiyomi/stat/imported": {
+    "defaultMessage": "Imported",
+    "description": "Tachiyomi import: imported"
+  },
+  "fork/import/tachiyomi/stat/mangadex": {
+    "defaultMessage": "MangaDex",
+    "description": "Tachiyomi import: mangadex"
+  },
+  "fork/import/tachiyomi/stat/skipped": {
+    "defaultMessage": "Skipped",
+    "description": "Tachiyomi import: skipped"
+  },
+  "fork/import/tachiyomi/stat/total": {
+    "defaultMessage": "In backup",
+    "description": "Tachiyomi import: total"
+  },
+  "fork/import/tachiyomi/subtitle": {
+    "defaultMessage": "Import the MangaDex series from a Tachiyomi/Mihon backup (.proto.gz, .tachibk or .json) into a library. They are added to that library's followed series.",
+    "description": "Tachiyomi import: subtitle"
+  },
+  "fork/import/tachiyomi/title": {
+    "defaultMessage": "Import Tachiyomi / Mihon backup",
+    "description": "Tachiyomi import: title"
+  },
+  "fork/library/chapterUrls/header": {
+    "defaultMessage": "Chapter URLs (fork)",
+    "description": "Form add/edit library: Metadata - section header for chapter URLs"
+  },
+  "fork/library/chapterUrls/label": {
+    "defaultMessage": "Track chapter source URLs (enables per-chapter re-download & blacklist)",
+    "description": "Form add/edit library: Metadata - import chapter URLs"
+  },
+  "fork/library/scanDeleted": {
+    "defaultMessage": "Scan deleted chapters",
+    "description": "Library menu: manage > scan deleted chapters"
+  },
+  "fork/library/scanDeleted/confirm": {
+    "defaultMessage": "Scan",
+    "description": "Library scan deleted chapters dialog: confirm"
+  },
+  "fork/library/scanDeleted/started": {
+    "defaultMessage": "Deleted-chapters scan started in the background",
+    "description": "Library scan deleted chapters: started"
+  },
+  "fork/library/scanDeleted/title": {
+    "defaultMessage": "Scan deleted chapters",
+    "description": "Library scan deleted chapters dialog: title"
+  },
+  "fork/library/scanDeleted/warning": {
+    "defaultMessage": "Finds tracked chapter URLs whose CBZ file is gone (orphans) and removes those whose source chapter still exists, so they can be re-downloaded. Runs in the background — follow progress under Server → Fixes. Only tracked URLs are removed, never files.",
+    "description": "Library scan deleted chapters dialog: warning"
+  },
+  "fork/library/sort/asc": {
+    "defaultMessage": "Ascending",
+    "description": "Library sort order: ascending"
+  },
+  "fork/library/sort/dateAdded": {
+    "defaultMessage": "Date added",
+    "description": "Library sort field: date added"
+  },
+  "fork/library/sort/dateUpdated": {
+    "defaultMessage": "Date updated",
+    "description": "Library sort field: date updated"
+  },
+  "fork/library/sort/desc": {
+    "defaultMessage": "Descending",
+    "description": "Library sort order: descending"
+  },
+  "fork/library/sort/field": {
+    "defaultMessage": "Sort by",
+    "description": "Form add/edit library: default book sort field"
+  },
+  "fork/library/sort/fileName": {
+    "defaultMessage": "File name",
+    "description": "Library sort field: file name"
+  },
+  "fork/library/sort/fileSize": {
+    "defaultMessage": "File size",
+    "description": "Library sort field: file size"
+  },
+  "fork/library/sort/header": {
+    "defaultMessage": "Default book sort (fork)",
+    "description": "Form add/edit library: Options - default book sort header"
+  },
+  "fork/library/sort/number": {
+    "defaultMessage": "Number",
+    "description": "Library sort field: number"
+  },
+  "fork/library/sort/order": {
+    "defaultMessage": "Order",
+    "description": "Form add/edit library: default book sort order"
+  },
+  "fork/library/sort/pageCount": {
+    "defaultMessage": "Page count",
+    "description": "Library sort field: page count"
+  },
+  "fork/library/sort/releaseDate": {
+    "defaultMessage": "Release date",
+    "description": "Library sort field: release date"
+  },
+  "fork/logs/download": {
+    "defaultMessage": "Download logs",
+    "description": "Logs view: download logs"
+  },
+  "fork/logs/filter": {
+    "defaultMessage": "Filter",
+    "description": "Logs view: filter field"
+  },
+  "fork/logs/level": {
+    "defaultMessage": "Level",
+    "description": "Logs view: log level"
+  },
+  "fork/logs/lines": {
+    "defaultMessage": "Lines",
+    "description": "Logs view: line count"
+  },
+  "fork/logs/live": {
+    "defaultMessage": "Live",
+    "description": "Logs view: live stream toggle"
+  },
+  "fork/logs/pause": {
+    "defaultMessage": "Pause",
+    "description": "Logs view: pause stream"
+  },
+  "fork/logs/streamError": {
+    "defaultMessage": "Live log stream disconnected",
+    "description": "Logs view: live stream disconnected error"
+  },
+  "fork/logs/title": {
+    "defaultMessage": "Logs",
+    "description": "Logs view: page title"
+  },
+  "fork/mangadex/close": {
+    "defaultMessage": "Close",
+    "description": "MangaDex search: close details dialog button"
+  },
+  "fork/mangadex/contentRating": {
+    "defaultMessage": "Content rating",
+    "description": "MangaDex search: content rating filter"
+  },
+  "fork/mangadex/download": {
+    "defaultMessage": "Download",
+    "description": "MangaDex search: download result"
+  },
+  "fork/mangadex/empty": {
+    "defaultMessage": "No results.",
+    "description": "MangaDex search: no results"
+  },
+  "fork/mangadex/follow": {
+    "defaultMessage": "Follow",
+    "description": "MangaDex search: follow result"
+  },
+  "fork/mangadex/followed": {
+    "defaultMessage": "Followed",
+    "description": "MangaDex search: already followed badge"
+  },
+  "fork/mangadex/hideFollowed": {
+    "defaultMessage": "Hide already followed",
+    "description": "MangaDex search: hide already followed toggle"
+  },
+  "fork/mangadex/mdfollow": {
+    "defaultMessage": "Follow on MangaDex",
+    "description": "MangaDex search: toggle follow on MangaDex account"
+  },
+  "fork/mangadex/noChapters": {
+    "defaultMessage": "No EN chapters",
+    "description": "MangaDex search: no downloadable chapters badge"
+  },
+  "fork/mangadex/noDescription": {
+    "defaultMessage": "No description available.",
+    "description": "MangaDex search: no description available in details dialog"
+  },
+  "fork/mangadex/onMd": {
+    "defaultMessage": "On MangaDex",
+    "description": "MangaDex search: on mangadex account badge"
+  },
+  "fork/mangadex/order": {
+    "defaultMessage": "Order by",
+    "description": "MangaDex search: order field"
+  },
+  "fork/mangadex/query": {
+    "defaultMessage": "Search MangaDex",
+    "description": "MangaDex search: query field"
+  },
+  "fork/mangadex/results": {
+    "defaultMessage": "results",
+    "description": "MangaDex search: results count suffix"
+  },
+  "fork/mangadex/search": {
+    "defaultMessage": "Search",
+    "description": "MangaDex search: search button"
+  },
+  "fork/mangadex/status": {
+    "defaultMessage": "Status",
+    "description": "MangaDex search: status filter"
+  },
+  "fork/mangadex/tags": {
+    "defaultMessage": "Tags",
+    "description": "MangaDex search: tags filter"
+  },
+  "fork/media/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Media analysis: cancel"
+  },
+  "fork/media/col/actions": {
+    "defaultMessage": "Actions",
+    "description": "Media analysis: col actions"
+  },
+  "fork/media/col/book": {
+    "defaultMessage": "Book",
+    "description": "Media analysis: col book"
+  },
+  "fork/media/col/comment": {
+    "defaultMessage": "Comment",
+    "description": "Media analysis: col comment"
+  },
+  "fork/media/col/ignored": {
+    "defaultMessage": "Ignored",
+    "description": "Media analysis: col ignored"
+  },
+  "fork/media/col/library": {
+    "defaultMessage": "Library",
+    "description": "Media analysis: col library"
+  },
+  "fork/media/col/size": {
+    "defaultMessage": "Size",
+    "description": "Media analysis: col size"
+  },
+  "fork/media/col/source": {
+    "defaultMessage": "Source",
+    "description": "Media analysis: col source"
+  },
+  "fork/media/col/status": {
+    "defaultMessage": "Status",
+    "description": "Media analysis: col status"
+  },
+  "fork/media/col/type": {
+    "defaultMessage": "Type",
+    "description": "Media analysis: col type"
+  },
+  "fork/media/corrupt": {
+    "defaultMessage": "Books with errors",
+    "description": "Media analysis: corrupt section"
+  },
+  "fork/media/delete": {
+    "defaultMessage": "Delete",
+    "description": "Media analysis: delete"
+  },
+  "fork/media/delete/body": {
+    "defaultMessage": "This removes the book files from disk and cannot be undone.",
+    "description": "Media analysis: delete confirm body"
+  },
+  "fork/media/delete/title": {
+    "defaultMessage": "Delete {count, plural, one {# file} other {# files}} from disk?",
+    "description": "Media analysis: delete confirm title"
+  },
+  "fork/media/deleteResult": {
+    "defaultMessage": "Queued {count} book(s) for deletion{failed, plural, =0 {} other { ({failed} failed)}}",
+    "description": "Media analysis: delete batch result"
+  },
+  "fork/media/deleteSelected": {
+    "defaultMessage": "Delete",
+    "description": "Media analysis: delete selected"
+  },
+  "fork/media/fixed": {
+    "defaultMessage": "fixed",
+    "description": "Media analysis: fixed count suffix"
+  },
+  "fork/media/flagged": {
+    "defaultMessage": "flagged",
+    "description": "Media analysis: flagged count suffix"
+  },
+  "fork/media/flaggedFiles": {
+    "defaultMessage": "files flagged with integrity issues",
+    "description": "Media analysis: flagged files idle"
+  },
+  "fork/media/ignoreSelected": {
+    "defaultMessage": "Ignore",
+    "description": "Media analysis: ignore selected"
+  },
+  "fork/media/integrity": {
+    "defaultMessage": "ZIP integrity",
+    "description": "Media analysis: integrity section"
+  },
+  "fork/media/libraries": {
+    "defaultMessage": "Libraries",
+    "description": "Media analysis: libraries filter"
+  },
+  "fork/media/noCorrupt": {
+    "defaultMessage": "No books with the selected status.",
+    "description": "Media analysis: no corrupt books"
+  },
+  "fork/media/noSinglePage": {
+    "defaultMessage": "No single-page chapters detected.",
+    "description": "Media analysis: no single-page books"
+  },
+  "fork/media/noSource": {
+    "defaultMessage": "No tracked chapter URL — repair unavailable",
+    "description": "Media analysis: no source url"
+  },
+  "fork/media/refresh": {
+    "defaultMessage": "Refresh",
+    "description": "Media analysis: refresh"
+  },
+  "fork/media/repair": {
+    "defaultMessage": "Repair flagged",
+    "description": "Media analysis: repair button"
+  },
+  "fork/media/repairFailed": {
+    "defaultMessage": "Re-download failed",
+    "description": "Media analysis: repair failed"
+  },
+  "fork/media/repairQueued": {
+    "defaultMessage": "Re-download queued",
+    "description": "Media analysis: repair queued"
+  },
+  "fork/media/repairResult": {
+    "defaultMessage": "Repair: {repaired} fixed · {stillSingle} still single-page · {sourceGone} source gone · {failed} failed",
+    "description": "Media analysis: repair batch result"
+  },
+  "fork/media/repairSelected": {
+    "defaultMessage": "Repair",
+    "description": "Media analysis: repair selected"
+  },
+  "fork/media/repairSingle": {
+    "defaultMessage": "Re-download chapter",
+    "description": "Media analysis: repair single-page (re-download)"
+  },
+  "fork/media/repairSourceGone": {
+    "defaultMessage": "Cannot re-download: the source chapter is gone or has no source URL",
+    "description": "Media analysis: repair source gone"
+  },
+  "fork/media/repairStillSingle": {
+    "defaultMessage": "Re-download finished but the book still has a single page",
+    "description": "Media analysis: repair still single page"
+  },
+  "fork/media/repairing": {
+    "defaultMessage": "Repairing",
+    "description": "Media analysis: repairing progress"
+  },
+  "fork/media/rescan": {
+    "defaultMessage": "Rescan",
+    "description": "Media analysis: rescan button"
+  },
+  "fork/media/showIgnored": {
+    "defaultMessage": "Show ignored",
+    "description": "Media analysis: show ignored"
+  },
+  "fork/media/singlePage": {
+    "defaultMessage": "Single-page chapters",
+    "description": "Media analysis: single-page section"
+  },
+  "fork/media/singlePage/hint": {
+    "defaultMessage": "Chapters whose archive contains only a single image. Repair re-downloads from the tracked chapter link and replaces the file only if the fresh download succeeds. Flip Ignore for the ones that are genuinely single-image.",
+    "description": "Media analysis: single-page hint"
+  },
+  "fork/media/status/error": {
+    "defaultMessage": "Error",
+    "description": "Media analysis: status error"
+  },
+  "fork/media/status/unsupported": {
+    "defaultMessage": "Unsupported",
+    "description": "Media analysis: status unsupported"
+  },
+  "fork/media/title": {
+    "defaultMessage": "Media integrity",
+    "description": "Media analysis view: title"
+  },
+  "fork/media/unavailable": {
+    "defaultMessage": "Unavailable",
+    "description": "Media analysis: unavailable"
+  },
+  "fork/media/verify": {
+    "defaultMessage": "Verify integrity",
+    "description": "Media analysis: verify button"
+  },
+  "fork/media/verifying": {
+    "defaultMessage": "Verifying",
+    "description": "Media analysis: verifying progress"
+  },
+  "fork/metasearch/applied": {
+    "defaultMessage": "Metadata applied",
+    "description": "Metadata search: metadata applied"
+  },
+  "fork/metasearch/empty": {
+    "defaultMessage": "No results.",
+    "description": "Metadata search: no results"
+  },
+  "fork/metasearch/noPlugins": {
+    "defaultMessage": "No metadata plugins enabled. Enable MangaDex or AniList in the plugin manager.",
+    "description": "Metadata search: no metadata plugins"
+  },
+  "fork/metasearch/provider": {
+    "defaultMessage": "Provider",
+    "description": "Metadata search: provider select"
+  },
+  "fork/metasearch/query": {
+    "defaultMessage": "Search title",
+    "description": "Metadata search: query field"
+  },
+  "fork/metasearch/search": {
+    "defaultMessage": "Search",
+    "description": "Metadata search: search button"
+  },
+  "fork/metasearch/title": {
+    "defaultMessage": "Search metadata online",
+    "description": "Metadata search dialog title"
+  },
+  "fork/oversized/action/delete": {
+    "defaultMessage": "Delete",
+    "description": "Oversized: delete action"
+  },
+  "fork/oversized/action/ignore": {
+    "defaultMessage": "Ignore",
+    "description": "Oversized: ignore action"
+  },
+  "fork/oversized/action/preview": {
+    "defaultMessage": "Preview",
+    "description": "Oversized: preview action"
+  },
+  "fork/oversized/action/split": {
+    "defaultMessage": "Split page",
+    "description": "Oversized: split action"
+  },
+  "fork/oversized/apply": {
+    "defaultMessage": "Search",
+    "description": "Oversized: apply filter"
+  },
+  "fork/oversized/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Oversized: cancel"
+  },
+  "fork/oversized/close": {
+    "defaultMessage": "Close",
+    "description": "Oversized: close"
+  },
+  "fork/oversized/col/book": {
+    "defaultMessage": "Book",
+    "description": "Oversized: col book"
+  },
+  "fork/oversized/col/dimensions": {
+    "defaultMessage": "Size (px)",
+    "description": "Oversized: col dimensions"
+  },
+  "fork/oversized/col/message": {
+    "defaultMessage": "Message",
+    "description": "Oversized: col message"
+  },
+  "fork/oversized/col/newPages": {
+    "defaultMessage": "New pages",
+    "description": "Oversized: col new pages"
+  },
+  "fork/oversized/col/page": {
+    "defaultMessage": "Page",
+    "description": "Oversized: col page"
+  },
+  "fork/oversized/col/pagesSplit": {
+    "defaultMessage": "Pages split",
+    "description": "Oversized: col pages split"
+  },
+  "fork/oversized/col/ratio": {
+    "defaultMessage": "Ratio",
+    "description": "Oversized: col ratio"
+  },
+  "fork/oversized/col/series": {
+    "defaultMessage": "Series",
+    "description": "Oversized: col series"
+  },
+  "fork/oversized/col/size": {
+    "defaultMessage": "File size",
+    "description": "Oversized: col file size"
+  },
+  "fork/oversized/col/splitInto": {
+    "defaultMessage": "Split into",
+    "description": "Oversized: col split into"
+  },
+  "fork/oversized/col/status": {
+    "defaultMessage": "Status",
+    "description": "Oversized: col status"
+  },
+  "fork/oversized/delete/body": {
+    "defaultMessage": "The selected pages are removed from their book archives. Page numbers of the following pages shift. This modifies your book files and cannot be undone.",
+    "description": "Oversized pages view: delete dialog body"
+  },
+  "fork/oversized/delete/title": {
+    "defaultMessage": "Delete {count, plural, one {# page} other {# pages}}?",
+    "description": "Oversized: delete dialog title"
+  },
+  "fork/oversized/deleteSelected": {
+    "defaultMessage": "Delete selected",
+    "description": "Oversized: delete selected"
+  },
+  "fork/oversized/deselectAll": {
+    "defaultMessage": "Deselect all",
+    "description": "Oversized: deselect all"
+  },
+  "fork/oversized/detect": {
+    "defaultMessage": "Detect ratio",
+    "description": "Oversized: detect ratio"
+  },
+  "fork/oversized/empty": {
+    "defaultMessage": "No oversized pages match the current filter.",
+    "description": "Oversized pages view: none found"
+  },
+  "fork/oversized/ignoreSelected": {
+    "defaultMessage": "Ignore selected",
+    "description": "Oversized: ignore selected"
+  },
+  "fork/oversized/includeIgnored": {
+    "defaultMessage": "Show ignored",
+    "description": "Oversized: include ignored"
+  },
+  "fork/oversized/info/tall": {
+    "defaultMessage": "Scan for tall pages (webtoon strips, long scrolling pages) and split them into multiple readable pages. Uses the height ÷ width ratio, so it works at any resolution.",
+    "description": "Oversized pages view: tall info"
+  },
+  "fork/oversized/info/wide": {
+    "defaultMessage": "Scan for wide pages (double pages combined in one image) and split them horizontally into single pages. Uses the width ÷ height ratio, so it works at any resolution.",
+    "description": "Oversized pages view: wide info"
+  },
+  "fork/oversized/mode": {
+    "defaultMessage": "Mode",
+    "description": "Oversized: mode select"
+  },
+  "fork/oversized/perPage": {
+    "defaultMessage": "Per page:",
+    "description": "Oversized: per page"
+  },
+  "fork/oversized/preset": {
+    "defaultMessage": "Preset",
+    "description": "Oversized: preset select"
+  },
+  "fork/oversized/refresh": {
+    "defaultMessage": "Refresh",
+    "description": "Oversized: refresh"
+  },
+  "fork/oversized/results/title": {
+    "defaultMessage": "Split results",
+    "description": "Oversized pages view: results dialog title"
+  },
+  "fork/oversized/search": {
+    "defaultMessage": "Filter by series or book",
+    "description": "Oversized: search"
+  },
+  "fork/oversized/selectAll": {
+    "defaultMessage": "Select all",
+    "description": "Oversized: select all"
+  },
+  "fork/oversized/sort/book": {
+    "defaultMessage": "Book",
+    "description": "Oversized: sort book"
+  },
+  "fork/oversized/sort/page": {
+    "defaultMessage": "Page",
+    "description": "Oversized: sort page"
+  },
+  "fork/oversized/sort/ratio": {
+    "defaultMessage": "Ratio",
+    "description": "Oversized: sort ratio"
+  },
+  "fork/oversized/sort/series": {
+    "defaultMessage": "Series",
+    "description": "Oversized: sort series"
+  },
+  "fork/oversized/sort/size": {
+    "defaultMessage": "Size",
+    "description": "Oversized: sort size"
+  },
+  "fork/oversized/sortDir": {
+    "defaultMessage": "Toggle sort direction",
+    "description": "Oversized: sort direction"
+  },
+  "fork/oversized/sortLabel": {
+    "defaultMessage": "Sort:",
+    "description": "Oversized: sort"
+  },
+  "fork/oversized/split": {
+    "defaultMessage": "Split ratio",
+    "description": "Oversized: split ratio"
+  },
+  "fork/oversized/splitAll": {
+    "defaultMessage": "Split all matching",
+    "description": "Oversized: split all button"
+  },
+  "fork/oversized/splitAll/body": {
+    "defaultMessage": "This rewrites the affected CBZ files (detect ratio {detect}:1, split ratio {split}:1). It runs in the background and cannot be undone.",
+    "description": "Oversized pages view: split all dialog body"
+  },
+  "fork/oversized/splitAll/confirm": {
+    "defaultMessage": "Split all",
+    "description": "Oversized pages view: confirm split all"
+  },
+  "fork/oversized/splitAll/running": {
+    "defaultMessage": "Split-all is running in the background…",
+    "description": "Oversized: split all running"
+  },
+  "fork/oversized/splitAll/started": {
+    "defaultMessage": "Splitting started in the background",
+    "description": "Oversized: split all started"
+  },
+  "fork/oversized/splitAll/title": {
+    "defaultMessage": "Split all matching pages?",
+    "description": "Oversized pages view: split all dialog title"
+  },
+  "fork/oversized/splitSelected": {
+    "defaultMessage": "Split selected",
+    "description": "Oversized: split selected"
+  },
+  "fork/oversized/title": {
+    "defaultMessage": "Oversized pages",
+    "description": "Oversized pages view: title"
+  },
+  "fork/plugins/builtin": {
+    "defaultMessage": "Built-in plugin (cannot be removed)",
+    "description": "Plugins view: built-in locked"
+  },
+  "fork/plugins/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Plugins view: cancel"
+  },
+  "fork/plugins/col/actions": {
+    "defaultMessage": "Actions",
+    "description": "Plugins view: column actions"
+  },
+  "fork/plugins/col/enabled": {
+    "defaultMessage": "Enabled",
+    "description": "Plugins view: column enabled"
+  },
+  "fork/plugins/col/name": {
+    "defaultMessage": "Plugin",
+    "description": "Plugins view: column name"
+  },
+  "fork/plugins/col/type": {
+    "defaultMessage": "Type",
+    "description": "Plugins view: column type"
+  },
+  "fork/plugins/col/version": {
+    "defaultMessage": "Version",
+    "description": "Plugins view: column version"
+  },
+  "fork/plugins/config/none": {
+    "defaultMessage": "This plugin has no editable configuration.",
+    "description": "Plugins view: no config"
+  },
+  "fork/plugins/config/save": {
+    "defaultMessage": "Save",
+    "description": "Plugins view: save config"
+  },
+  "fork/plugins/config/title": {
+    "defaultMessage": "Plugin configuration",
+    "description": "Plugins view: config dialog title"
+  },
+  "fork/plugins/configure": {
+    "defaultMessage": "Configure",
+    "description": "Plugins view: configure"
+  },
+  "fork/plugins/file": {
+    "defaultMessage": "Plugin JAR file",
+    "description": "Plugins view: file input"
+  },
+  "fork/plugins/install": {
+    "defaultMessage": "Install plugin",
+    "description": "Plugins view: install button"
+  },
+  "fork/plugins/install/confirm": {
+    "defaultMessage": "Install",
+    "description": "Plugins view: install confirm"
+  },
+  "fork/plugins/install/title": {
+    "defaultMessage": "Install plugin",
+    "description": "Plugins view: install dialog title"
+  },
+  "fork/plugins/installed": {
+    "defaultMessage": "Plugin installed",
+    "description": "Plugins view: installed confirmation"
+  },
+  "fork/plugins/or": {
+    "defaultMessage": "or install from URL",
+    "description": "Plugins view: or separator"
+  },
+  "fork/plugins/saved": {
+    "defaultMessage": "Configuration saved",
+    "description": "Plugins view: config saved"
+  },
+  "fork/plugins/title": {
+    "defaultMessage": "Plugins",
+    "description": "Plugins view: title"
+  },
+  "fork/plugins/uninstall": {
+    "defaultMessage": "Uninstall",
+    "description": "Plugins view: uninstall"
+  },
+  "fork/plugins/uninstall/body": {
+    "defaultMessage": "This removes the plugin JAR. This cannot be undone.",
+    "description": "Plugins view: uninstall dialog body"
+  },
+  "fork/plugins/uninstall/title": {
+    "defaultMessage": "Uninstall plugin?",
+    "description": "Plugins view: uninstall dialog title"
+  },
+  "fork/plugins/url": {
+    "defaultMessage": "Plugin URL",
+    "description": "Plugins view: url input"
+  },
+  "fork/schedule/checkTime": {
+    "defaultMessage": "Check time (HH:MM)",
+    "description": "Follow schedule: fixed check time"
+  },
+  "fork/schedule/enabled": {
+    "defaultMessage": "Automatic follow checks",
+    "description": "Follow schedule: enabled switch"
+  },
+  "fork/schedule/interval": {
+    "defaultMessage": "Every N hours",
+    "description": "Follow schedule: interval hours"
+  },
+  "fork/schedule/mode": {
+    "defaultMessage": "Schedule mode",
+    "description": "Follow schedule: mode select"
+  },
+  "fork/schedule/off": {
+    "defaultMessage": "off",
+    "description": "Follow schedule: plugin off"
+  },
+  "fork/schedule/on": {
+    "defaultMessage": "on",
+    "description": "Follow schedule: plugin on"
+  },
+  "fork/schedule/plugin-status": {
+    "defaultMessage": "MangaDex subscription: {state}",
+    "description": "Follow schedule: mangadex subscription plugin status"
+  },
+  "fork/schedule/save": {
+    "defaultMessage": "Save schedule",
+    "description": "Follow schedule: save button"
+  },
+  "fork/schedule/saved": {
+    "defaultMessage": "Schedule saved",
+    "description": "Follow schedule: saved confirmation"
+  },
+  "fork/schedule/sync": {
+    "defaultMessage": "Sync follows to MangaDex",
+    "description": "Follow schedule: sync to mangadex button"
+  },
+  "fork/schedule/synced": {
+    "defaultMessage": "Follows synced to MangaDex",
+    "description": "Follow schedule: synced confirmation"
+  },
+  "fork/seriesform/metasearch/empty": {
+    "defaultMessage": "No results.",
+    "description": "Series form metadata search: no results"
+  },
+  "fork/seriesform/metasearch/filled": {
+    "defaultMessage": "Fields filled from provider — review the tabs and Save to apply",
+    "description": "Series form metadata search: filled"
+  },
+  "fork/seriesform/metasearch/hint": {
+    "defaultMessage": "Search a metadata provider and pick a result to auto-fill the fields on the other tabs. Review them, then Save to apply.",
+    "description": "Series form metadata search: hint"
+  },
+  "fork/seriesform/metasearch/noPlugins": {
+    "defaultMessage": "No metadata plugins enabled. Enable MangaDex or AniList in the plugin manager.",
+    "description": "Series form metadata search: no plugins"
+  },
+  "fork/seriesform/metasearch/provider": {
+    "defaultMessage": "Provider",
+    "description": "Series form metadata search: provider"
+  },
+  "fork/seriesform/metasearch/query": {
+    "defaultMessage": "Search title",
+    "description": "Series form metadata search: query"
+  },
+  "fork/seriesform/metasearch/searchBtn": {
+    "defaultMessage": "Search",
+    "description": "Series form metadata search: search"
+  },
+  "fork/seriesform/tab/metadataSearch": {
+    "defaultMessage": "Metadata search",
+    "description": "Form edit series: Metadata search"
+  },
+  "fork/server/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Server settings: cancel"
+  },
+  "fork/server/cancelTasks": {
+    "defaultMessage": "Cancel all tasks",
+    "description": "Server settings: cancel all tasks button"
+  },
+  "fork/server/maintenance": {
+    "defaultMessage": "Server maintenance",
+    "description": "Server settings: maintenance section"
+  },
+  "fork/server/shutdown": {
+    "defaultMessage": "Shut down server",
+    "description": "Server settings: shutdown button"
+  },
+  "fork/server/shutdown/confirm": {
+    "defaultMessage": "The server will stop and must be restarted manually. Continue?",
+    "description": "Server settings: shutdown confirm"
+  },
+  "fork/server/shutdownStarted": {
+    "defaultMessage": "Server is shutting down",
+    "description": "Server settings: shutdown started"
+  },
+  "fork/server/tasksCancelled": {
+    "defaultMessage": "Task queue cleared",
+    "description": "Server settings: tasks cancelled"
+  },
+  "fork/sources/cancel": {
+    "defaultMessage": "Cancel",
+    "description": "Download sources: cancel"
+  },
+  "fork/sources/clear/body": {
+    "defaultMessage": "Removes all tracked chapter source URLs for this series. They will be re-tracked on the next download. This cannot be undone.",
+    "description": "Download sources: clear confirm body"
+  },
+  "fork/sources/clear/title": {
+    "defaultMessage": "Clear all tracked URLs?",
+    "description": "Download sources: clear confirm title"
+  },
+  "fork/sources/clearAll": {
+    "defaultMessage": "Clear all",
+    "description": "Download sources: clear all"
+  },
+  "fork/sources/delete": {
+    "defaultMessage": "Remove source URL",
+    "description": "Download sources: delete"
+  },
+  "fork/sources/empty": {
+    "defaultMessage": "No tracked chapter URLs for this series.",
+    "description": "Download sources: empty"
+  },
+  "fork/sources/hint": {
+    "defaultMessage": "Tracked chapter source URLs for this series (used for re-download & blacklist).",
+    "description": "Download sources: hint"
+  },
+  "fork/sources/title": {
+    "defaultMessage": "Download sources",
+    "description": "Download sources dialog title"
+  },
+  "fork/updates/baseVersion": {
+    "defaultMessage": "Base: {version}",
+    "description": "Updates: base version chip"
+  },
+  "fork/updates/fork/available": {
+    "defaultMessage": "A fork update is available",
+    "description": "Updates: fork available"
+  },
+  "fork/updates/fork/latest": {
+    "defaultMessage": "The latest fork version is installed",
+    "description": "Updates: fork latest"
+  },
+  "fork/updates/fork/none": {
+    "defaultMessage": "No fork releases found",
+    "description": "Updates: no fork releases"
+  },
+  "fork/updates/forkVersion": {
+    "defaultMessage": "Fork: {version}",
+    "description": "Updates: fork version chip"
+  },
+  "fork/updates/galleryDl/behind": {
+    "defaultMessage": "{count, plural, one {# commit behind} other {# commits behind}}",
+    "description": "Updates: gallery-dl behind"
+  },
+  "fork/updates/galleryDl/hint": {
+    "defaultMessage": "New commits are available on the fork.",
+    "description": "Updates: gallery-dl update hint"
+  },
+  "fork/updates/galleryDl/latest": {
+    "defaultMessage": "Up to date",
+    "description": "Updates: gallery-dl up to date"
+  },
+  "fork/updates/galleryDl/loading": {
+    "defaultMessage": "Loading gallery-dl-fork update info…",
+    "description": "Updates: gallery-dl loading"
+  },
+  "fork/updates/galleryDl/presetFork": {
+    "defaultMessage": "Fork (github)",
+    "description": "Updates: gallery-dl preset fork"
+  },
+  "fork/updates/galleryDl/presetOfficial": {
+    "defaultMessage": "Official (codeberg)",
+    "description": "Updates: gallery-dl preset official"
+  },
+  "fork/updates/galleryDl/running": {
+    "defaultMessage": "Installing and re-applying fork integration…",
+    "description": "Updates: gallery-dl update running"
+  },
+  "fork/updates/galleryDl/sha": {
+    "defaultMessage": "Installed SHA: {sha}",
+    "description": "Updates: installed sha"
+  },
+  "fork/updates/galleryDl/unknown": {
+    "defaultMessage": "Installed SHA unknown",
+    "description": "Updates: gallery-dl unknown"
+  },
+  "fork/updates/galleryDl/updateBtn": {
+    "defaultMessage": "Update",
+    "description": "Updates: gallery-dl update button"
+  },
+  "fork/updates/galleryDl/url": {
+    "defaultMessage": "gallery-dl URL (pip target)",
+    "description": "Updates: gallery-dl update url field"
+  },
+  "fork/updates/galleryDl/urlHint": {
+    "defaultMessage": "Install a gallery-dl distribution from a URL — the bundled Komga integration (komga/komgazip postprocessors, custom extractors, core patches) is automatically re-applied on top. Installs into the config dir; new downloads use it immediately, no restart needed.",
+    "description": "Updates: gallery-dl update from url hint"
+  },
+  "fork/updates/tab/fork": {
+    "defaultMessage": "Fork",
+    "description": "Updates: fork tab"
+  },
+  "fork/updates/tab/galleryDl": {
+    "defaultMessage": "gallery-dl-fork",
+    "description": "Updates: gallery-dl tab"
+  },
+  "fork/updates/tab/upstream": {
+    "defaultMessage": "Upstream (Komga)",
+    "description": "Updates: upstream tab"
+  },
+  "fork/updates/upstream/available": {
+    "defaultMessage": "Updates are available",
+    "description": "Updates: upstream available"
+  },
+  "fork/updates/upstream/latest": {
+    "defaultMessage": "The latest version of Komga is already installed",
+    "description": "Updates: upstream latest"
+  },
   "g+OQSw": {
     "defaultMessage": "reorder",
     "description": "Reorder library drawer: title"
@@ -2298,10 +4178,6 @@
   "gtEH1R": {
     "defaultMessage": "General",
     "description": "Form edit read list: General"
-  },
-  "gxZjIe": {
-    "defaultMessage": "Action",
-    "description": "Unknown Duplicate Page Table header: action"
   },
   "h6C8/l": {
     "defaultMessage": "General",
@@ -2339,13 +4215,13 @@
     "defaultMessage": "There might be a problem with your connection or your server.",
     "description": "Common message: an error happened while loading data, explanation"
   },
-  "hdoWGT": {
-    "defaultMessage": "Matches",
-    "description": "Unknown Duplicate Page Table header: match count"
-  },
   "hgiBeR": {
     "defaultMessage": "Latest activity",
     "description": "API Key table header: key latest activity"
+  },
+  "hkbgs/": {
+    "defaultMessage": "Add Custom Role",
+    "description": "Metadata edition: add role dialog title"
   },
   "hrh5Rn": {
     "defaultMessage": "Upgrade",
@@ -2427,9 +4303,17 @@
     "defaultMessage": "Analyze",
     "description": "Library analyze dialog: confirm button"
   },
+  "jYOsNC": {
+    "defaultMessage": "Unselected",
+    "description": "Poster filter: subheader for unselected section"
+  },
   "jeXb2z": {
     "defaultMessage": "Media type",
     "description": "Book info: media type"
+  },
+  "jm9oYh": {
+    "defaultMessage": "Any type",
+    "description": "Poster type - any type"
   },
   "jnjpZy": {
     "defaultMessage": "Local file",
@@ -2523,6 +4407,10 @@
     "defaultMessage": "Mark as",
     "description": "Unknown Duplicate Page: selection action button"
   },
+  "lFWPpj": {
+    "defaultMessage": "Add kind",
+    "description": "Metadata edition: add kind button"
+  },
   "lPZ5hy": {
     "defaultMessage": "Close",
     "description": "Reorder library drawer: close button"
@@ -2534,6 +4422,10 @@
   "laWvMU": {
     "defaultMessage": "Ok",
     "description": "Form add/edit library: General - root directory selection dialog confirmation button label"
+  },
+  "ldAVd7": {
+    "defaultMessage": "Read list",
+    "description": "Browsing context: read list"
   },
   "lkoTf7": {
     "defaultMessage": "CBR",
@@ -2579,10 +4471,6 @@
     "defaultMessage": "Activity",
     "description": "Task Indicator button: tooltip"
   },
-  "n1Ik+L": {
-    "defaultMessage": "Updates are available",
-    "description": "Updates view: banner shown at the top"
-  },
   "n4w2CE": {
     "defaultMessage": "Edit",
     "description": "Library menu: manage > edit"
@@ -2598,6 +4486,10 @@
   "nOcpr8": {
     "defaultMessage": "One shot",
     "description": "Import books table: book cell: one shot indicator"
+  },
+  "nWgSSS": {
+    "defaultMessage": "Collection",
+    "description": "Container chip, subtitle for collection"
   },
   "nXFVsQ": {
     "defaultMessage": "Compute hash for KOReader",
@@ -2663,9 +4555,9 @@
     "defaultMessage": "My Account",
     "description": "Drawer menu for My Account"
   },
-  "oyeyK/": {
-    "defaultMessage": "Thumbnail",
-    "description": "Unknown Duplicate Page Table header: thumbnail"
+  "pCBNlA": {
+    "defaultMessage": "Library",
+    "description": "Browsing context: library"
   },
   "pENCUD": {
     "defaultMessage": "Cancel",
@@ -2714,6 +4606,10 @@
   "qiZm6U": {
     "defaultMessage": "Unknown",
     "description": "Drawer menu for Media > Duplicate Pages > Unknown"
+  },
+  "qlImvg": {
+    "defaultMessage": "Restore to default",
+    "description": "Sort panel: restore icon tootlip"
   },
   "r/G7j0": {
     "defaultMessage": "Number",
@@ -2775,6 +4671,10 @@
     "defaultMessage": "{rating}+",
     "description": "Series view: age rating chip"
   },
+  "roy9ap": {
+    "defaultMessage": "Works only if a single OAuth2 provider is configured",
+    "description": "Server settings: checkbox to set automatic OAuth2 login - information tooltip"
+  },
   "rrF/Z2": {
     "defaultMessage": "Name",
     "description": "Import reading list: bottom bar: reading list name"
@@ -2802,6 +4702,10 @@
   "sGsWvI": {
     "defaultMessage": "Change password",
     "description": "User details screen: change password button"
+  },
+  "sMmke1": {
+    "defaultMessage": "Notable entities",
+    "description": "Filter panel sub-section: Notable entities"
   },
   "sNSGMQ": {
     "defaultMessage": "Drag and drop images here",
@@ -2842,6 +4746,10 @@
   "so1P5Y": {
     "defaultMessage": "Refresh book local artwork",
     "description": "Task name: RefreshBookLocalArtwork"
+  },
+  "sutqn3": {
+    "defaultMessage": "Custom kind...",
+    "description": "Metadata edition: add kind menu - custom kind"
   },
   "syF0Ap": {
     "defaultMessage": "Size",
@@ -2967,6 +4875,10 @@
     "defaultMessage": "Delete file",
     "description": "Book menu: manage > delete file"
   },
+  "viKuRl": {
+    "defaultMessage": "Poster",
+    "description": "Filter panel: Poster"
+  },
   "vkeTYG": {
     "defaultMessage": "Book import failed",
     "description": "Book imported notification: import failure: title"
@@ -2986,6 +4898,10 @@
   "w2K5yu": {
     "defaultMessage": "Read Lists",
     "description": "Library navigation: read lists"
+  },
+  "wESuod": {
+    "defaultMessage": "Unread",
+    "description": "Card subtitle: unread"
   },
   "wJaip6": {
     "defaultMessage": "Compute hash for files",
@@ -3087,6 +5003,10 @@
     "defaultMessage": "Details",
     "description": "Book picker dialog: series books table header: book details"
   },
+  "yxnX5k": {
+    "defaultMessage": "Hide login fields if OAuth2 is enabled",
+    "description": "Server settings: checkbox to hide login fields if OAuth2 is enabled"
+  },
   "yyAGH1": {
     "defaultMessage": "w: {width}, h: {height}",
     "description": "Page comparison: file dimensions"
@@ -3098,10 +5018,6 @@
   "z8b1Xe": {
     "defaultMessage": "Import from directory",
     "description": "Import books directory selection: directory text field label"
-  },
-  "zRDVnR": {
-    "defaultMessage": "Size",
-    "description": "Unknown Duplicate Page Table header: size"
   },
   "zWRhDm": {
     "defaultMessage": "Alternate titles",

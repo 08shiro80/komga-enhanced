@@ -8,9 +8,12 @@ import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
 import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.jooq.main.tables.records.DownloadQueueRecord
 import org.gotson.komga.language.toCurrentTimeZone
+import org.gotson.komga.language.toUTC
 import org.jooq.DSLContext
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 @Component
 class DownloadQueueDao(
@@ -126,8 +129,8 @@ class DownloadQueueDao(
         download.pluginId,
         download.metadataJson,
         download.createdBy,
-        download.startedDate,
-        download.completedDate,
+        download.startedDate?.toUTC(),
+        download.completedDate?.toUTC(),
         download.priority,
         download.retryCount,
         download.maxRetries,
@@ -151,13 +154,32 @@ class DownloadQueueDao(
       .set(dq.PLUGIN_ID, download.pluginId)
       .set(dq.METADATA_JSON, download.metadataJson)
       .set(dq.CREATED_BY, download.createdBy)
-      .set(dq.STARTED_DATE, download.startedDate)
-      .set(dq.COMPLETED_DATE, download.completedDate)
+      .set(dq.STARTED_DATE, download.startedDate?.toUTC())
+      .set(dq.COMPLETED_DATE, download.completedDate?.toUTC())
       .set(dq.PRIORITY, download.priority)
       .set(dq.RETRY_COUNT, download.retryCount)
       .set(dq.MAX_RETRIES, download.maxRetries)
-      .set(dq.LAST_MODIFIED_DATE, download.lastModifiedDate)
+      .set(dq.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z")))
       .where(dq.ID.eq(download.id))
+      .execute()
+  }
+
+  override fun updateProgressIfDownloading(
+    id: String,
+    progressPercent: Int,
+    currentChapter: Int?,
+    totalChapters: Int?,
+  ) {
+    var step =
+      dslRW
+        .update(dq)
+        .set(dq.PROGRESS_PERCENT, progressPercent)
+        .set(dq.CURRENT_CHAPTER, currentChapter)
+        .set(dq.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z")))
+    if (totalChapters != null) step = step.set(dq.TOTAL_CHAPTERS, totalChapters)
+    step
+      .where(dq.ID.eq(id))
+      .and(dq.STATUS.eq(DownloadStatus.DOWNLOADING.name))
       .execute()
   }
 

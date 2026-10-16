@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.gotson.komga.application.query.UnpagedSorted
 import org.gotson.komga.application.tasks.TaskEmitter
 import org.gotson.komga.domain.model.BookPageNumbered
 import org.gotson.komga.domain.model.PageHashKnown
@@ -70,8 +71,16 @@ class PageHashController(
   @GetMapping("/unknown")
   @PageableAsQueryParam
   fun getUnknownPageHashes(
+    @RequestParam(name = "unpaged", required = false) unpaged: Boolean = false,
     @Parameter(hidden = true) page: Pageable,
-  ): Page<PageHashUnknownDto> = pageHashRepository.findAllUnknown(page).map { it.toDto() }
+  ): Page<PageHashUnknownDto> {
+    val pageRequest =
+      if (unpaged)
+        UnpagedSorted(page.sort)
+      else
+        page
+    return pageHashRepository.findAllUnknown(pageRequest).map { it.toDto() }
+  }
 
   @Operation(summary = "List duplicate matches")
   @GetMapping("{pageHash}")

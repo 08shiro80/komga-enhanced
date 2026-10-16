@@ -9,7 +9,7 @@
     :quick-action-props="quickActionProps"
     :menu-icon="menuIcon"
     :menu-props="menuProps"
-    :card-to="`/readlist/${readList.id}`"
+    :card-to="linkTo"
     v-bind="props"
     :disable-selection="!isAdmin"
     @selection="(val, event) => emit('selection', val, event)"
@@ -34,6 +34,8 @@ import { useEditReadListDialog } from '@/composables/readlist/useEditReadListDia
 import type { ReadListDto } from '@/generated/openapi'
 import { useImageCacheStore } from '@/stores/image-cache'
 import { useBooks } from '@/composables/book/useBooks'
+import { BrowsingContextKey, formatBrowsingContextAsQueryParam } from '@/functions/browsing-context'
+import type { RouteLocationObject } from '@/types/route'
 
 const intl = useIntl()
 const cacheStore = useImageCacheStore()
@@ -52,7 +54,7 @@ const bottomSheet = ref(false)
 const title = computed<ItemCardTitle>(() => ({
   text: readList.name,
   lines: 2,
-  routerLink: `/readlist/${readList.id}`,
+  routerLink: linkTo.value,
 }))
 
 const lines = computed<ItemCardLine[]>(() => [
@@ -70,6 +72,13 @@ other {# books}
     ),
   },
 ])
+
+const context = inject(BrowsingContextKey, undefined)
+const linkTo = computed<RouteLocationObject>(() => ({
+  name: '/readlist/[id]',
+  params: { id: readList.id },
+  query: formatBrowsingContextAsQueryParam(toValue(context)),
+}))
 
 const { isAdmin, hasRole } = useCurrentUser()
 const quickActionIcon = computed(() => (isAdmin.value ? 'i-mdi:pencil' : undefined))

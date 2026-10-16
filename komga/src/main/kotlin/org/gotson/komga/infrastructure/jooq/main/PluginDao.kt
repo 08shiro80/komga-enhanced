@@ -7,9 +7,12 @@ import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
 import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.jooq.main.tables.records.PluginRecord
 import org.gotson.komga.language.toCurrentTimeZone
+import org.gotson.komga.language.toUTC
 import org.jooq.DSLContext
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 @Component
 class PluginDao(
@@ -84,7 +87,8 @@ class PluginDao(
       .set(p.SOURCE_URL, plugin.sourceUrl)
       .set(p.CONFIG_SCHEMA, plugin.configSchema)
       .set(p.DEPENDENCIES, plugin.dependencies)
-      .set(p.LAST_UPDATED, plugin.lastUpdated)
+      .set(p.LAST_UPDATED, plugin.lastUpdated.toUTC())
+      .set(p.LAST_MODIFIED_DATE, LocalDateTime.now(ZoneId.of("Z")))
       .where(p.ID.eq(plugin.id))
       .execute()
   }

@@ -62,6 +62,11 @@ export const commonMessages = {
     defaultMessage: 'Contributors',
     id: 'rkpCD1',
   }),
+  filterPanelNotableEntities: defineMessage({
+    description: 'Filter panel sub-section: Notable entities',
+    defaultMessage: 'Notable entities',
+    id: 'sMmke1',
+  }),
   filterPanelSort: defineMessage({
     description: 'Filter panel sub-section: Sort',
     defaultMessage: 'SORT',
@@ -101,6 +106,11 @@ export const commonMessages = {
     description: 'Filter panel: Tag',
     defaultMessage: 'Tag',
     id: 'NwK2Kv',
+  }),
+  filterPanelPoster: defineMessage({
+    description: 'Filter panel: Poster',
+    defaultMessage: 'Poster',
+    id: 'viKuRl',
   }),
   filterPanelPublisher: defineMessage({
     description: 'Filter panel: Publisher',
@@ -191,5 +201,40 @@ export const commonMessages = {
     description: 'Form edit series: General - language, error code',
     defaultMessage: 'Must be a valid BCP 47 language code',
     id: 'v3beFf',
+  }),
+  libraryPinned: defineMessage({
+    description: 'Library tab navigation: library selection: pinned',
+    defaultMessage: 'Pinned',
+    id: '1qIfds',
+  }),
+  libraryUnpinned: defineMessage({
+    description: 'Library tab navigation: library selection: unpinned',
+    defaultMessage: 'Unpinned',
+    id: '9oA9gw',
+  }),
+  libraryAll: defineMessage({
+    description: 'Library tab navigation: library selection: all',
+    defaultMessage: 'All',
+    id: '8/BXfN',
+  }),
+  containerChipSubTitleReadList: defineMessage({
+    description: 'Container chip, subtitle for read list',
+    defaultMessage: 'Read list',
+    id: 'Q7tJAG',
+  }),
+  containerChipSubTitleCollection: defineMessage({
+    description: 'Container chip, subtitle for collection',
+    defaultMessage: 'Collection',
+    id: 'nWgSSS',
+  }),
+  cardSubtitleNoReleaseDate:defineMessage({
+    description: 'Card subtitle: no release date',
+    defaultMessage: 'No release date',
+    id: '9mujmD',
+  }),
+  cardSubtitleUnread:defineMessage({
+    description: 'Card subtitle: unread',
+    defaultMessage: 'Unread',
+    id: 'wESuod',
   }),
 }

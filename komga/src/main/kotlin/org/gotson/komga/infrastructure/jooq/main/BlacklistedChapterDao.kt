@@ -2,7 +2,6 @@ package org.gotson.komga.infrastructure.jooq.main
 
 import org.gotson.komga.domain.model.BlacklistedChapter
 import org.gotson.komga.domain.persistence.BlacklistedChapterRepository
-import org.gotson.komga.language.toCurrentTimeZone
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.jooq.impl.DSL
@@ -47,6 +46,13 @@ class BlacklistedChapterDao(
       .orderBy(createdDateField.desc())
       .fetch()
       .map { it.toDomain() }
+
+  override fun findAllUrls(): Set<String> =
+    dslRO
+      .select(chapterUrlField)
+      .from(table)
+      .fetch(chapterUrlField)
+      .toSet()
 
   override fun existsByChapterUrl(url: String): Boolean =
     dslRO
@@ -107,19 +113,4 @@ class BlacklistedChapterDao(
       chapterTitle = get(chapterTitleField),
       createdDate = getTimestamp(createdDateField) ?: LocalDateTime.now(),
     )
-
-  private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
-    val raw = get(field.name) ?: return null
-    return when (raw) {
-      is LocalDateTime -> raw.toCurrentTimeZone()
-      is java.sql.Timestamp -> raw.toLocalDateTime()
-      is String ->
-        try {
-          LocalDateTime.parse(raw.replace(" ", "T").substringBefore("+"))
-        } catch (_: Exception) {
-          LocalDateTime.now()
-        }
-      else -> LocalDateTime.now()
-    }
-  }
 }

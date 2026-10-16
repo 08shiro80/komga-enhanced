@@ -55,6 +55,13 @@
             </v-card-text>
           </v-card>
         </div>
+        <v-pagination
+          v-if="totalBooks > options.itemsPerPage"
+          v-model="options.page"
+          :length="Math.ceil(totalBooks / options.itemsPerPage)"
+          :total-visible="5"
+          class="mt-2"
+        />
       </div>
     </div>
 
@@ -119,9 +126,13 @@ export default Vue.extend({
       totalBooks: 0,
       loading: true,
       options: {
+        page: 1,
         itemsPerPage: this.$store?.state?.persistedState?.dataTablePageSize || 20,
       } as any,
     }
+  },
+  mounted() {
+    if (this.$vuetify.breakpoint.smAndDown) this.loadBooks()
   },
   watch: {
     options: {
@@ -159,7 +170,7 @@ export default Vue.extend({
     async loadBooks() {
       this.loading = true
 
-      const {sortBy, sortDesc, page, itemsPerPage} = this.options
+      const {sortBy = [], sortDesc = [], page = 1, itemsPerPage = 20} = this.options
 
       const pageRequest = {
         page: page - 1,

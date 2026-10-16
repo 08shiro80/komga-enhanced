@@ -3,3 +3,5 @@ komga:
     file: "file:database?mode=memory"
   tasks-db:
     file: "file:tasks?mode=memory"
+  thumbnails-db:
+    file: "file:thumbnails?mode=memory"

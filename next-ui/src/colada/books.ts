@@ -5,7 +5,7 @@ import {
   useMutation,
 } from '@pinia/colada'
 import { PageRequest, type Sort, sortToString } from '@/types/PageRequest'
-import { entitiesChanged, entityChanged } from '@/colada/cache'
+import { clearBook, clearThumbnailBook } from '@/colada/cache'
 import { useAppStore } from '@/stores/app'
 import {
   type BookSearch,
@@ -24,6 +24,8 @@ import {
   komgaDeleteUserUploadedBookThumbnail,
   type BookMetadataUpdateDto,
   komgaGetBookPages,
+  komgaGetBookSiblingPrevious,
+  komgaGetBookSiblingNext,
 } from '@/generated/openapi'
 import { useImageCacheStore } from '@/stores/image-cache'
 import { STALE_TIME } from '@/types/time'
@@ -96,6 +98,26 @@ export const bookDetailQuery = defineQueryOptions(({ bookId }: { bookId: string 
   staleTime: STALE_TIME.LONG,
 }))
 
+export const bookPreviousInSeries = defineQueryOptions(({ bookId }: { bookId: string }) => ({
+  key: [...QUERY_KEYS_BOOKS.byId(bookId), 'series', 'previous'],
+  query: () =>
+    komgaGetBookSiblingPrevious({
+      path: {
+        bookId: bookId,
+      },
+    }),
+}))
+
+export const bookNextInSeries = defineQueryOptions(({ bookId }: { bookId: string }) => ({
+  key: [...QUERY_KEYS_BOOKS.byId(bookId), 'series', 'next'],
+  query: () =>
+    komgaGetBookSiblingNext({
+      path: {
+        bookId: bookId,
+      },
+    }),
+}))
+
 export const useRefreshMetadataBook = defineMutation(() =>
   useMutation({
     mutation: (bookId: string) =>
@@ -129,7 +151,7 @@ export const useMarkBookRead = defineMutation(() => {
         body: { completed: true },
       }),
     onSuccess: (data, bookId) => {
-      if (appStore.sseUnavailable) entityChanged(QUERY_KEYS_BOOKS.root, bookId)
+      if (appStore.sseUnavailable) clearBook(bookId)
     },
   })
 })
@@ -144,7 +166,7 @@ export const useMarkBookUnread = defineMutation(() => {
         },
       }),
     onSuccess: (data, bookId) => {
-      if (appStore.sseUnavailable) entityChanged(QUERY_KEYS_BOOKS.root, bookId)
+      if (appStore.sseUnavailable) clearBook(bookId)
     },
   })
 })
@@ -159,7 +181,7 @@ export const useDeleteBook = defineMutation(() => {
         },
       }),
     onSuccess: (data, bookId) => {
-      if (appStore.sseUnavailable) entityChanged(QUERY_KEYS_BOOKS.root, bookId)
+      if (appStore.sseUnavailable) clearBook(bookId)
     },
   })
 })
@@ -175,7 +197,7 @@ export const useUpdateBookMetadata = defineMutation(() => {
         body: metadata,
       }),
     onSuccess: (data, { bookId }) => {
-      if (appStore.sseUnavailable) entityChanged(QUERY_KEYS_BOOKS.root, bookId)
+      if (appStore.sseUnavailable) clearBook(bookId)
     },
   })
 })
@@ -209,7 +231,7 @@ export const useAddBookPoster = defineMutation(() => {
       }),
     onSuccess: (_data, { bookId }) => {
       if (appStore.sseUnavailable) {
-        entitiesChanged(QUERY_KEYS_BOOKS.posters(bookId))
+        clearThumbnailBook(bookId)
         cacheStore.bustCache(bookId)
       }
     },
@@ -229,7 +251,7 @@ export const useDeleteBookPoster = defineMutation(() => {
       }),
     onSuccess: (_data, { bookId }) => {
       if (appStore.sseUnavailable) {
-        entitiesChanged(QUERY_KEYS_BOOKS.posters(bookId))
+        clearThumbnailBook(bookId)
         cacheStore.bustCache(bookId)
       }
     },
@@ -249,7 +271,7 @@ export const useMarkBookPosterSelected = defineMutation(() => {
       }),
     onSuccess: (_data, { bookId }) => {
       if (appStore.sseUnavailable) {
-        entitiesChanged(QUERY_KEYS_BOOKS.posters(bookId))
+        clearThumbnailBook(bookId)
         cacheStore.bustCache(bookId)
       }
     },

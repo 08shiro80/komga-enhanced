@@ -82,6 +82,45 @@ class FixRegistry(
           ),
         isEnabled = { true },
       ),
+      Registration(
+        fix =
+          Fix(
+            id = "thumbnails-migrate",
+            title = "Externalize thumbnails → shrink main database",
+            description = "Moves existing book and duplicate-page thumbnail images out of the main database into the separate thumbnails database. New thumbnails already go there automatically. Safe to re-run and resumable; run the VACUUM fix afterwards to actually reclaim the freed space.",
+            icon = "mdi-database-arrow-right-outline",
+            endpoint = "/api/v1/maintenance/thumbnails/migrate",
+            method = "POST",
+            params = emptyList(),
+          ),
+        isEnabled = { true },
+      ),
+      Registration(
+        fix =
+          Fix(
+            id = "thumbnails-vacuum",
+            title = "Reclaim database space (VACUUM)",
+            description = "Compacts the main database to reclaim space freed by externalizing thumbnails. Takes an exclusive lock and can run for a while on large databases, and needs free disk space roughly equal to the database size. Run after migrating thumbnails.",
+            icon = "mdi-database-refresh-outline",
+            endpoint = "/api/v1/maintenance/thumbnails/vacuum",
+            method = "POST",
+            params = emptyList(),
+          ),
+        isEnabled = { true },
+      ),
+      Registration(
+        fix =
+          Fix(
+            id = "thumbnails-cleanup-orphans",
+            title = "Clean up orphaned thumbnails",
+            description = "Deletes externalized thumbnail images whose owning book or page-hash no longer exists in the main database. A safety net for the rare case a delete did not fully propagate across both databases.",
+            icon = "mdi-broom",
+            endpoint = "/api/v1/maintenance/thumbnails/cleanup-orphans",
+            method = "POST",
+            params = emptyList(),
+          ),
+        isEnabled = { true },
+      ),
     )
 
   fun findAll(): List<Fix> =

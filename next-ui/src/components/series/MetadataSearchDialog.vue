@@ -139,10 +139,11 @@ function search() {
 }
 
 async function apply(result: MetadataSearchResult) {
-  if (!selectedPlugin.value) return
+  const resultPluginId = searchParams.value?.pluginId
+  if (!resultPluginId) return
   applyingId.value = result.externalId
   try {
-    await applyMetadata({ seriesId: props.seriesId, pluginId: selectedPlugin.value, result })
+    await applyMetadata({ seriesId: props.seriesId, pluginId: resultPluginId, result })
     messagesStore.messages.push({ message: appliedMessage })
   } catch (e) {
     messagesStore.messages.push({ message: (e as Error).message, color: 'error' })

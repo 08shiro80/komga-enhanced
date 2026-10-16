@@ -2,6 +2,7 @@ package org.gotson.komga.interfaces.api.rest.dto
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.Pattern
 import java.time.LocalDateTime
 
 data class DownloadDto(
@@ -21,6 +22,7 @@ data class DownloadDto(
 )
 
 data class DownloadCreateDto(
+  @field:Pattern(regexp = "^https?://.+", message = "sourceUrl must be an http(s) URL")
   val sourceUrl: String,
   val title: String?,
   val libraryId: String?,
@@ -101,7 +103,9 @@ data class FollowDto(
 )
 
 data class FollowCreationDto(
-  @field:NotBlank val url: String,
+  @field:NotBlank
+  @field:Pattern(regexp = "^https?://.+", message = "url must be an http(s) URL")
+  val url: String,
   val title: String? = null,
   val seriesId: String? = null,
 )

@@ -17,6 +17,8 @@ interface FollowRepository {
 
   fun insert(follow: Follow)
 
+  fun insertAll(follows: Collection<Follow>)
+
   fun update(follow: Follow)
 
   fun delete(id: String)
@@ -27,8 +29,8 @@ interface FollowRepository {
 
   fun deleteAllByLibraryId(libraryId: String)
 
-  fun updateLastChecked(
-    id: String,
+  fun updateLastCheckedBatch(
+    ids: Collection<String>,
     checkedAt: LocalDateTime,
   )
 }

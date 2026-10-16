@@ -2,6 +2,7 @@ package org.gotson.komga.interfaces.api.rest
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
+import jakarta.annotation.PreDestroy
 import jakarta.validation.Valid
 import org.gotson.komga.domain.model.DuplicateNameException
 import org.gotson.komga.domain.model.EntryNotFoundException
@@ -65,6 +66,17 @@ class DownloadController(
   private val followService: FollowLifecycle,
   private val followScheduleLifecycle: FollowScheduleLifecycle,
 ) {
+  private val repairExecutor: ExecutorService =
+    Executors.newSingleThreadExecutor { r ->
+      Thread(r, "repair-comicinfo").apply { isDaemon = true }
+    }
+  private val repairProgress: AtomicReference<RepairProgress> = AtomicReference(RepairProgress.idle())
+
+  @PreDestroy
+  fun shutdownRepairExecutor() {
+    repairExecutor.shutdown()
+  }
+
   @GetMapping
   @Operation(summary = "List all downloads", tags = [TagNames.DOWNLOADS])
   fun getAllDownloads(): List<DownloadDto> =
@@ -181,6 +193,17 @@ class DownloadController(
     )
   }
 
+  @PostMapping("cancel/active")
+  @Operation(summary = "Cancel all active, pending and paused downloads", tags = [TagNames.DOWNLOADS])
+  fun cancelAllActiveDownloads(): ClearResultDto {
+    val count = downloadExecutor.cancelAllActive()
+    return ClearResultDto(
+      deletedCount = count,
+      status = "CANCELLED",
+      message = "Cancelled $count downloads",
+    )
+  }
+
   @PostMapping("{libraryId}/migrate-to-uuid")
   @Operation(summary = "Migrate title-based folders to UUID folder names", tags = [TagNames.DOWNLOADS])
   fun migrateToUuidFolders(
@@ -210,48 +233,46 @@ class DownloadController(
       throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Library path is not a directory")
     }
 
-    if (repairProgress.get().running) {
+    val current = repairProgress.get()
+    val claimed =
+      RepairProgress
+        .idle()
+        .copy(running = true, libraryId = libraryId, startedAt = Instant.now())
+    if (current.running || !repairProgress.compareAndSet(current, claimed)) {
       throw ResponseStatusException(HttpStatus.CONFLICT, "Re-inject ComicInfo already running for library ${repairProgress.get().libraryId}")
     }
 
     val uuidRegex = Regex("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
     val mangaDexDirs = mutableMapOf<String, MutableList<java.io.File>>()
 
-    libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { dir ->
-      if (uuidRegex.matches(dir.name)) {
-        mangaDexDirs.getOrPut(dir.name) { mutableListOf() }.add(dir)
-      } else {
-        val seriesJson = java.io.File(dir, "series.json")
-        if (seriesJson.exists()) {
-          try {
-            val content = seriesJson.readText()
-            val idMatch =
-              Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""").find(content)
-                ?: Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
-            if (idMatch != null) {
-              mangaDexDirs.getOrPut(idMatch.groupValues[1]) { mutableListOf() }.add(dir)
+    try {
+      libraryDir.listFiles()?.filter { it.isDirectory }?.forEach { dir ->
+        if (uuidRegex.matches(dir.name)) {
+          mangaDexDirs.getOrPut(dir.name) { mutableListOf() }.add(dir)
+        } else {
+          val seriesJson = java.io.File(dir, "series.json")
+          if (seriesJson.exists()) {
+            try {
+              val content = seriesJson.readText()
+              val idMatch =
+                Regex(""""comicid"\s*:\s*"([a-f0-9-]{36})"""").find(content)
+                  ?: Regex("""mangadex\.org/title/([a-f0-9-]{36})""").find(content)
+              if (idMatch != null) {
+                mangaDexDirs.getOrPut(idMatch.groupValues[1]) { mutableListOf() }.add(dir)
+              }
+            } catch (e: Exception) {
+              logger.warn(e) { "Failed to read series.json in ${dir.name}" }
             }
-          } catch (e: Exception) {
-            logger.warn(e) { "Failed to read series.json in ${dir.name}" }
           }
         }
       }
+    } catch (e: Exception) {
+      repairProgress.updateAndGet { it.copy(running = false, finishedAt = Instant.now()) }
+      throw e
     }
 
     val totalMangas = mangaDexDirs.size
-    repairProgress.set(
-      RepairProgress(
-        running = true,
-        libraryId = libraryId,
-        total = totalMangas,
-        processed = 0,
-        repaired = 0,
-        skipped = 0,
-        errors = emptyList(),
-        startedAt = Instant.now(),
-        finishedAt = null,
-      ),
-    )
+    repairProgress.updateAndGet { it.copy(total = totalMangas) }
 
     repairExecutor.submit {
       var repaired = 0
@@ -328,7 +349,12 @@ class DownloadController(
   @GetMapping("mangadex/follows")
   @Operation(summary = "Get the set of manga UUIDs followed on the user's MangaDex account", tags = [TagNames.DOWNLOADS])
   fun getMangaDexFollows(): Map<String, Any> {
-    val ids = mangaDexSubscriptionSyncer.getFollowedMangaIdsFromAccount()
+    val ids =
+      try {
+        mangaDexSubscriptionSyncer.getFollowedMangaIdsFromAccount()
+      } catch (e: org.gotson.komga.infrastructure.download.MangaDexApiException) {
+        throw ResponseStatusException(HttpStatus.BAD_GATEWAY, e.message)
+      }
     return mapOf("uuids" to ids)
   }
 
@@ -440,7 +466,7 @@ class DownloadController(
     @PathVariable libraryId: String,
     @Valid @RequestBody request: FollowBatchDeleteDto,
   ) {
-    followService.deleteBatch(request.ids)
+    followService.deleteBatch(request.ids, libraryId)
   }
 
   @DeleteMapping("follows/{libraryId}/{id}")
@@ -510,14 +536,6 @@ class DownloadController(
           checkTime = update.checkTime,
         ),
       ).toDto()
-  }
-
-  companion object {
-    private val repairExecutor: ExecutorService =
-      Executors.newSingleThreadExecutor { r ->
-        Thread(r, "repair-comicinfo").apply { isDaemon = true }
-      }
-    private val repairProgress: AtomicReference<RepairProgress> = AtomicReference(RepairProgress.idle())
   }
 }
 

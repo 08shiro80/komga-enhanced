@@ -10,6 +10,7 @@ import org.gotson.komga.domain.model.BookMetadataPatchCapability
 import org.gotson.komga.domain.model.BookWithMedia
 import org.gotson.komga.domain.model.Library
 import org.gotson.komga.domain.model.MetadataPatchTarget
+import org.gotson.komga.domain.model.NotableEntity
 import org.gotson.komga.domain.model.SeriesMetadata
 import org.gotson.komga.domain.model.SeriesMetadataPatch
 import org.gotson.komga.domain.model.WebLink
@@ -42,6 +43,7 @@ class ComicInfoProvider(
       BookMetadataPatchCapability.NUMBER_SORT,
       BookMetadataPatchCapability.RELEASE_DATE,
       BookMetadataPatchCapability.AUTHORS,
+      BookMetadataPatchCapability.NOTABLE_ENTITIES,
       BookMetadataPatchCapability.READ_LISTS,
       BookMetadataPatchCapability.LINKS,
     )
@@ -49,49 +51,68 @@ class ComicInfoProvider(
   override fun getBookMetadataFromBook(book: BookWithMedia): BookMetadataPatch? {
     getComicInfo(book)?.let { comicInfo ->
       val releaseDate =
-        comicInfo.year?.let {
+        comicInfo.year?.let { year ->
           try {
-            LocalDate.of(comicInfo.year!!, comicInfo.month ?: 1, comicInfo.day ?: 1)
+            LocalDate.of(year, comicInfo.month ?: 1, comicInfo.day ?: 1)
           } catch (_: java.time.DateTimeException) {
-            LocalDate.of(comicInfo.year!!, comicInfo.month ?: 1, 1)
+            try {
+              LocalDate.of(year, comicInfo.month ?: 1, 1)
+            } catch (_: java.time.DateTimeException) {
+              try {
+                LocalDate.of(year, 1, 1)
+              } catch (_: java.time.DateTimeException) {
+                null
+              }
+            }
           }
         }
 
-      val authors = mutableListOf<Author>()
-      comicInfo.writer?.splitWithRole("writer")?.let { authors += it }
-      comicInfo.penciller?.splitWithRole("penciller")?.let { authors += it }
-      comicInfo.inker?.splitWithRole("inker")?.let { authors += it }
-      comicInfo.colorist?.splitWithRole("colorist")?.let { authors += it }
-      comicInfo.letterer?.splitWithRole("letterer")?.let { authors += it }
-      comicInfo.coverArtist?.splitWithRole("cover")?.let { authors += it }
-      comicInfo.editor?.splitWithRole("editor")?.let { authors += it }
-      comicInfo.translator?.splitWithRole("translator")?.let { authors += it }
-
-      val readLists = mutableListOf<BookMetadataPatch.ReadListEntry>()
-      if (!comicInfo.alternateSeries.isNullOrBlank()) {
-        readLists.add(
-          BookMetadataPatch.ReadListEntry(
-            comicInfo.alternateSeries!!,
-            comicInfo.alternateNumber?.toIntOrNull(),
-          ),
-        )
-      }
-
-      comicInfo.storyArc?.let { value ->
-        // get list of arcs and corresponding number, split by `,`
-        val arcs = value.split(",").map { it.trim().ifBlank { null } }
-        val numbers = comicInfo.storyArcNumber?.split(",")?.map { it.trim().toIntOrNull() }
-
-        if (!numbers.isNullOrEmpty()) {
-          // if there is associated numbers, add each valid association as a read list entry
-          (arcs zip numbers).forEach { (arc, number) ->
-            if (arc != null && number != null) readLists.add(BookMetadataPatch.ReadListEntry(arc, number))
-          }
-        } else {
-          // if there is no numbers, only use the arcs name
-          readLists.addAll(arcs.filterNotNull().map { BookMetadataPatch.ReadListEntry(it) })
+      val authors =
+        buildList {
+          comicInfo.writer?.splitWithRole("writer")?.let { addAll(it) }
+          comicInfo.penciller?.splitWithRole("penciller")?.let { addAll(it) }
+          comicInfo.inker?.splitWithRole("inker")?.let { addAll(it) }
+          comicInfo.colorist?.splitWithRole("colorist")?.let { addAll(it) }
+          comicInfo.letterer?.splitWithRole("letterer")?.let { addAll(it) }
+          comicInfo.coverArtist?.splitWithRole("cover")?.let { addAll(it) }
+          comicInfo.editor?.splitWithRole("editor")?.let { addAll(it) }
+          comicInfo.translator?.splitWithRole("translator")?.let { addAll(it) }
         }
-      }
+
+      val notableEntities =
+        buildList {
+          comicInfo.locations?.splitWithKind("location")?.let { addAll(it) }
+          comicInfo.teams?.splitWithKind("team")?.let { addAll(it) }
+          comicInfo.characters?.splitWithKind("character")?.let { addAll(it) }
+        }
+
+      val readLists =
+        buildList {
+          if (!comicInfo.alternateSeries.isNullOrBlank()) {
+            add(
+              BookMetadataPatch.ReadListEntry(
+                comicInfo.alternateSeries!!,
+                comicInfo.alternateNumber?.toIntOrNull(),
+              ),
+            )
+          }
+
+          comicInfo.storyArc?.let { value ->
+            // get list of arcs and corresponding number, split by `,`
+            val arcs = value.split(",").map { it.trim().ifBlank { null } }
+            val numbers = comicInfo.storyArcNumber?.split(",")?.map { it.trim().toIntOrNull() }
+
+            if (!numbers.isNullOrEmpty()) {
+              // if there is associated numbers, add each valid association as a read list entry
+              (arcs zip numbers).forEach { (arc, number) ->
+                if (arc != null && number != null) add(BookMetadataPatch.ReadListEntry(arc, number))
+              }
+            } else {
+              // if there is no numbers, only use the arcs name
+              addAll(arcs.filterNotNull().map { BookMetadataPatch.ReadListEntry(it) })
+            }
+          }
+        }
 
       val links =
         comicInfo.web
@@ -117,6 +138,7 @@ class ComicInfoProvider(
         numberSort = comicInfo.number?.toFloatOrNull(),
         releaseDate = releaseDate,
         authors = authors.ifEmpty { null },
+        notableEntities = notableEntities.ifEmpty { null },
         readLists = readLists,
         links = links?.ifEmpty { null },
         tags = if (!tags.isNullOrEmpty()) tags.toSet() else null,
@@ -194,6 +216,11 @@ class ComicInfoProvider(
   private fun String.splitWithRole(role: String) =
     split(',').mapNotNull { it.trim().ifBlank { null } }.let { list ->
       if (list.isNotEmpty()) list.map { Author(it, role) } else null
+    }
+
+  private fun String.splitWithKind(kind: String) =
+    split(',').mapNotNull { it.trim().ifBlank { null } }.let { list ->
+      if (list.isNotEmpty()) list.map { NotableEntity(kind, it) } else null
     }
 }
 

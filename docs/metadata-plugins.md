@@ -25,30 +25,20 @@ Fetches metadata directly from MangaDex for downloaded manga.
 
 ### Configuration
 
+The MangaDex metadata plugin (ID `mangadex-metadata`) needs no per-plugin configuration — it fetches
+metadata automatically for series that carry a MangaDex URL/ID. The preferred title language follows the
+**gallery-dl Downloader** plugin's `default_language` setting (see [Download System Guide](downloads.md)).
+
+Plugins in general are configured through schema-driven endpoints; the request body is defined by each
+plugin's own `configSchema`, so it differs per plugin:
+
 ```bash
-curl -X PUT http://localhost:25600/api/v1/plugins/mangadex/config \
-  -H "Content-Type: application/json" \
-  -d '{
-    "enabled": true,
-    "preferredTitleLanguage": "en",
-    "fallbackLanguages": ["ja-ro", "ja"]
-  }'
+# read a plugin's config schema + current values
+curl http://localhost:25600/api/v1/plugins/{pluginId}/config
+# save config values
+curl -X POST http://localhost:25600/api/v1/plugins/{pluginId}/config \
+  -H "Content-Type: application/json" -d '{ "key": "value" }'
 ```
-
-### Language Options
-
-| Code | Language |
-|------|----------|
-| `en` | English |
-| `ja` | Japanese |
-| `ja-ro` | Japanese Romanized |
-| `ko` | Korean |
-| `ko-ro` | Korean Romanized |
-| `zh` | Chinese (Simplified) |
-| `zh-hk` | Chinese (Traditional) |
-| `es` | Spanish |
-| `fr` | French |
-| `de` | German |
 
 ### How It Works
 
@@ -90,23 +80,10 @@ Fetches metadata from AniList using GraphQL API.
 
 ### Configuration
 
-```bash
-curl -X PUT http://localhost:25600/api/v1/plugins/anilist/config \
-  -H "Content-Type: application/json" \
-  -d '{
-    "enabled": true,
-    "preferredTitleType": "english",
-    "fallbackTitleTypes": ["romaji", "native"]
-  }'
-```
-
-### Title Type Options
-
-| Type | Example |
-|------|---------|
-| `english` | "Attack on Titan" |
-| `romaji` | "Shingeki no Kyojin" |
-| `native` | "進撃の巨人" |
+AniList is an external plugin (ID `anilist-metadata`). Any configurable options it exposes are set
+through the generic schema-driven endpoint `GET`/`POST /api/v1/plugins/anilist-metadata/config` — the
+body shape is defined by the plugin's own `configSchema`. AniList provides English, Romaji and Native
+titles (e.g. "Attack on Titan" / "Shingeki no Kyojin" / "進撃の巨人").
 
 ### series.json Format
 
@@ -196,9 +173,8 @@ For downloaded manga, metadata sources are detected automatically:
 
 ### Wrong title language
 
-- Adjust `preferredTitleLanguage` setting
-- Add fallback languages
-- Check if preferred language exists on source
+- Set the preferred language via the gallery-dl Downloader's `default_language`
+- Check if the preferred language exists on the source
 
 ### API rate limits
 
@@ -206,10 +182,25 @@ For downloaded manga, metadata sources are detected automatically:
 - MangaDex: Automatic rate limiting
 - Reduce concurrent scans if hitting limits
 
-## Manual Refresh
+## Manual Metadata Apply
 
-Force metadata refresh for a series:
+Apply metadata from the configured providers to a series (this is what the **Series → Search Online
+Metadata** flow calls). The request body carries the selected match returned by the plugin search:
 
 ```bash
-curl -X POST http://localhost:25600/api/v1/series/{seriesId}/metadata/refresh
+curl -X POST http://localhost:25600/api/v1/plugins/apply-metadata/{seriesId} \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "mangadex",
+    "externalId": "a1c7c817-4e59-43b7-9365-09c5f56e5eb1",
+    "title": "Series Title",
+    "summary": "…",
+    "status": "ONGOING",
+    "genres": ["Action"],
+    "tags": ["Long Strip"]
+  }'
 ```
+
+The body is a resolved-metadata payload written to `series.json` (fields: `title`, `summary`,
+`publisher`, `ageRating`, `releaseDate`, `status`, `externalId`, `genres`, `tags`, `authors`,
+`alternativeTitles`, `provider` — all optional).

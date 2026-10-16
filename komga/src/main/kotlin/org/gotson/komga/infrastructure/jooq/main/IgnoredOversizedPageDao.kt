@@ -2,7 +2,6 @@ package org.gotson.komga.infrastructure.jooq.main
 
 import org.gotson.komga.domain.model.IgnoredOversizedPage
 import org.gotson.komga.domain.persistence.IgnoredOversizedPageRepository
-import org.gotson.komga.language.toCurrentTimeZone
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.jooq.impl.DSL
@@ -103,19 +102,4 @@ class IgnoredOversizedPageDao(
       mode = get(modeField)!!,
       createdDate = getTimestamp(createdDateField) ?: LocalDateTime.now(),
     )
-
-  private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
-    val raw = get(field.name) ?: return null
-    return when (raw) {
-      is LocalDateTime -> raw.toCurrentTimeZone()
-      is java.sql.Timestamp -> raw.toLocalDateTime()
-      is String ->
-        try {
-          LocalDateTime.parse(raw.replace(" ", "T").substringBefore("+"))
-        } catch (_: Exception) {
-          LocalDateTime.now()
-        }
-      else -> LocalDateTime.now()
-    }
-  }
 }

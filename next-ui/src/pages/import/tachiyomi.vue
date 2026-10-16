@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-1">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Tachiyomi import: title',
@@ -9,7 +9,7 @@
             id: 'fork/import/tachiyomi/title',
           })
         }}
-      </span>
+      </h1>
     </div>
     <p class="text-body-2 text-medium-emphasis mb-4">
       {{
@@ -167,11 +167,15 @@ const result = ref<TachiyomiImportResultDto | null>(null)
 
 const { mutateAsync: importTachiyomi, isLoading: importing } = useImportTachiyomi()
 
-watchEffect(() => {
-  if (!libraryId.value && libraryItems.value.length > 0) {
-    libraryId.value = libraryItems.value[0]?.value
-  }
-})
+watch(
+  libraryItems,
+  () => {
+    if (!libraryId.value && libraryItems.value.length > 0) {
+      libraryId.value = libraryItems.value[0]?.value
+    }
+  },
+  { immediate: true },
+)
 
 async function doImport() {
   if (!file.value || !libraryId.value) return
@@ -191,8 +195,8 @@ const statMangaDex = defineMessage({ description: 'Tachiyomi import: mangadex', 
 const statImported = defineMessage({ description: 'Tachiyomi import: imported', defaultMessage: 'Imported', id: 'fork/import/tachiyomi/stat/imported' })
 const statSkipped = defineMessage({ description: 'Tachiyomi import: skipped', defaultMessage: 'Skipped', id: 'fork/import/tachiyomi/stat/skipped' })
 const statErrors = defineMessage({ description: 'Tachiyomi import: errors', defaultMessage: 'Errors', id: 'fork/import/tachiyomi/stat/errors' })
-const importedTitle = defineMessage({ description: 'Tachiyomi import: imported list', defaultMessage: 'Imported ({count})', id: 'fork/import/tachiyomi/importedList' })
-const errorsTitle = defineMessage({ description: 'Tachiyomi import: errors list', defaultMessage: 'Errors ({count})', id: 'fork/import/tachiyomi/errorsList' })
+const importedTitle = defineMessage<{ count: number }>({ description: 'Tachiyomi import: imported list', defaultMessage: 'Imported ({count})', id: 'fork/import/tachiyomi/importedList' })
+const errorsTitle = defineMessage<{ count: number }>({ description: 'Tachiyomi import: errors list', defaultMessage: 'Errors ({count})', id: 'fork/import/tachiyomi/errorsList' })
 </script>
 
 <route lang="yaml">

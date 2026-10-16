@@ -93,16 +93,6 @@ export const vBookImportDto = v.object({
     upgradeBookId: v.optional(v.string())
 });
 
-export const vBookMetadataAggregationDto = v.object({
-    authors: v.array(vAuthorDto),
-    created: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
-    lastModified: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
-    releaseDate: v.optional(v.pipe(v.string(), v.isoDate(), v.transform((val: string): Date => new Date(val)))),
-    summary: v.string(),
-    summaryNumber: v.string(),
-    tags: v.array(v.string())
-});
-
 export const vChapterUrlBatchCheckResult = v.object({
     existingCount: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
     newCount: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
@@ -399,13 +389,18 @@ export const vIgnoreOversizedPagesRequestDto = v.object({
     pages: v.array(vIgnoredPageKeyDto)
 });
 
+export const vItemAuthorDto = v.object({
+    name: v.optional(v.string()),
+    url: v.optional(v.string())
+});
+
 export const vKomgaExtensionDto = v.object({
     read: v.boolean()
 });
 
 export const vItemDto = v.object({
     _komga: v.optional(vKomgaExtensionDto),
-    author: v.optional(vAuthorDto),
+    author: v.optional(vItemAuthorDto),
     content_html: v.optional(v.string()),
     date_modified: v.optional(v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val)))),
     id: v.string(),
@@ -530,6 +525,27 @@ export const vNewChaptersResponse = v.object({
     seriesId: v.string()
 });
 
+export const vNotableEntityDto = v.object({
+    kind: v.string(),
+    name: v.string()
+});
+
+export const vBookMetadataAggregationDto = v.object({
+    authors: v.array(vAuthorDto),
+    created: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
+    lastModified: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
+    notableEntities: v.array(vNotableEntityDto),
+    releaseDate: v.optional(v.pipe(v.string(), v.isoDate(), v.transform((val: string): Date => new Date(val)))),
+    summary: v.string(),
+    summaryNumber: v.string(),
+    tags: v.array(v.string())
+});
+
+export const vNotableEntityUpdateDto = v.object({
+    kind: v.pipe(v.string(), v.minLength(1)),
+    name: v.pipe(v.string(), v.minLength(1))
+});
+
 export const vOAuth2ClientDto = v.object({
     name: v.string(),
     registrationId: v.string()
@@ -588,6 +604,40 @@ export const vPageHashUnknownDto = v.object({
         v.string(),
         v.bigint()
     ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807')))
+});
+
+/**
+ * Paginated API response container
+ */
+export const vPageResponseNotableEntityDto = v.object({
+    content: v.array(vNotableEntityDto),
+    first: v.boolean(),
+    last: v.boolean(),
+    page: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
+    size: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
+    totalElements: v.pipe(v.union([
+        v.number(),
+        v.string(),
+        v.bigint()
+    ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807')),
+    totalPages: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))
+});
+
+/**
+ * Paginated API response container
+ */
+export const vPageResponseString = v.object({
+    content: v.array(v.string()),
+    first: v.boolean(),
+    last: v.boolean(),
+    page: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
+    size: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
+    totalElements: v.pipe(v.union([
+        v.number(),
+        v.string(),
+        v.bigint()
+    ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807')),
+    totalPages: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))
 });
 
 export const vParam = v.object({
@@ -852,6 +902,14 @@ export const vSearchConditionMediaProfile = v.object({
     mediaProfile: vSearchOperatorEqualityMediaProfile
 });
 
+export const vSearchOperatorEqualityNotableEntityMatch = v.intersect([v.union([vSearchOperatorIs, vSearchOperatorIsNot]), v.object({
+        operator: v.string()
+    })]);
+
+export const vSearchConditionNotableEntity = v.object({
+    notableEntity: vSearchOperatorEqualityNotableEntityMatch
+});
+
 export const vSearchOperatorEqualityPosterMatch = v.intersect([v.union([vSearchOperatorIs, vSearchOperatorIsNot]), v.object({
         operator: v.string()
     })]);
@@ -951,15 +1009,15 @@ export const vSearchConditionTitleSort = v.object({
 });
 
 export const vSettingMultiSourceInteger = v.object({
-    configurationSource: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
-    databaseSource: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
-    effectiveValue: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))
+    configurationSource: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))),
+    databaseSource: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))),
+    effectiveValue: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')))
 });
 
 export const vSettingMultiSourceString = v.object({
-    configurationSource: v.string(),
-    databaseSource: v.string(),
-    effectiveValue: v.string()
+    configurationSource: v.optional(v.string()),
+    databaseSource: v.optional(v.string()),
+    effectiveValue: v.optional(v.string())
 });
 
 export const vSharedLibrariesUpdateDto = v.object({
@@ -1344,6 +1402,11 @@ export const vThumbnailSeriesDto = v.object({
     width: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))
 });
 
+export const vTrackerCheckResultDto = v.object({
+    message: v.string(),
+    success: v.boolean()
+});
+
 export const vTransientBookDto = v.object({
     comment: v.string(),
     fileLastModified: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
@@ -1362,6 +1425,19 @@ export const vTransientBookDto = v.object({
     ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807')),
     status: v.string(),
     url: v.string()
+});
+
+export const vUserTrackerDto = v.object({
+    enabled: v.boolean(),
+    linked: v.boolean(),
+    secretsSet: v.array(v.string()),
+    settings: v.record(v.string(), v.string()),
+    tracker: v.string()
+});
+
+export const vUserTrackerUpdateDto = v.object({
+    enabled: v.optional(v.boolean()),
+    settings: v.optional(v.record(v.string(), v.string()))
 });
 
 export const vViolation = v.object({
@@ -1409,6 +1485,8 @@ export const vBookMetadataDto = v.object({
     lastModified: v.pipe(v.string(), v.isoTimestamp(), v.transform((val: string): Date => new Date(val))),
     links: v.array(vWebLinkDto),
     linksLock: v.boolean(),
+    notableEntities: v.array(vNotableEntityDto),
+    notableEntitiesLock: v.boolean(),
     number: v.string(),
     numberLock: v.boolean(),
     numberSort: v.number(),
@@ -1550,6 +1628,8 @@ export const vBookMetadataUpdateDto = v.object({
     isbnLock: v.optional(v.boolean()),
     links: v.optional(v.array(vWebLinkUpdateDto)),
     linksLock: v.optional(v.boolean()),
+    notableEntities: v.optional(v.array(vNotableEntityUpdateDto)),
+    notableEntitiesLock: v.optional(v.boolean()),
     number: v.optional(v.string()),
     numberLock: v.optional(v.boolean()),
     numberSort: v.optional(v.number()),
@@ -1919,25 +1999,26 @@ export const vThumbnailSizeEnum = v.picklist([
 ]);
 
 export const vSettingsDto = v.object({
-    deleteEmptyCollections: v.boolean(),
-    deleteEmptyReadLists: v.boolean(),
-    kepubifyPath: vSettingMultiSourceString,
+    deleteEmptyCollections: v.optional(v.boolean()),
+    deleteEmptyReadLists: v.optional(v.boolean()),
+    kepubifyPath: v.optional(vSettingMultiSourceString),
     koboPort: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))),
-    koboProxy: v.boolean(),
-    rememberMeDurationDays: v.pipe(v.union([
-        v.number(),
-        v.string(),
-        v.bigint()
-    ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807')),
-    serverContextPath: vSettingMultiSourceString,
-    serverPort: vSettingMultiSourceInteger,
-    taskPoolSize: v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647')),
-    thumbnailSize: vThumbnailSizeEnum,
+    koboProxy: v.optional(v.boolean()),
     maxUploadFileSizeBytes: v.optional(v.pipe(v.union([
         v.number(),
         v.string(),
         v.bigint()
-    ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807')))
+    ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807'))),
+    nextUiAsDefault: v.optional(v.boolean()),
+    rememberMeDurationDays: v.optional(v.pipe(v.union([
+        v.number(),
+        v.string(),
+        v.bigint()
+    ]), v.transform(x => BigInt(x)), v.minValue(BigInt('-9223372036854775808'), 'Invalid value: Expected int64 to be >= -9223372036854775808'), v.maxValue(BigInt('9223372036854775807'), 'Invalid value: Expected int64 to be <= 9223372036854775807'))),
+    serverContextPath: v.optional(vSettingMultiSourceString),
+    serverPort: v.optional(vSettingMultiSourceInteger),
+    taskPoolSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'))),
+    thumbnailSize: v.optional(vThumbnailSizeEnum)
 });
 
 /**
@@ -1949,6 +2030,7 @@ export const vSettingsUpdateDto = v.object({
     kepubifyPath: v.optional(v.string()),
     koboPort: v.optional(v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(65535))),
     koboProxy: v.optional(v.boolean()),
+    nextUiAsDefault: v.optional(v.boolean()),
     rememberMeDurationDays: v.optional(v.pipe(v.union([
         v.number(),
         v.string(),
@@ -4058,6 +4140,40 @@ export const vDeleteSyncPointsForCurrentUserResponse = v.void();
  */
 export const vEmptyTaskQueueResponse = v.pipe(v.number(), v.integer(), v.minValue(-2147483648, 'Invalid value: Expected int32 to be >= -2147483648'), v.maxValue(2147483647, 'Invalid value: Expected int32 to be <= 2147483647'));
 
+/**
+ * OK
+ */
+export const vGetTrackersResponse = v.array(vUserTrackerDto);
+
+export const vDeleteTrackerPath = v.object({
+    tracker: v.string()
+});
+
+/**
+ * No Content
+ */
+export const vDeleteTrackerResponse = v.void();
+
+export const vUpdateTrackerBody = vUserTrackerUpdateDto;
+
+export const vUpdateTrackerPath = v.object({
+    tracker: v.string()
+});
+
+/**
+ * No Content
+ */
+export const vUpdateTrackerResponse = v.void();
+
+export const vTestTrackerPath = v.object({
+    tracker: v.string()
+});
+
+/**
+ * OK
+ */
+export const vTestTrackerResponse = vTrackerCheckResultDto;
+
 export const vScanTransientBooksBody = vScanRequestDto;
 
 /**
@@ -4369,6 +4485,55 @@ export const vUpdatePasswordByUserIdPath = v.object({
  */
 export const vUpdatePasswordByUserIdResponse = v.void();
 
+export const vGetNotableEntitiesQuery = v.object({
+    search: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    library_id: v.optional(v.array(v.string())),
+    collection_id: v.optional(v.array(v.string())),
+    series_id: v.optional(v.array(v.string())),
+    readlist_id: v.optional(v.array(v.string())),
+    unpaged: v.optional(v.boolean()),
+    page: v.optional(v.pipe(v.number(), v.integer())),
+    size: v.optional(v.pipe(v.number(), v.integer()))
+});
+
+/**
+ * OK
+ */
+export const vGetNotableEntitiesResponse = vPageResponseNotableEntityDto;
+
+export const vGetNotableEntitiesKindsQuery = v.object({
+    library_id: v.optional(v.array(v.string())),
+    collection_id: v.optional(v.array(v.string())),
+    series_id: v.optional(v.array(v.string())),
+    readlist_id: v.optional(v.array(v.string())),
+    unpaged: v.optional(v.boolean()),
+    page: v.optional(v.pipe(v.number(), v.integer())),
+    size: v.optional(v.pipe(v.number(), v.integer()))
+});
+
+/**
+ * OK
+ */
+export const vGetNotableEntitiesKindsResponse = vPageResponseString;
+
+export const vGetNotableEntitiesNamesQuery = v.object({
+    search: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    library_id: v.optional(v.array(v.string())),
+    collection_id: v.optional(v.array(v.string())),
+    series_id: v.optional(v.array(v.string())),
+    readlist_id: v.optional(v.array(v.string())),
+    unpaged: v.optional(v.boolean()),
+    page: v.optional(v.pipe(v.number(), v.integer())),
+    size: v.optional(v.pipe(v.number(), v.integer()))
+});
+
+/**
+ * OK
+ */
+export const vGetNotableEntitiesNamesResponse = vPageResponseString;
+
 export const vBookSearch: v.GenericSchema = v.object({
     condition: v.optional(v.lazy(() => vSearchConditionBook)),
     fullTextSearch: v.optional(v.string())
@@ -4410,6 +4575,7 @@ export const vSearchConditionBook: v.GenericSchema = v.union([
     vSearchConditionMediaStatus,
     vSearchConditionMediaProfile,
     vSearchConditionAuthor,
+    vSearchConditionNotableEntity,
     vSearchConditionPoster
 ]);
 
@@ -4452,7 +4618,8 @@ export const vSearchConditionSeries: v.GenericSchema = v.union([
     vSearchConditionAgeRating,
     vSearchConditionReadStatus,
     vSearchConditionSeriesStatus,
-    vSearchConditionAuthor
+    vSearchConditionAuthor,
+    vSearchConditionNotableEntity
 ]);
 
 export const vSearchConditionSharingLabel: v.GenericSchema = v.object({

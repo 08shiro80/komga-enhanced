@@ -4,6 +4,13 @@
     :actions="actionsDefault"
     :manage-actions="actionsManagement"
     :activator="activator"
+    :sheet-title="
+      $formatMessage({
+        description: 'Libraries bottom sheet, subtitle',
+        defaultMessage: 'Libraries',
+        id: 'HaF+a6',
+      })
+    "
   />
 </template>
 
@@ -35,7 +42,3 @@ const actionsManagement = computed(() =>
     .toSorted(createOrderCompareFn(management, (it) => it.action.toString())),
 )
 </script>
-
-<script lang="ts"></script>
-
-<style scoped></style>

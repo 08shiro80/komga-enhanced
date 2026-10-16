@@ -381,8 +381,8 @@ async function runGalleryDlUpdate() {
   }
 }
 
-const baseVersionLabel = defineMessage({ description: 'Updates: base version chip', defaultMessage: 'Base: {version}', id: 'fork/updates/baseVersion' })
-const forkVersionLabel = defineMessage({ description: 'Updates: fork version chip', defaultMessage: 'Fork: {version}', id: 'fork/updates/forkVersion' })
+const baseVersionLabel = defineMessage<{ version: string }>({ description: 'Updates: base version chip', defaultMessage: 'Base: {version}', id: 'fork/updates/baseVersion' })
+const forkVersionLabel = defineMessage<{ version: string | undefined }>({ description: 'Updates: fork version chip', defaultMessage: 'Fork: {version}', id: 'fork/updates/forkVersion' })
 const tabUpstreamLabel = defineMessage({ description: 'Updates: upstream tab', defaultMessage: 'Upstream (Komga)', id: 'fork/updates/tab/upstream' })
 const tabForkLabel = defineMessage({ description: 'Updates: fork tab', defaultMessage: 'Fork', id: 'fork/updates/tab/fork' })
 const tabGalleryDlLabel = defineMessage({ description: 'Updates: gallery-dl tab', defaultMessage: 'gallery-dl-fork', id: 'fork/updates/tab/galleryDl' })
@@ -393,9 +393,9 @@ const forkAvailableLabel = defineMessage({ description: 'Updates: fork available
 const forkLatestLabel = defineMessage({ description: 'Updates: fork latest', defaultMessage: 'The latest fork version is installed', id: 'fork/updates/fork/latest' })
 const galleryDlLoadingLabel = defineMessage({ description: 'Updates: gallery-dl loading', defaultMessage: 'Loading gallery-dl-fork update info…', id: 'fork/updates/galleryDl/loading' })
 const galleryDlLatestLabel = defineMessage({ description: 'Updates: gallery-dl up to date', defaultMessage: 'Up to date', id: 'fork/updates/galleryDl/latest' })
-const galleryDlBehindLabel = defineMessage({ description: 'Updates: gallery-dl behind', defaultMessage: '{count, plural, one {# commit behind} other {# commits behind}}', id: 'fork/updates/galleryDl/behind' })
+const galleryDlBehindLabel = defineMessage<{ count: number }>({ description: 'Updates: gallery-dl behind', defaultMessage: '{count, plural, one {# commit behind} other {# commits behind}}', id: 'fork/updates/galleryDl/behind' })
 const galleryDlUnknownLabel = defineMessage({ description: 'Updates: gallery-dl unknown', defaultMessage: 'Installed SHA unknown', id: 'fork/updates/galleryDl/unknown' })
-const installedShaLabel = defineMessage({ description: 'Updates: installed sha', defaultMessage: 'Installed SHA: {sha}', id: 'fork/updates/galleryDl/sha' })
+const installedShaLabel = defineMessage<{ sha: string }>({ description: 'Updates: installed sha', defaultMessage: 'Installed SHA: {sha}', id: 'fork/updates/galleryDl/sha' })
 const galleryDlUpdateHintLabel = defineMessage({ description: 'Updates: gallery-dl update hint', defaultMessage: 'New commits are available on the fork.', id: 'fork/updates/galleryDl/hint' })
 const updateFromUrlHint = defineMessage({ description: 'Updates: gallery-dl update from url hint', defaultMessage: 'Install a gallery-dl distribution from a URL — the bundled Komga integration (komga/komgazip postprocessors, custom extractors, core patches) is automatically re-applied on top. Installs into the config dir; new downloads use it immediately, no restart needed.', id: 'fork/updates/galleryDl/urlHint' })
 const updateUrlLabel = defineMessage({ description: 'Updates: gallery-dl update url field', defaultMessage: 'gallery-dl URL (pip target)', id: 'fork/updates/galleryDl/url' })

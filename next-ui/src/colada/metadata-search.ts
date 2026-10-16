@@ -54,7 +54,9 @@ export const useApplyMetadataFromResult = defineMutation(() => {
       await komgaApplyMetadata({ path: { seriesId }, body })
       if (md.coverUrl) await komgaApplyCover({ path: { seriesId }, body: { coverUrl: md.coverUrl } })
     },
-    onSuccess: (_data, { seriesId }) =>
-      void queryCache.invalidateQueries({ key: QUERY_KEYS_SERIES.byId(seriesId) }),
+    onSuccess: (_data, { seriesId }) => {
+      void queryCache.invalidateQueries({ key: QUERY_KEYS_SERIES.byId(seriesId) })
+      void queryCache.invalidateQueries({ key: QUERY_KEYS_SERIES.posters(seriesId) })
+    },
   })
 })

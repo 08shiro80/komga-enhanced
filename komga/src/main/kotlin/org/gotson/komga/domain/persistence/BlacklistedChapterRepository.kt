@@ -9,6 +9,8 @@ interface BlacklistedChapterRepository {
 
   fun findAll(): Collection<BlacklistedChapter>
 
+  fun findAllUrls(): Set<String>
+
   fun existsByChapterUrl(url: String): Boolean
 
   fun insert(blacklistedChapter: BlacklistedChapter)

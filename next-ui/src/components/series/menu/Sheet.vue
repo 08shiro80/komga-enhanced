@@ -5,6 +5,13 @@
     :manage-actions="actionsManagement"
     :activator="activator"
     :sheet-title="series.metadata.title"
+    :sheet-subtitle="
+      $formatMessage({
+        description: 'Series bottom sheet, subtitle',
+        defaultMessage: 'Series',
+        id: 'Gwmnm6',
+      })
+    "
   />
 </template>
 
@@ -74,7 +81,3 @@ const actionsManagement = computed(() =>
     .toSorted(createOrderCompareFn(management, (it) => it.action.toString())),
 )
 </script>
-
-<script lang="ts"></script>
-
-<style scoped></style>

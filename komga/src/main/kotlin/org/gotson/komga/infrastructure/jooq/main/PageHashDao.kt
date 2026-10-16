@@ -1,11 +1,13 @@
 package org.gotson.komga.infrastructure.jooq.main
 
+import org.gotson.komga.application.query.isEmpty
 import org.gotson.komga.domain.model.BookPageNumbered
 import org.gotson.komga.domain.model.PageHashKnown
 import org.gotson.komga.domain.model.PageHashMatch
 import org.gotson.komga.domain.model.PageHashUnknown
 import org.gotson.komga.domain.persistence.PageHashRepository
 import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
+import org.gotson.komga.infrastructure.jooq.ThumbnailDataStore
 import org.gotson.komga.infrastructure.jooq.toOrderBy
 import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.jooq.main.tables.records.PageHashRecord
@@ -28,6 +30,7 @@ import java.time.ZoneId
 class PageHashDao(
   dslRW: DSLContext,
   @Qualifier("dslContextRO") dslRO: DSLContext,
+  private val thumbnailDataStore: ThumbnailDataStore,
 ) : SplitDslDaoBase(dslRW, dslRO),
   PageHashRepository {
   private val p = Tables.MEDIA_PAGE
@@ -63,6 +66,17 @@ class PageHashDao(
       "seriesTitle" to DSL.field("seriesTitle"),
     )
 
+  private val sortsMatches =
+    mapOf(
+      "hash" to p.FILE_HASH,
+      "fileSize" to p.FILE_SIZE,
+      "size" to p.FILE_SIZE,
+      "url" to b.URL,
+      "bookId" to b.ID,
+      "pageNumber" to p.NUMBER,
+      "fileName" to p.FILE_NAME,
+    )
+
   override fun findKnown(pageHash: String): PageHashKnown? =
     dslRO
       .selectFrom(ph)
@@ -83,15 +97,19 @@ class PageHashDao(
         .apply { actions?.let { where(ph.ACTION.`in`(actions)) } }
         .groupBy(*ph.fields())
 
-    val count = dslRO.fetchCount(query)
-
     val orderBy = pageable.sort.toOrderBy(sortsKnown)
+
     val items =
-      query
-        .orderBy(orderBy)
-        .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
-        .fetch()
-        .map { it.into(ph).toDomain(it.get("count", Int::class.java)) }
+      if (pageable.isEmpty())
+        emptyList()
+      else
+        query
+          .orderBy(orderBy)
+          .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+          .fetch()
+          .map { it.into(ph).toDomain(it.get("count", Int::class.java)) }
+
+    val count = if (pageable.isUnpaged) items.size else dslRO.fetchCount(query)
 
     val pageSort = if (orderBy.isNotEmpty()) pageable.sort else Sort.unsorted()
     return PageImpl(
@@ -130,21 +148,25 @@ class PageHashDao(
         ).groupBy(p.FILE_HASH)
         .having(DSL.count(p.BOOK_ID).gt(1))
 
-    val count = dslRO.fetchCount(query)
-
     val orderBy = pageable.sort.toOrderBy(sortsUnknown)
+
     val items =
-      query
-        .orderBy(orderBy)
-        .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
-        .fetch {
-          PageHashUnknown(
-            it.value1(),
-            it.value2(),
-            it.value3(),
-            it.get("seriesTitle", String::class.java),
-          )
-        }
+      if (pageable.isEmpty())
+        emptyList()
+      else
+        query
+          .orderBy(orderBy)
+          .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+          .fetch {
+            PageHashUnknown(
+              it.value1(),
+              it.value2(),
+              it.value3(),
+              it.get("seriesTitle", String::class.java),
+            )
+          }
+
+    val count = if (pageable.isUnpaged) items.size else dslRO.fetchCount(query)
 
     val pageSort = if (orderBy.isNotEmpty()) pageable.sort else Sort.unsorted()
     return PageImpl(
@@ -169,23 +191,27 @@ class PageHashDao(
         .on(p.BOOK_ID.eq(b.ID))
         .where(p.FILE_HASH.eq(pageHash))
 
-    val count = dslRO.fetchCount(query)
+    val orderBy = pageable.sort.toOrderBy(sortsMatches)
 
-    val orderBy = pageable.sort.toOrderBy(sortsUnknown)
     val items =
-      query
-        .orderBy(orderBy)
-        .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
-        .fetch {
-          PageHashMatch(
-            bookId = it.value1(),
-            url = java.net.URI(it.value2()).toURL(),
-            pageNumber = it.value3() + 1,
-            fileName = it.value4(),
-            fileSize = it.value5(),
-            mediaType = it.value6(),
-          )
-        }
+      if (pageable.isEmpty())
+        emptyList()
+      else
+        query
+          .orderBy(orderBy)
+          .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+          .fetch {
+            PageHashMatch(
+              bookId = it.value1(),
+              url = java.net.URI(it.value2()).toURL(),
+              pageNumber = it.value3() + 1,
+              fileName = it.value4(),
+              fileSize = it.value5(),
+              mediaType = it.value6(),
+            )
+          }
+
+    val count = if (pageable.isUnpaged) items.size else dslRO.fetchCount(query)
 
     val pageSort = if (orderBy.isNotEmpty()) pageable.sort else Sort.unsorted()
     return PageImpl(
@@ -223,12 +249,13 @@ class PageHashDao(
       .fold(emptyList()) { acc, (_, new) -> acc + new }
 
   override fun getKnownThumbnail(pageHash: String): ByteArray? =
-    dslRO
-      .select(pht.THUMBNAIL)
-      .from(pht)
-      .where(pht.HASH.eq(pageHash))
-      .fetchOne()
-      ?.value1()
+    thumbnailDataStore.getPageHashThumbnail(pageHash)
+      ?: dslRO
+        .select(pht.THUMBNAIL)
+        .from(pht)
+        .where(pht.HASH.eq(pageHash))
+        .fetchOne()
+        ?.value1()
 
   @Transactional
   override fun insert(
@@ -243,11 +270,7 @@ class PageHashDao(
       .execute()
 
     if (thumbnail != null) {
-      dslRW
-        .insertInto(pht)
-        .set(pht.HASH, pageHash.hash)
-        .set(pht.THUMBNAIL, thumbnail)
-        .execute()
+      thumbnailDataStore.putPageHashThumbnail(pageHash.hash, thumbnail)
     }
   }
 
@@ -266,12 +289,14 @@ class PageHashDao(
   override fun deleteKnown(pageHash: String) {
     dslRW.deleteFrom(pht).where(pht.HASH.eq(pageHash)).execute()
     dslRW.deleteFrom(ph).where(ph.HASH.eq(pageHash)).execute()
+    thumbnailDataStore.deletePageHashThumbnail(pageHash)
   }
 
   @Transactional
   override fun deleteAllKnown() {
     dslRW.deleteFrom(pht).execute()
     dslRW.deleteFrom(ph).execute()
+    thumbnailDataStore.deleteAllPageHashThumbnails()
   }
 }
 

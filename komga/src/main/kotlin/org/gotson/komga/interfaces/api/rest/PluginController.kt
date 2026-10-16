@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
 import java.io.File
@@ -50,7 +51,6 @@ private val logger = KotlinLogging.logger {}
 class PluginController(
   private val pluginRepository: PluginRepository,
   private val pluginConfigRepository: org.gotson.komga.domain.persistence.PluginConfigRepository,
-  private val pluginLogRepository: org.gotson.komga.domain.persistence.PluginLogRepository,
   private val mangaDexMetadataPlugin: MangaDexMetadataPlugin,
   private val mangaDexSubscriptionSyncer: MangaDexSubscriptionSyncer,
   private val seriesRepository: SeriesRepository,
@@ -63,6 +63,8 @@ class PluginController(
   private val coverClient = RestClient.create()
 
   private val allowedCoverHosts = listOf("mangadex.org", "anilist.co", "kitsu.io", "media.kitsu.app")
+
+  private val yearPrefixRegex = Regex("""^(\d{4})""")
 
   private fun getMetadataProvider(pluginId: String): OnlineMetadataProvider? =
     when (pluginId) {
@@ -127,7 +129,7 @@ class PluginController(
     pluginRepository.delete(id)
   }
 
-  @PostMapping("install", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+  @PostMapping("install")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Install an external plugin from a JAR file or URL", tags = [TagNames.PLUGINS])
   fun installPlugin(
@@ -146,12 +148,16 @@ class PluginController(
       }
       filename = uri.path.substringAfterLast('/').ifBlank { "plugin.jar" }
       bytes =
-        coverClient
-          .get()
-          .uri(uri)
-          .retrieve()
-          .body(ByteArray::class.java)
-          ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not download plugin from $url")
+        try {
+          coverClient
+            .get()
+            .uri(uri)
+            .retrieve()
+            .body(ByteArray::class.java)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not download plugin from $url")
+        } catch (e: RestClientException) {
+          throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not download plugin from $url", e)
+        }
     } else {
       throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide either a file or a url")
     }
@@ -296,38 +302,6 @@ class PluginController(
     }
   }
 
-  @GetMapping("{id}/logs")
-  @Operation(summary = "Get plugin logs", tags = [TagNames.PLUGINS])
-  fun getPluginLogs(
-    @PathVariable id: String,
-    @RequestParam(required = false) level: org.gotson.komga.domain.model.LogLevel?,
-    @RequestParam(defaultValue = "0") page: Int,
-    @RequestParam(defaultValue = "100") size: Int,
-  ): org.springframework.data.domain.Page<org.gotson.komga.domain.model.PluginLog> {
-    val pageable =
-      org.springframework.data.domain.PageRequest.of(
-        page,
-        size,
-        org.springframework.data.domain.Sort
-          .by(org.springframework.data.domain.Sort.Direction.DESC, "createdDate"),
-      )
-
-    return if (level != null) {
-      pluginLogRepository.findByPluginIdAndLevel(id, level, pageable)
-    } else {
-      pluginLogRepository.findByPluginId(id, pageable)
-    }
-  }
-
-  @DeleteMapping("{id}/logs")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(summary = "Clear plugin logs", tags = [TagNames.PLUGINS])
-  fun clearPluginLogs(
-    @PathVariable id: String,
-  ) {
-    pluginLogRepository.deleteByPluginId(id)
-  }
-
   @PostMapping("apply-metadata/{seriesId}", consumes = [MediaType.APPLICATION_JSON_VALUE])
   @ResponseStatus(HttpStatus.NO_CONTENT)
   fun applyMetadata(
@@ -389,7 +363,10 @@ class PluginController(
           else -> "Adult"
         }
     }
-    request.releaseDate?.toIntOrNull()?.let { metadata["year"] = it }
+    request.releaseDate
+      ?.trim()
+      ?.let { yearPrefixRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+      ?.let { metadata["year"] = it }
     request.status?.let {
       metadata["status"] =
         when (it.lowercase()) {
@@ -472,10 +449,12 @@ class PluginController(
     coverUrl: String,
   ) {
     val uri = URI.create(coverUrl)
-    val host = uri.host ?: return
+    val host =
+      uri.host
+        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cover URL has no host: $coverUrl")
     if (allowedCoverHosts.none { host == it || host.endsWith(".$it") }) {
       logger.warn { "Cover URL host not allowed: $host" }
-      return
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cover URL host not allowed: $host")
     }
 
     logger.info { "Downloading cover for series $seriesId from $coverUrl" }
@@ -486,10 +465,11 @@ class PluginController(
           .get()
           .uri(uri)
           .retrieve()
-          .body(ByteArray::class.java) ?: return
-      } catch (e: Exception) {
+          .body(ByteArray::class.java)
+          ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to download cover (empty response)")
+      } catch (e: RestClientException) {
         logger.error(e) { "Failed to download cover from $coverUrl" }
-        return
+        throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to download cover", e)
       }
 
     val mediaType =
@@ -499,7 +479,7 @@ class PluginController(
         .use { contentDetector.detectMediaType(it) }
     if (!contentDetector.isImage(mediaType)) {
       logger.warn { "Downloaded file is not an image: $mediaType" }
-      return
+      throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Downloaded file is not an image: $mediaType")
     }
 
     val ext =
@@ -517,6 +497,9 @@ class PluginController(
         coverFile.toPath(),
         java.nio.file.StandardCopyOption.REPLACE_EXISTING,
       )
+      listOf("jpg", "jpeg", "png", "webp")
+        .filter { it != ext }
+        .forEach { Files.deleteIfExists(seriesPath.resolve("cover.$it")) }
       logger.info { "Cover saved to ${coverFile.absolutePath}" }
     } catch (e: Exception) {
       logger.error(e) { "Failed to save cover file to disk" }

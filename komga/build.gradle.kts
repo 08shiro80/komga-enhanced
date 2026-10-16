@@ -1,8 +1,13 @@
+
 import nu.studer.gradle.jooq.JooqGenerate
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.flywaydb.gradle.task.FlywayMigrateTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.util.prefixIfNot
+import org.jooq.meta.kotlin.database
+import org.jooq.meta.kotlin.generator
+import org.jooq.meta.kotlin.jdbc
+import org.jooq.meta.kotlin.target
 import org.springframework.boot.gradle.plugin.SpringBootPlugin
 
 plugins {
@@ -56,6 +61,7 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
   implementation("org.springframework.boot:spring-boot-starter-jooq")
   implementation("org.springframework.session:spring-session-core")
+  implementation("org.springframework.session:spring-session-jdbc")
   implementation("com.github.gotson:spring-session-caffeine:2.1.0")
   implementation("org.springframework.data:spring-data-commons")
 
@@ -74,7 +80,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.8.1")
 
   implementation("commons-io:commons-io:2.22.0")
-  implementation("org.apache.commons:commons-lang3:3.20.0")
+  implementation("org.apache.commons:commons-lang3:3.21.0")
   implementation("commons-validator:commons-validator:1.11.0")
 
   implementation("org.apache.lucene:lucene-core:${libs.versions.lucene.get()}")
@@ -88,13 +94,13 @@ dependencies {
 
   implementation("org.apache.tika:tika-core:3.3.2")
   implementation("org.apache.commons:commons-compress:1.28.0")
-  implementation("com.github.junrar:junrar:8.1.0")
+  implementation("com.github.junrar:junrar:8.1.2")
   implementation("com.github.gotson.nightcompress:nightcompress:1.1.1")
   implementation("org.apache.pdfbox:pdfbox:3.0.8")
   implementation("net.grey-panther:natural-comparator:1.1")
-  implementation("org.jsoup:jsoup:1.23.1")
+  implementation("org.jsoup:jsoup:1.23.2")
 
-  implementation("net.coobird:thumbnailator:0.4.20")
+  implementation("net.coobird:thumbnailator:0.4.21")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-jpeg:${libs.versions.twelvemonkeys.get()}")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-tiff:${libs.versions.twelvemonkeys.get()}")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-webp:${libs.versions.twelvemonkeys.get()}")
@@ -103,10 +109,10 @@ dependencies {
   runtimeOnly("com.github.gotson.nightmonkeys:imageio-webp:${libs.versions.nightmonkeys.get()}")
   // support for jpeg2000
   runtimeOnly("com.github.jai-imageio:jai-imageio-jpeg2000:1.4.0")
-  runtimeOnly("org.apache.pdfbox:jbig2-imageio:3.0.4")
+  runtimeOnly("org.apache.pdfbox:jbig2-imageio:3.0.5")
 
   // barcode scanning
-  implementation("com.google.zxing:core:3.5.3")
+  implementation("com.google.zxing:core:3.5.4")
 
   implementation("com.jakewharton.byteunits:byteunits:0.9.1")
 
@@ -125,13 +131,13 @@ dependencies {
     exclude(module = "mockito-core")
   }
   testImplementation("org.springframework.security:spring-security-test")
-  testImplementation("com.ninja-squad:springmockk:4.0.2")
-  testImplementation("io.mockk:mockk:1.14.4")
-  testImplementation("com.google.jimfs:jimfs:1.3.1")
+  testImplementation("com.ninja-squad:springmockk:4.0.2") // v5 needs Spring Framework v7
+  testImplementation("io.mockk:mockk:1.14.11")
+  testImplementation("com.google.jimfs:jimfs:1.3.2")
 
-  testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+  testImplementation("com.tngtech.archunit:archunit-junit5:1.5.1")
 
-  benchmarkImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+  benchmarkImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
   benchmarkImplementation("org.openjdk.jmh:jmh-core:1.37")
   kaptBenchmark("org.openjdk.jmh:jmh-generator-annprocess:1.37")
   kaptBenchmark("org.springframework.boot:spring-boot-configuration-processor:${libs.versions.springboot.get()}")
@@ -310,8 +316,8 @@ tasks {
     filesMatching("application*.yml") {
       expand(
         mapOf(
-          "version" to project.version,
-          "rootDir" to rootDir,
+          "version" to project.version.toString(),
+          "rootDir" to project.rootDir.absolutePath,
         ),
       )
     }
@@ -322,6 +328,14 @@ tasks {
     inputs.files(benchmarkSourceSet.output)
     testClassesDirs = benchmarkSourceSet.output.classesDirs
     classpath = benchmarkSourceSet.runtimeClasspath
+
+    systemProperty(
+      "jmh.resultFolder",
+      layout.buildDirectory
+        .dir("reports/benchmarks")
+        .get()
+        .asFile.absolutePath,
+    )
   }
 }
 
@@ -352,7 +366,6 @@ val sqliteMigrationDirs =
     "tasks" to
       listOf(
         "$projectDir/src/flyway/resources/tasks/migration/sqlite",
-//    "$projectDir/src/flyway/kotlin/tasks/migration/sqlite",
       ),
   )
 
@@ -402,37 +415,37 @@ buildscript {
 }
 
 jooq {
-  version = libs.versions.jooq.get()
+  version.set(libs.versions.jooq.get())
   configurations {
     create("main") {
-      jooqConfiguration.apply {
+      jooqConfiguration {
         logging = org.jooq.meta.jaxb.Logging.WARN
-        jdbc.apply {
+        jdbc {
           driver = "org.sqlite.JDBC"
           url = sqliteUrls["main"]
         }
-        generator.apply {
-          database.apply {
+        generator {
+          database {
             name = "org.jooq.meta.sqlite.SQLiteDatabase"
           }
-          target.apply {
+          target {
             packageName = "org.gotson.komga.jooq.main"
           }
         }
       }
     }
     create("tasks") {
-      jooqConfiguration.apply {
+      jooqConfiguration {
         logging = org.jooq.meta.jaxb.Logging.WARN
-        jdbc.apply {
+        jdbc {
           driver = "org.sqlite.JDBC"
           url = sqliteUrls["tasks"]
         }
-        generator.apply {
-          database.apply {
+        generator {
+          database {
             name = "org.jooq.meta.sqlite.SQLiteDatabase"
           }
-          target.apply {
+          target {
             packageName = "org.gotson.komga.jooq.tasks"
           }
         }
@@ -486,6 +499,7 @@ openApi {
     args.add("--spring.profiles.active=claim,generate-openapi")
     args.add("--server.port=8080")
   }
+  waitTimeInSeconds.set(60)
 }
 
 tasks.jacocoTestReport {

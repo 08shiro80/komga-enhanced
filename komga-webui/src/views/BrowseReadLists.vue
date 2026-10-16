@@ -123,7 +123,8 @@ export default Vue.extend({
   },
   mounted() {
     this.$store.commit('setLibraryRoute', {id: this.libraryId, route: LIBRARY_ROUTE.READLISTS})
-    this.pageSize = this.$store.state.persistedState.browsingPageSize || this.pageSize
+    const savedPageSize = this.$store.state.persistedState.browsingPageSize
+    this.pageSize = savedPageSize !== undefined && savedPageSize !== null ? savedPageSize : this.pageSize
 
     // restore from query param
     if (this.$route.query.page) this.page = Number(this.$route.query.page)
@@ -228,10 +229,11 @@ export default Vue.extend({
     async loadPage(libraryId: string, page: number) {
       this.selectedReadLists = []
 
-      const pageRequest = {
-        page: page - 1,
-        size: this.pageSize,
-      } as PageRequest
+      const pageRequest = (
+        this.pageSize === 0
+          ? {unpaged: true}
+          : {page: page - 1, size: this.pageSize}
+      ) as PageRequest
 
       const lib = libraryId !== LIBRARIES_ALL ? [libraryId] : this.$store.getters.getLibrariesPinned.map(it => it.id)
       const elementsPage = await this.$komgaReadLists.getReadLists(lib, pageRequest)

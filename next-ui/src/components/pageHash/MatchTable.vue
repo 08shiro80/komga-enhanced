@@ -148,4 +148,3 @@ function updateOptions({
 }
 //endregion
 </script>
-<script setup lang="ts"></script>

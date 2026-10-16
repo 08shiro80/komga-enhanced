@@ -66,15 +66,6 @@
                     <span>{{ $t('plugin_manager.configure') }}</span>
                   </v-tooltip>
 
-                  <v-tooltip bottom>
-                    <template v-slot:activator="{ on }">
-                      <v-btn icon small v-on="on" @click="showLogs(item)" color="info">
-                        <v-icon small>mdi-text-box</v-icon>
-                      </v-btn>
-                    </template>
-                    <span>{{ $t('plugin_manager.view_logs') }}</span>
-                  </v-tooltip>
-
                   <v-tooltip v-if="item.external" bottom>
                     <template v-slot:activator="{ on }">
                       <v-btn icon small v-on="on" @click="confirmUninstall(item)" color="error">
@@ -261,81 +252,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Logs Dialog -->
-    <v-dialog v-model="logsDialog" max-width="1200" scrollable :fullscreen="$vuetify.breakpoint.xsOnly">
-      <v-card>
-        <v-card-title>
-          {{ selectedPlugin?.name }} {{ $t('plugin_manager.logs_title') }}
-          <v-spacer></v-spacer>
-          <v-btn icon @click="loadPluginLogs(selectedPlugin)" :loading="loadingLogs">
-            <v-icon>mdi-refresh</v-icon>
-          </v-btn>
-          <v-btn icon @click="clearLogs" color="error" :loading="clearingLogs">
-            <v-icon>mdi-delete</v-icon>
-          </v-btn>
-        </v-card-title>
-
-        <v-card-subtitle>
-          <v-chip-group v-model="logLevelFilter" mandatory>
-            <v-chip small filter value="">{{ $t('plugin_manager.log_all') }}</v-chip>
-            <v-chip small filter value="DEBUG">{{ $t('plugin_manager.log_debug') }}</v-chip>
-            <v-chip small filter value="INFO" color="info">{{ $t('plugin_manager.log_info') }}</v-chip>
-            <v-chip small filter value="WARN" color="warning">{{ $t('plugin_manager.log_warn') }}</v-chip>
-            <v-chip small filter value="ERROR" color="error">{{ $t('plugin_manager.log_error') }}</v-chip>
-          </v-chip-group>
-        </v-card-subtitle>
-
-        <v-divider></v-divider>
-
-        <v-card-text style="max-height: 600px;">
-          <v-alert v-if="pluginLogs.length === 0 && !loadingLogs" type="info" text>
-            {{ $t('plugin_manager.no_logs') }}
-          </v-alert>
-
-          <v-timeline v-else dense>
-            <v-timeline-item
-              v-for="log in filteredLogs"
-              :key="log.id"
-              :color="getLogColor(log.logLevel)"
-              small
-              fill-dot
-            >
-              <template v-slot:icon>
-                <v-icon small dark>{{ getLogIcon(log.logLevel) }}</v-icon>
-              </template>
-
-              <v-card flat>
-                <v-card-subtitle class="py-1">
-                  <v-chip x-small :color="getLogColor(log.logLevel)">
-                    {{ log.logLevel }}
-                  </v-chip>
-                  <span class="text-caption ml-2">{{ formatDate(log.createdDate) }}</span>
-                </v-card-subtitle>
-                <v-card-text class="py-2">
-                  {{ log.message }}
-                  <v-expansion-panels v-if="log.exceptionTrace" flat class="mt-2">
-                    <v-expansion-panel>
-                      <v-expansion-panel-header class="py-0 px-0">
-                        <span class="text-caption error--text">{{ $t('plugin_manager.stack_trace') }}</span>
-                      </v-expansion-panel-header>
-                      <v-expansion-panel-content>
-                        <pre class="text-caption">{{ log.exceptionTrace }}</pre>
-                      </v-expansion-panel-content>
-                    </v-expansion-panel>
-                  </v-expansion-panels>
-                </v-card-text>
-              </v-card>
-            </v-timeline-item>
-          </v-timeline>
-        </v-card-text>
-
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn text @click="logsDialog = false">{{ $t('download_manager.close') }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000" bottom>
       {{ snackbarText }}
@@ -360,7 +276,6 @@ export default {
       installDialog: false,
       uninstallDialog: false,
       configDialog: false,
-      logsDialog: false,
       selectedPlugin: null,
       pluginFile: null,
       pluginUrl: '',
@@ -372,10 +287,6 @@ export default {
       providerPriorityList: [],
       excludedLibraryIdsList: [],
       providerToAdd: null,
-      pluginLogs: [],
-      loadingLogs: false,
-      clearingLogs: false,
-      logLevelFilter: '',
       snackbar: false,
       snackbarText: '',
       snackbarColor: 'success',
@@ -391,10 +302,6 @@ export default {
         { text: this.$t('plugin_manager.header_enabled'), value: 'enabled' },
         { text: this.$t('plugin_manager.header_actions'), value: 'actions', sortable: false },
       ]
-    },
-    filteredLogs() {
-      if (!this.logLevelFilter) return this.pluginLogs
-      return this.pluginLogs.filter(log => log.logLevel === this.logLevelFilter)
     },
     configKeys() {
       if (this.parsedSchema?.properties) {
@@ -578,37 +485,6 @@ export default {
         this.savingConfig = false
       }
     },
-    async showLogs(plugin) {
-      this.selectedPlugin = plugin
-      this.logsDialog = true
-      await this.loadPluginLogs(plugin)
-    },
-    async loadPluginLogs(plugin) {
-      if (!plugin) return
-      this.loadingLogs = true
-      try {
-        const response = await this.$http.get(`/api/v1/plugins/${plugin.id}/logs`, {
-          params: { page: 0, size: 100 },
-        })
-        this.pluginLogs = response.data.content || []
-      } catch (error) {
-        this.showError(this.$t('plugin_manager.snack_logs_load_failed') + ': ' + error.message)
-      } finally {
-        this.loadingLogs = false
-      }
-    },
-    async clearLogs() {
-      this.clearingLogs = true
-      try {
-        await this.$http.delete(`/api/v1/plugins/${this.selectedPlugin.id}/logs`)
-        this.pluginLogs = []
-        this.showSuccess(this.$t('plugin_manager.snack_logs_cleared'))
-      } catch (error) {
-        this.showError(this.$t('plugin_manager.snack_logs_clear_failed') + ': ' + error.message)
-      } finally {
-        this.clearingLogs = false
-      }
-    },
     async resolveDynamicEnums(properties) {
       for (const key of Object.keys(properties)) {
         const field = properties[key]
@@ -628,27 +504,6 @@ export default {
     },
     formatConfigKey(key) {
       return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-    },
-    formatDate(date) {
-      return new Date(date).toLocaleString()
-    },
-    getLogColor(level) {
-      const colors = {
-        DEBUG: 'grey',
-        INFO: 'info',
-        WARN: 'warning',
-        ERROR: 'error',
-      }
-      return colors[level] || 'grey'
-    },
-    getLogIcon(level) {
-      const icons = {
-        DEBUG: 'mdi-bug',
-        INFO: 'mdi-information',
-        WARN: 'mdi-alert',
-        ERROR: 'mdi-alert-circle',
-      }
-      return icons[level] || 'mdi-circle'
     },
     getTypeColor(type) {
       const colors = {

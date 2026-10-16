@@ -21,6 +21,7 @@ class LogLevelInitializer(
         "TRACE" -> Level.TRACE
         "INFO" -> Level.INFO
         "ERROR" -> Level.ERROR
+        "OFF" -> Level.OFF
         else -> Level.WARN
       }
     val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext

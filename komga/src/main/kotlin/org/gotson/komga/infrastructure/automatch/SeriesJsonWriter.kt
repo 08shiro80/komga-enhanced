@@ -22,6 +22,8 @@ private val logger = KotlinLogging.logger {}
 class SeriesJsonWriter(
   private val objectMapper: ObjectMapper,
 ) {
+  private val yearPrefixRegex = Regex("""^(\d{4})""")
+
   /** Map a metadata-plugin id (e.g. "anilist-metadata") to a normalized provider tag. */
   fun providerOfPluginId(pluginId: String?): String? = pluginId?.removeSuffix("-metadata")?.lowercase()?.takeIf { it.isNotBlank() }
 
@@ -108,7 +110,10 @@ class SeriesJsonWriter(
     details.summary?.let { metadata["description_text"] = it }
     details.publisher?.let { metadata["publisher"] = it }
     ageRatingBucket(details.ageRating)?.let { metadata["age_rating"] = it }
-    details.releaseDate?.toIntOrNull()?.let { metadata["year"] = it }
+    details.releaseDate
+      ?.trim()
+      ?.let { yearPrefixRegex.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+      ?.let { metadata["year"] = it }
     normalizeStatus(details.status)?.let { metadata["status"] = it }
     externalId?.takeIf { it.isNotBlank() }?.let { metadata["comicid"] = it }
     if (details.genres.isNotEmpty()) metadata["genres"] = details.genres

@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-3">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Media analysis view: title',
@@ -9,7 +9,7 @@
             id: 'fork/media/title',
           })
         }}
-      </span>
+      </h1>
     </div>
 
     <!-- Corrupt / unsupported books -->
@@ -138,7 +138,7 @@
             v-if="(corruptData?.totalPages ?? 1) > 1"
             v-model="corruptPage"
             :length="corruptData?.totalPages ?? 1"
-            :total-visible="7"
+            :total-visible="display.xs.value ? 3 : 7"
             class="mt-4"
           />
         </template>
@@ -451,11 +451,13 @@ import {
 import { useLibraries } from '@/colada/libraries'
 import { useMessagesStore } from '@/stores/messages'
 import { useErrorCodeFormatter } from '@/composables/errorCodeFormatter'
+import { useDisplay } from 'vuetify'
 import EmptyStateNetworkError from '@/components/EmptyStateNetworkError.vue'
 
 const intl = useIntl()
 const messagesStore = useMessagesStore()
 const { convertErrorCodes } = useErrorCodeFormatter()
+const display = useDisplay()
 
 const { data: libraries } = useLibraries()
 const libraryItems = computed(() =>
@@ -611,8 +613,21 @@ function toggleSelectAll() {
 
 async function repairSingle(bookId: string) {
   try {
-    await repairSinglePage(bookId)
-    messagesStore.messages.push({ message: repairQueuedMessage })
+    const r = await repairSinglePage(bookId)
+    switch (r.outcome) {
+      case 'REPAIRED':
+        messagesStore.messages.push({ message: repairQueuedMessage })
+        break
+      case 'STILL_SINGLE_PAGE':
+        messagesStore.messages.push({ message: repairStillSingleMessage, color: 'warning' })
+        break
+      case 'SOURCE_GONE':
+      case 'NO_SOURCE_URL':
+        messagesStore.messages.push({ message: repairSourceGoneMessage, color: 'warning' })
+        break
+      default:
+        messagesStore.messages.push({ message: repairFailedMessage, color: 'error' })
+    }
   } catch (e) {
     messagesStore.messages.push({ message: (e as Error).message, color: 'error' })
   }
@@ -733,9 +748,12 @@ const deleteSelectedLabel = defineMessage({ description: 'Media analysis: delete
 const ignoreSelectedLabel = defineMessage({ description: 'Media analysis: ignore selected', defaultMessage: 'Ignore', id: 'fork/media/ignoreSelected' })
 const repairSinglePageLabel = defineMessage({ description: 'Media analysis: repair single-page (re-download)', defaultMessage: 'Re-download chapter', id: 'fork/media/repairSingle' })
 const repairQueuedMessage = defineMessage({ description: 'Media analysis: repair queued', defaultMessage: 'Re-download queued', id: 'fork/media/repairQueued' })
-const repairResultLabel = defineMessage({ description: 'Media analysis: repair batch result', defaultMessage: 'Repair: {repaired} fixed · {stillSingle} still single-page · {sourceGone} source gone · {failed} failed', id: 'fork/media/repairResult' })
-const deleteResultLabel = defineMessage({ description: 'Media analysis: delete batch result', defaultMessage: 'Queued {count} book(s) for deletion{failed, plural, =0 {} other { ({failed} failed)}}', id: 'fork/media/deleteResult' })
-const deleteConfirmTitleLabel = defineMessage({ description: 'Media analysis: delete confirm title', defaultMessage: 'Delete {count, plural, one {# file} other {# files}} from disk?', id: 'fork/media/delete/title' })
+const repairStillSingleMessage = defineMessage({ description: 'Media analysis: repair still single page', defaultMessage: 'Re-download finished but the book still has a single page', id: 'fork/media/repairStillSingle' })
+const repairSourceGoneMessage = defineMessage({ description: 'Media analysis: repair source gone', defaultMessage: 'Cannot re-download: the source chapter is gone or has no source URL', id: 'fork/media/repairSourceGone' })
+const repairFailedMessage = defineMessage({ description: 'Media analysis: repair failed', defaultMessage: 'Re-download failed', id: 'fork/media/repairFailed' })
+const repairResultLabel = defineMessage<{ repaired: number; stillSingle: number; sourceGone: number; failed: number }>({ description: 'Media analysis: repair batch result', defaultMessage: 'Repair: {repaired} fixed · {stillSingle} still single-page · {sourceGone} source gone · {failed} failed', id: 'fork/media/repairResult' })
+const deleteResultLabel = defineMessage<{ count: number; failed: number }>({ description: 'Media analysis: delete batch result', defaultMessage: 'Queued {count} book(s) for deletion{failed, plural, =0 {} other { ({failed} failed)}}', id: 'fork/media/deleteResult' })
+const deleteConfirmTitleLabel = defineMessage<{ count: number }>({ description: 'Media analysis: delete confirm title', defaultMessage: 'Delete {count, plural, one {# file} other {# files}} from disk?', id: 'fork/media/delete/title' })
 const cancelLabel = defineMessage({ description: 'Media analysis: cancel', defaultMessage: 'Cancel', id: 'fork/media/cancel' })
 const deleteLabel = defineMessage({ description: 'Media analysis: delete', defaultMessage: 'Delete', id: 'fork/media/delete' })
 </script>

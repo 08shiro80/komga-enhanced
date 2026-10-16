@@ -1,3 +1,6 @@
+import type { RouteLocationObject } from '@/types/route'
+import type { Sort } from './PageRequest'
+
 export type ItemCardProps = {
   /**
    * Card width.
@@ -23,6 +26,10 @@ export type ItemCardProps = {
    * Defaults to `true`.
    */
   stretchPoster?: boolean
+  /**
+   * The active sorts in the parent view. Can be used to adjust the card subtitle.
+   */
+  sortActive?: Sort[]
 }
 
 export type ItemCardEmits = {
@@ -41,7 +48,7 @@ export type ItemCardTitle = {
   /**
    * Link.
    */
-  routerLink?: string | object
+  routerLink?: RouteLocationObject
 }
 
 export type ItemCardLine = {
@@ -64,5 +71,5 @@ export type ItemCardLine = {
   /**
    * Link.
    */
-  routerLink?: string | object
+  routerLink?: RouteLocationObject
 }

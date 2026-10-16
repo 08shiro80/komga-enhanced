@@ -332,6 +332,10 @@
               <v-list-item-title>{{ $t('common.ui') }}</v-list-item-title>
             </v-list-item>
 
+            <v-list-item :to="{name: 'account-trackers'}">
+              <v-list-item-title>{{ $t('account_settings.trackers.title') }}</v-list-item-title>
+            </v-list-item>
+
             <v-list-item :to="{name: 'account-activity'}">
               <v-list-item-title>{{ $t('users.authentication_activity') }}</v-list-item-title>
             </v-list-item>
@@ -346,7 +350,7 @@
             </v-list-item-content>
           </v-list-item>
 
-          <v-list-item :href="nextUrl" target="_blank">
+          <v-list-item :href="nextUrl">
             <v-list-item-icon>
               <v-icon>mdi-ab-testing</v-icon>
             </v-list-item-icon>

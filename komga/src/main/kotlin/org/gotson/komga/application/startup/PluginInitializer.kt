@@ -42,7 +42,7 @@ class PluginInitializer(
                 "mangadex_username": {
                   "type": "string",
                   "title": "MangaDex Username",
-                  "description": "Shared MangaDex credential — used by gallery-dl Downloader, MangaDex Subscription Sync, and Manga Scrobbler unless they override it."
+                  "description": "Shared MangaDex credential — used by gallery-dl Downloader and MangaDex Subscription Sync. The Manga Scrobbler uses each user's own MangaDex account (My account → Trackers)."
                 },
                 "mangadex_password": {
                   "type": "string",
@@ -53,7 +53,7 @@ class PluginInitializer(
                 "mangadex_client_id": {
                   "type": "string",
                   "title": "MangaDex Client ID",
-                  "description": "MangaDex personal API client ID (mangadex.org/settings → API Clients). Required only for the OAuth2 flows used by Subscription Sync and Manga Scrobbler — gallery-dl itself doesn't need it. Stored here so all plugins share one place."
+                  "description": "MangaDex personal API client ID (mangadex.org/settings → API Clients). Required only for the OAuth2 flow used by Subscription Sync — gallery-dl itself doesn't need it. Stored here so all plugins share one place."
                 },
                 "mangadex_client_secret": {
                   "type": "string",
@@ -113,7 +113,7 @@ class PluginInitializer(
           name = "Manga Scrobbler (AniList / MyAnimeList / Kitsu / MangaDex)",
           version = PluginVersions.MANGA_SCROBBLER,
           author = "Jack O'Hagan",
-          description = "Syncs read progress to AniList, MyAnimeList, Kitsu, and/or MangaDex when a book is marked completed. Supports auto-refresh for expiring MAL/Kitsu OAuth2 tokens. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net / kitsu.app / mangadex.org) or via manual JSON mappings.",
+          description = "Syncs read progress to AniList, MyAnimeList, Kitsu and/or MangaDex when a book is marked completed. Every user links their own tracker accounts under My account → Trackers; only that user's progress is synced to their accounts. Resolves tracker IDs from SeriesMetadata links (anilist.co / myanimelist.net / kitsu.app / mangadex.org) or via manual JSON mappings.",
           enabled = false,
           pluginType = PluginType.SCROBBLER,
           entryPoint = "org.gotson.komga.infrastructure.scrobbler.MangaScrobblerPlugin",
@@ -125,93 +125,6 @@ class PluginInitializer(
             {
               "type": "object",
               "properties": {
-                "tracker": {
-                  "type": "string",
-                  "title": "Trackers to update",
-                  "default": "anilist",
-                  "enum": ["anilist", "mal", "kitsu", "mangadex", "both", "both_kitsu", "all"]
-                },
-                "anilist_token": {
-                  "type": "string",
-                  "title": "AniList Access Token",
-                  "format": "password",
-                  "description": "Personal access token from anilist.co/api/v2/oauth/pin (Implicit Grant flow)."
-                },
-                "mal_access_token": {
-                  "type": "string",
-                  "title": "MyAnimeList Access Token",
-                  "format": "password",
-                  "description": "OAuth2 access token. MAL tokens expire ~monthly — auto-refresh is supported when mal_client_id/mal_client_secret/mal_refresh_token are configured."
-                },
-                "mal_refresh_token": {
-                  "type": "string",
-                  "title": "MyAnimeList Refresh Token",
-                  "format": "password",
-                  "description": "OAuth2 refresh token returned during initial authorization."
-                },
-                "mal_client_id": {
-                  "type": "string",
-                  "title": "MyAnimeList Client ID",
-                  "description": "MAL OAuth2 app client ID (required for token refresh)."
-                },
-                "mal_client_secret": {
-                  "type": "string",
-                  "title": "MyAnimeList Client Secret",
-                  "format": "password",
-                  "description": "MAL OAuth2 app client secret (required for token refresh)."
-                },
-                "kitsu_token": {
-                  "type": "string",
-                  "title": "Kitsu Access Token",
-                  "format": "password",
-                  "description": "OAuth2 bearer token from kitsu.app/api/oauth/token. Auto-refresh is supported when kitsu_refresh_token/kitsu_client_id/kitsu_client_secret are configured."
-                },
-                "kitsu_refresh_token": {
-                  "type": "string",
-                  "title": "Kitsu Refresh Token",
-                  "format": "password",
-                  "description": "OAuth2 refresh token returned during initial authorization."
-                },
-                "kitsu_client_id": {
-                  "type": "string",
-                  "title": "Kitsu Client ID",
-                  "description": "Kitsu OAuth2 app client ID (required for token refresh)."
-                },
-                "kitsu_client_secret": {
-                  "type": "string",
-                  "title": "Kitsu Client Secret",
-                  "format": "password",
-                  "description": "Kitsu OAuth2 app client secret (required for token refresh)."
-                },
-                "mangadex_username": {
-                  "type": "string",
-                  "title": "MangaDex Username",
-                  "description": "Optional override — leave blank to use the gallery-dl Downloader's `mangadex_username` (then MangaDex Subscription Sync's `username` as second fallback)."
-                },
-                "mangadex_password": {
-                  "type": "string",
-                  "title": "MangaDex Password",
-                  "format": "password",
-                  "description": "Optional override — leave blank to use gallery-dl Downloader / Subscription Sync as fallback."
-                },
-                "mangadex_client_id": {
-                  "type": "string",
-                  "title": "MangaDex Client ID",
-                  "description": "Optional override — leave blank to use gallery-dl Downloader / Subscription Sync as fallback."
-                },
-                "mangadex_client_secret": {
-                  "type": "string",
-                  "title": "MangaDex Client Secret",
-                  "format": "password",
-                  "description": "Optional override — leave blank to use gallery-dl Downloader / Subscription Sync as fallback."
-                },
-                "mangadex_max_content_rating": {
-                  "type": "string",
-                  "title": "MangaDex: max content rating to sync",
-                  "default": "pornographic",
-                  "enum": ["safe", "suggestive", "erotica", "pornographic"],
-                  "description": "Only push read progress to MangaDex for manga up to this content rating (inclusive). Manga rated higher are skipped. Ordering: safe < suggestive < erotica < pornographic."
-                },
                 "auto_detect_links": {
                   "type": "string",
                   "title": "Auto-detect tracker IDs from series links",
@@ -223,11 +136,6 @@ class PluginInitializer(
                   "type": "string",
                   "title": "Manual series mappings (JSON)",
                   "description": "Override auto-detection. Example: {\"Berserk\":{\"anilist_id\":30002,\"mal_id\":2}}"
-                },
-                "sync_user_id": {
-                  "type": "string",
-                  "title": "Restrict to user ID",
-                  "description": "Optional. If set, only progress changes from this Komga user ID are synced."
                 },
                 "exclude_library_ids": {
                   "type": "string",
@@ -245,7 +153,7 @@ class PluginInitializer(
           name = "Comic Scrobbler (Metron)",
           version = PluginVersions.COMIC_SCROBBLER,
           author = "Jack O'Hagan",
-          description = "Syncs comic read progress to Metron (metron.cloud) when a book is marked completed. Resolves issue IDs from series links (metron.cloud/issue/... or metron.cloud/series/... from Metron Metadata Provider), auto-search by series name, or via manual JSON mappings.",
+          description = "Syncs comic read progress to Metron (metron.cloud) when a book is marked completed. Every user links their own Metron account under My account → Trackers; only that user's progress is synced. Resolves issue IDs from series links (metron.cloud/issue/... or metron.cloud/series/... from Metron Metadata Provider), auto-search by series name, or via manual JSON mappings.",
           enabled = false,
           pluginType = PluginType.SCROBBLER,
           entryPoint = "org.gotson.komga.infrastructure.comicscrobbler.ComicScrobblerPlugin",
@@ -257,18 +165,6 @@ class PluginInitializer(
             {
               "type": "object",
               "properties": {
-                "metron_username": {
-                  "type": "string",
-                  "title": "Metron Username",
-                  "description": "Your Metron account username (metron.cloud)"
-                },
-                "metron_password": {
-                  "type": "string",
-                  "title": "Metron Password",
-                  "format": "password",
-                  "description": "Your Metron account password"
-                },
-
                 "auto_detect_links": {
                   "type": "string",
                   "title": "Auto-detect issue IDs from series links",
@@ -281,18 +177,13 @@ class PluginInitializer(
                   "title": "Manual issue mappings (JSON)",
                   "description": "Fallback when auto-detect/search fails. Example: {\"Amazing Spider-Man\":{\"metron_issue_id\":12345}}"
                 },
-                "sync_user_id": {
-                  "type": "string",
-                  "title": "Restrict to user ID",
-                  "description": "Optional. Only syncs reads from this Komga user."
-                },
                 "exclude_library_ids": {
                   "type": "string",
                   "title": "Exclude libraries (CSV of library IDs)",
                   "description": "Optional. Library IDs to never send to Metron (e.g. manga libraries when this plugin is for Western comics)."
                 }
               },
-              "required": ["metron_username", "metron_password"]
+              "required": []
             }
             """.trimIndent(),
           dependencies = null,
@@ -342,6 +233,11 @@ class PluginInitializer(
                   "type": "string",
                   "title": "Exclude libraries (CSV of library IDs)",
                   "description": "Optional. Komga libraries where auto-match must not run (new-series enqueue, bulk queue, and per-series apply). Does not affect other metadata providers."
+                },
+                "mal_client_id": {
+                  "type": "string",
+                  "title": "MyAnimeList Client ID (tracker link lookup)",
+                  "description": "Optional. MAL API client ID used to find MyAnimeList links for series metadata. Scrobbling uses each user's own MAL account (My account → Trackers)."
                 }
               },
               "required": []

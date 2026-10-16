@@ -1719,6 +1719,15 @@ export default {
         this.showError('Failed to resume download: ' + error.message)
       }
     },
+    async retryDownload(download) {
+      try {
+        await this.$http.post(`/api/v1/downloads/${download.id}/action`, { action: 'retry' })
+        this.showSuccess('Download retry queued')
+        await this.loadDownloads()
+      } catch (error) {
+        this.showError('Failed to retry download: ' + error.message)
+      }
+    },
     async cancelDownload(download) {
       try {
         await this.$http.post(`/api/v1/downloads/${download.id}/action`, { action: 'cancel' })
@@ -1749,7 +1758,7 @@ export default {
           this.cancelDownload(download)
           break
         case 'retry':
-          this.resumeDownload(download)
+          this.retryDownload(download)
           break
         case 'delete':
           this.deleteDownload(download)

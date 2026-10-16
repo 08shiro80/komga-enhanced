@@ -91,6 +91,11 @@ interface ChapterUrlRepository {
   fun delete(id: String)
 
   /**
+   * Delete multiple chapter URLs by ID in a single statement
+   */
+  fun deleteByIds(ids: Collection<String>)
+
+  /**
    * Delete all chapter URLs for a series
    */
   fun deleteBySeriesId(seriesId: String)

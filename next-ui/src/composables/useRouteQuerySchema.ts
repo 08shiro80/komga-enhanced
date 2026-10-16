@@ -1,6 +1,7 @@
 import * as v from 'valibot'
 import { useRouteQuery } from '@vueuse/router'
 import { syncRef } from '@vueuse/core'
+import { deepEqual } from 'fast-equals'
 import { useAppStore } from '@/stores/app'
 
 /**
@@ -9,7 +10,8 @@ import { useAppStore } from '@/stores/app'
  *
  * @param queryName the query parameter name
  * @param schema valibot schema to validate against
- * @param updateQueryFn custom function to update the query param. The default function compares the JSON.stringify'ed value against the schema's defaults.
+ * @param updateQueryFn custom function to update the query param. The default function performs a deep equality comparison between value and the schema's defaults.
+ * @param defaultValue default value to use if the query param cannot be parsed. The default is to use `v.getDefaults` on the {@link schema}
  * @param persistKey when set, the value is also persisted in the app store under this key, so it
  *        survives navigating away and back to a view (an explicit URL query still takes precedence).
  */
@@ -17,11 +19,13 @@ export function useRouteQuerySchema<T extends v.GenericSchema>(
   queryName: string,
   schema: T,
   updateQueryFn?: (data: v.InferOutput<T>) => string | undefined,
+  defaultValue?: v.InferOutput<T>,
   persistKey?: string,
 ) {
   const queryString = useRouteQuery(queryName, '{}')
 
-  const defaults = v.getDefaults(schema)
+  const defaults =
+    defaultValue !== undefined ? structuredClone(defaultValue) : v.getDefaults(schema)
 
   function getInitialValue(stringValue: string) {
     try {
@@ -32,7 +36,7 @@ export function useRouteQuerySchema<T extends v.GenericSchema>(
   }
 
   function defaultUpdateQueryFn(data: v.InferOutput<T>): string | undefined {
-    if (JSON.stringify(data) !== JSON.stringify(defaults)) return JSON.stringify(data)
+    if (!deepEqual(data, defaults)) return JSON.stringify(data)
     return undefined
   }
 

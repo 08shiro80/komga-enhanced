@@ -4,7 +4,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.DomainEvent
 import org.gotson.komga.domain.model.FollowSchedule
 import org.gotson.komga.domain.persistence.FollowScheduleRepository
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.TaskScheduler
@@ -20,12 +19,6 @@ import java.util.concurrent.ScheduledFuture
 private val logger = KotlinLogging.logger {}
 
 @Service
-@ConditionalOnProperty(
-  prefix = "komga.download",
-  name = ["enabled"],
-  havingValue = "true",
-  matchIfMissing = true,
-)
 class FollowScheduleLifecycle(
   private val followScheduleRepository: FollowScheduleRepository,
   private val followLifecycle: FollowLifecycle,
@@ -39,7 +32,13 @@ class FollowScheduleLifecycle(
       followScheduleRepository
         .findAll()
         .filter { it.enabled }
-        .forEach { scheduleLibrary(it) }
+        .forEach {
+          try {
+            scheduleLibrary(it)
+          } catch (e: Exception) {
+            logger.warn(e) { "Failed to schedule follow check for library ${it.libraryId}" }
+          }
+        }
     } catch (e: Exception) {
       logger.warn(e) { "Failed to initialize follow schedules" }
     }
@@ -48,14 +47,18 @@ class FollowScheduleLifecycle(
   fun getSchedule(libraryId: String): FollowSchedule = followScheduleRepository.findByLibraryId(libraryId) ?: FollowSchedule(libraryId = libraryId)
 
   fun updateSchedule(schedule: FollowSchedule): FollowSchedule {
-    followScheduleRepository.save(schedule)
-    tasks.remove(schedule.libraryId)?.cancel(false)
-    if (schedule.enabled) scheduleLibrary(schedule)
+    val merged =
+      schedule.copy(
+        lastCheckTime = schedule.lastCheckTime ?: followScheduleRepository.findByLibraryId(schedule.libraryId)?.lastCheckTime,
+      )
+    followScheduleRepository.save(merged)
+    tasks.remove(merged.libraryId)?.cancel(false)
+    if (merged.enabled) scheduleLibrary(merged)
     logger.info {
-      "Follow schedule for library ${schedule.libraryId}: enabled=${schedule.enabled}, " +
-        "mode=${schedule.scheduleMode}, interval=${schedule.intervalHours}h, time=${schedule.checkTime}"
+      "Follow schedule for library ${merged.libraryId}: enabled=${merged.enabled}, " +
+        "mode=${merged.scheduleMode}, interval=${merged.intervalHours}h, time=${merged.checkTime}"
     }
-    return schedule
+    return merged
   }
 
   fun removeSchedule(libraryId: String) {
@@ -70,21 +73,24 @@ class FollowScheduleLifecycle(
 
   private fun scheduleLibrary(schedule: FollowSchedule) {
     val task = buildTask(schedule) ?: return
-    tasks[schedule.libraryId] = task
+    tasks.compute(schedule.libraryId) { _, old ->
+      old?.cancel(false)
+      task
+    }
   }
 
   private fun buildTask(schedule: FollowSchedule): ScheduledFuture<*>? {
     val runnable = Runnable { runCheck(schedule.libraryId) }
     if (schedule.scheduleMode == "fixed_time" && !schedule.checkTime.isNullOrBlank()) {
       val parts = schedule.checkTime.split(":")
-      if (parts.size == 2) {
-        val hour = parts[0].padStart(2, '0')
-        val minute = parts[1].padStart(2, '0')
+      val hour = parts.getOrNull(0)?.trim()?.toIntOrNull()
+      val minute = parts.getOrNull(1)?.trim()?.toIntOrNull()
+      if (parts.size == 2 && hour != null && minute != null && hour in 0..23 && minute in 0..59) {
         return taskScheduler.schedule(runnable, CronTrigger("0 $minute $hour * * *"))
       }
       logger.warn { "Invalid checkTime '${schedule.checkTime}' for library ${schedule.libraryId}, using interval" }
     }
-    val intervalMillis = schedule.intervalHours.coerceAtLeast(1) * 60 * 60 * 1000L
+    val intervalMillis = schedule.intervalHours.coerceAtLeast(1).toLong() * 60 * 60 * 1000L
     // Base the first run on the last recorded check so a check missed while the server was down
     // fires shortly after startup instead of being delayed a full interval (or skipped forever
     // when reboots happen more often than the interval).

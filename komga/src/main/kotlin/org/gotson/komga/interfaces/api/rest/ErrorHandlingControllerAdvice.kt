@@ -1,7 +1,6 @@
 package org.gotson.komga.interfaces.api.rest
 
 import jakarta.validation.ConstraintViolationException
-import org.gotson.komga.domain.model.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -30,13 +29,11 @@ class ErrorHandlingControllerAdvice {
       e.bindingResult.fieldErrors.map { Violation(it.field, it.defaultMessage) },
     )
 
-  @ExceptionHandler(EntityNotFoundException::class)
-  @ResponseStatus(HttpStatus.NOT_FOUND)
-  fun handleEntityNotFound() {
-  }
-
   @ExceptionHandler(MaxUploadSizeExceededException::class)
   fun handleMaxUploadSizeExceededException(e: MaxUploadSizeExceededException): ProblemDetail = e.body
+
+  @ExceptionHandler(IllegalArgumentException::class)
+  fun handleIllegalArgumentException(e: IllegalArgumentException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.message ?: "Invalid request")
 }
 
 data class ValidationErrorResponse(

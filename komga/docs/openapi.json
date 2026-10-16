@@ -1,13 +1,13 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "description": "Komga REST API.\n\n## Reference\n\nCheck the API reference:\n- on the [Komga website](https://komga.org/docs/openapi/komga-api)\n- on any running Komga instance at `/swagger-ui.html`\n- on [GitHub](https://raw.githubusercontent.com/gotson/komga/refs/heads/master/komga/docs/openapi.json)\n\n## Authentication\n\nMost endpoints require authentication. Authentication is done using either:\n- Basic Authentication\n- Passing an API Key in the `X-API-Key` header\n\n## Sessions\n\nUpon successful authentication, a session is created, and can be reused.\n\n- By default, a `KOMGA-SESSION` cookie is set via `Set-Cookie` response header. This works well for browsers and clients that can handle cookies.\n- If you specify a header `X-Auth-Token` during authentication, the session ID will be returned via this same header. You can then pass that header again for subsequent requests to reuse the session.\n\nIf you need to set the session cookie later on, you can call `/api/v1/login/set-cookie` with `X-Auth-Token`. The response will contain the `Set-Cookie` header.\n\n## Remember Me\n\nDuring authentication, if a request parameter `remember-me` is passed and set to `true`, the server will also return a `komga-remember-me` cookie. This cookie will be used to login automatically even if the session has expired.\n\n## Logout\n\nYou can explicitly logout an existing session by calling `/api/logout`. This would return a `204`.\n\n## Deprecation\n\nAPI endpoints marked as deprecated will be removed in the next major version.",
+    "description": "Komga REST API.\n\n## Reference\n\nCheck the API reference:\n- on the [Komga website](https://komga.org/docs/openapi/komga-api)\n- on any running Komga instance at `/swagger-ui.html`\n- on [GitHub](https://raw.githubusercontent.com/gotson/komga/refs/heads/master/komga/docs/openapi.json)\n\n## Authentication\n\nMost endpoints require authentication. Authentication is done using either:\n- Basic Authentication\n- Passing an API Key in the `X-API-Key` header\n\n## Sessions\n\nUpon successful authentication, a session is created, and can be reused.\n\n- By default, a `KOMGA-SESSION` cookie is set via `Set-Cookie` response header. This works well for browsers and clients that can handle cookies.\n- If you specify a header `X-Auth-Token` during authentication, the session ID will be returned via this same header. You can then pass that header again for subsequent requests to reuse the session.\n\nIf you need to set the session cookie later on, you can call `/api/v1/login/set-cookie` with `X-Auth-Token`. The response will contain the `Set-Cookie` header.\n\nSessions are not created when authenticating with an API Key.\n\n## Remember Me\n\nDuring authentication, if a request parameter `remember-me` is passed and set to `true`, the server will also return a `komga-remember-me` cookie. This cookie will be used to login automatically even if the session has expired.\n\n## Logout\n\nYou can explicitly logout an existing session by calling `/api/logout`. This would return a `204`.\n\n## Deprecation\n\nAPI endpoints marked as deprecated will be removed in the next major version.",
     "license": {
       "name": "MIT",
       "url": "https://github.com/gotson/komga/blob/master/LICENSE"
     },
     "title": "Komga API",
-    "version": "1.27.1-fork-0.1.6"
+    "version": "1.29.0-fork-0.1.6.1"
   },
   "externalDocs": {
     "description": "Komga documentation",
@@ -210,6 +210,9 @@
                   "Example": {
                     "value": "{\n  \"git\": {\n    \"branch\": \"master\",\n    \"commit\": {\n      \"id\": \"9be980d\",\n      \"time\": \"2025-03-12T03:40:38Z\"\n    }\n  },\n  \"build\": {\n    \"artifact\": \"komga\",\n    \"name\": \"komga\",\n    \"version\": \"1.21.2\",\n    \"group\": \"komga\"\n  },\n  \"java\": {\n    \"version\": \"23.0.2\",\n    \"vendor\": {\n      \"name\": \"Eclipse Adoptium\",\n      \"version\": \"Temurin-23.0.2+7\"\n    },\n    \"runtime\": {\n      \"name\": \"OpenJDK Runtime Environment\",\n      \"version\": \"23.0.2+7\"\n    },\n    \"jvm\": {\n      \"name\": \"OpenJDK 64-Bit Server VM\",\n      \"vendor\": \"Eclipse Adoptium\",\n      \"version\": \"23.0.2+7\"\n    }\n  },\n  \"os\": {\n    \"name\": \"Linux\",\n    \"version\": \"6.8.0-57-generic\",\n    \"arch\": \"amd64\"\n  }\n}"
                   }
+                },
+                "schema": {
+                  "additionalProperties": true
                 }
               }
             },
@@ -12316,7 +12319,6 @@
     },
     "/api/v1/settings": {
       "get": {
-        "description": "Required role: **ADMIN**",
         "operationId": "getServerSettings",
         "responses": {
           "200": {
@@ -12691,6 +12693,159 @@
         "summary": "Clear task queue",
         "tags": [
           "Tasks"
+        ]
+      }
+    },
+    "/api/v1/trackers": {
+      "get": {
+        "description": "Secrets are never returned, only whether they are set.",
+        "operationId": "getTrackers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserTrackerDto"
+                  }
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "List the tracker accounts of the current user",
+        "tags": [
+          "user-tracker-controller"
+        ]
+      }
+    },
+    "/api/v1/trackers/{tracker}": {
+      "delete": {
+        "operationId": "deleteTracker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Unlink a tracker account of the current user",
+        "tags": [
+          "user-tracker-controller"
+        ]
+      },
+      "put": {
+        "description": "Omitted settings keep their value, blank or null settings are removed.",
+        "operationId": "updateTracker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTrackerUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Link or update a tracker account of the current user",
+        "tags": [
+          "user-tracker-controller"
+        ]
+      }
+    },
+    "/api/v1/trackers/{tracker}/test": {
+      "post": {
+        "operationId": "testTracker",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tracker",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackerCheckResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Test the connection of a tracker account of the current user",
+        "tags": [
+          "user-tracker-controller"
         ]
       }
     },
@@ -14495,6 +14650,356 @@
           "Users"
         ]
       }
+    },
+    "/api/v3/notable-entities": {
+      "get": {
+        "description": "Can be filtered by various criteria",
+        "operationId": "getNotableEntities",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "library_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "collection_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "series_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "readlist_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "unpaged",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponseNotableEntityDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "List notable entities",
+        "tags": [
+          "Referential metadata"
+        ]
+      }
+    },
+    "/api/v3/notable-entities/kinds": {
+      "get": {
+        "description": "Can be filtered by various criteria",
+        "operationId": "getNotableEntitiesKinds",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "library_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "collection_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "series_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "readlist_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "unpaged",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponseString"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "List notable entities kinds",
+        "tags": [
+          "Referential metadata"
+        ]
+      }
+    },
+    "/api/v3/notable-entities/names": {
+      "get": {
+        "description": "Can be filtered by various criteria",
+        "operationId": "getNotableEntitiesNames",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "library_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "collection_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "series_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "readlist_id",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "unpaged",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponseString"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "List notable entities names",
+        "tags": [
+          "Referential metadata"
+        ]
+      }
     }
   },
   "components": {
@@ -14939,6 +15444,12 @@
             "type": "string",
             "format": "date-time"
           },
+          "notableEntities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotableEntityDto"
+            }
+          },
           "releaseDate": {
             "type": "string",
             "format": "date"
@@ -14961,6 +15472,7 @@
           "authors",
           "created",
           "lastModified",
+          "notableEntities",
           "summary",
           "summaryNumber",
           "tags"
@@ -14999,6 +15511,15 @@
             }
           },
           "linksLock": {
+            "type": "boolean"
+          },
+          "notableEntities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotableEntityDto"
+            }
+          },
+          "notableEntitiesLock": {
             "type": "boolean"
           },
           "number": {
@@ -15053,6 +15574,8 @@
           "lastModified",
           "links",
           "linksLock",
+          "notableEntities",
+          "notableEntitiesLock",
           "number",
           "numberLock",
           "numberSort",
@@ -15092,6 +15615,15 @@
             }
           },
           "linksLock": {
+            "type": "boolean"
+          },
+          "notableEntities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotableEntityUpdateDto"
+            }
+          },
+          "notableEntitiesLock": {
             "type": "boolean"
           },
           "number": {
@@ -16212,40 +16744,74 @@
           "pageNumber"
         ]
       },
+      "ItemAuthorDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Author's name",
+            "example": "gotson"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL of a site owned by the author",
+            "example": "https://github.com/gotson"
+          }
+        }
+      },
       "ItemDto": {
         "type": "object",
         "properties": {
           "_komga": {
-            "$ref": "#/components/schemas/KomgaExtensionDto"
+            "$ref": "#/components/schemas/KomgaExtensionDto",
+            "description": "Additional fields for the item"
           },
           "author": {
-            "$ref": "#/components/schemas/AuthorDto"
+            "$ref": "#/components/schemas/ItemAuthorDto",
+            "description": "Author of the item"
           },
           "content_html": {
-            "type": "string"
+            "type": "string",
+            "description": "HTML of the item",
+            "example": "<p>A longer text…</p>"
           },
           "date_modified": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Modification date in RFC 3339 format",
+            "example": "2023-12-15T00:00:00Z"
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "Unique for that item for that feed over time",
+            "example": "https://komga.org/blog/ebook-drop2"
           },
           "summary": {
-            "type": "string"
+            "type": "string",
+            "description": "A plain text sentence or two describing the item",
+            "example": "Version 1.9.0 contains the second feature drop for Ebooks support."
           },
           "tags": {
             "type": "array",
+            "description": "Tags describing the item",
+            "examples": [
+              "upgrade",
+              "komga"
+            ],
             "items": {
               "type": "string"
             },
             "uniqueItems": true
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Plain text title",
+            "example": "eBook drop 2"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "URL of the resource described by the item",
+            "example": "https://komga.org/blog/ebook-drop2"
           }
         },
         "required": [
@@ -16255,12 +16821,62 @@
       },
       "JsonFeedDto": {
         "type": "object",
+        "example": {
+          "version": "https://jsonfeed.org/version/1",
+          "title": "Announcements",
+          "home_page_url": "https://komga.org/blog",
+          "description": "Latest Komga announcements",
+          "items": [
+            {
+              "id": "https://komga.org/blog/ebook-drop2",
+              "url": "https://komga.org/blog/ebook-drop2",
+              "title": "eBook drop 2",
+              "summary": "Version 1.9.0 contains the second feature drop for Ebooks support.",
+              "content_html": "<p>A longer text…</p>",
+              "date_modified": "2023-12-15T00:00:00Z",
+              "author": {
+                "name": "gotson",
+                "url": "https://github.com/gotson"
+              },
+              "tags": [
+                "upgrade",
+                "komga"
+              ],
+              "_komga": {
+                "read": false
+              }
+            },
+            {
+              "id": "https://komga.org/blog/ebook-support",
+              "url": "https://komga.org/blog/ebook-support",
+              "title": "eBook support",
+              "summary": "Version 1.8.0 is bringing a long awaited feature: proper eBook support!",
+              "content_html": "<p>A longer text…</p>",
+              "date_modified": "2023-11-29T00:00:00Z",
+              "author": {
+                "name": "gotson",
+                "url": "https://github.com/gotson"
+              },
+              "tags": [
+                "upgrade",
+                "komga"
+              ],
+              "_komga": {
+                "read": true
+              }
+            }
+          ]
+        },
         "properties": {
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "Provides more detail on what the feed is about",
+            "example": "Latest Komga announcements"
           },
           "home_page_url": {
-            "type": "string"
+            "type": "string",
+            "description": "URL of the resource that the feed describes",
+            "example": "https://komga.org/blog"
           },
           "items": {
             "type": "array",
@@ -16269,10 +16885,14 @@
             }
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Name of the feed",
+            "example": "Announcements"
           },
           "version": {
-            "type": "string"
+            "type": "string",
+            "description": "URL of the version of the format the feed uses",
+            "example": "https://jsonfeed.org/version/1"
           }
         },
         "required": [
@@ -16285,7 +16905,9 @@
         "type": "object",
         "properties": {
           "read": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the current item has been marked read by the current user",
+            "example": false
           }
         },
         "required": [
@@ -17142,6 +17764,38 @@
           "seriesId"
         ]
       },
+      "NotableEntityDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ]
+      },
+      "NotableEntityUpdateDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ]
+      },
       "OAuth2ClientDto": {
         "type": "object",
         "properties": {
@@ -17922,6 +18576,118 @@
             "format": "int32"
           }
         }
+      },
+      "PageResponseNotableEntityDto": {
+        "type": "object",
+        "description": "Paginated API response container",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "List of items contained in the current page",
+            "items": {
+              "$ref": "#/components/schemas/NotableEntityDto"
+            }
+          },
+          "first": {
+            "type": "boolean",
+            "description": "Indicates if the current page is the first page",
+            "example": true
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Indicates if the current page is the last page",
+            "example": false
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Zero-based page index (0..N)",
+            "example": 0
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of items requested per page",
+            "example": 20
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of elements across all pages",
+            "example": 105
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of calculated pages",
+            "example": 6
+          }
+        },
+        "required": [
+          "content",
+          "first",
+          "last",
+          "page",
+          "size",
+          "totalElements",
+          "totalPages"
+        ]
+      },
+      "PageResponseString": {
+        "type": "object",
+        "description": "Paginated API response container",
+        "properties": {
+          "content": {
+            "type": "array",
+            "description": "List of items contained in the current page",
+            "items": {
+              "type": "string"
+            }
+          },
+          "first": {
+            "type": "boolean",
+            "description": "Indicates if the current page is the first page",
+            "example": true
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Indicates if the current page is the last page",
+            "example": false
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Zero-based page index (0..N)",
+            "example": 0
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of items requested per page",
+            "example": 20
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of elements across all pages",
+            "example": 105
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of calculated pages",
+            "example": 6
+          }
+        },
+        "required": [
+          "content",
+          "first",
+          "last",
+          "page",
+          "size",
+          "totalElements",
+          "totalPages"
+        ]
       },
       "PageSeriesDto": {
         "type": "object",
@@ -18877,6 +19643,9 @@
             "$ref": "#/components/schemas/SearchConditionAuthor"
           },
           {
+            "$ref": "#/components/schemas/SearchConditionNotableEntity"
+          },
+          {
             "$ref": "#/components/schemas/SearchConditionPoster"
           }
         ]
@@ -18959,6 +19728,16 @@
         },
         "required": [
           "mediaStatus"
+        ]
+      },
+      "SearchConditionNotableEntity": {
+        "properties": {
+          "notableEntity": {
+            "$ref": "#/components/schemas/SearchOperatorEqualityNotableEntityMatch"
+          }
+        },
+        "required": [
+          "notableEntity"
         ]
       },
       "SearchConditionNumberSort": {
@@ -19089,6 +19868,9 @@
           },
           {
             "$ref": "#/components/schemas/SearchConditionAuthor"
+          },
+          {
+            "$ref": "#/components/schemas/SearchConditionNotableEntity"
           }
         ]
       },
@@ -19326,6 +20108,31 @@
         ]
       },
       "SearchOperatorEqualityMediaProfile": {
+        "discriminator": {
+          "mapping": {
+            "is": "#/components/schemas/SearchOperatorIs",
+            "isNot": "#/components/schemas/SearchOperatorIsNot"
+          },
+          "propertyName": "operator"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SearchOperatorIs"
+          },
+          {
+            "$ref": "#/components/schemas/SearchOperatorIsNot"
+          }
+        ],
+        "properties": {
+          "operator": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator"
+        ]
+      },
+      "SearchOperatorEqualityNotableEntityMatch": {
         "discriminator": {
           "mapping": {
             "is": "#/components/schemas/SearchOperatorIs",
@@ -20075,12 +20882,7 @@
             "type": "integer",
             "format": "int32"
           }
-        },
-        "required": [
-          "configurationSource",
-          "databaseSource",
-          "effectiveValue"
-        ]
+        }
       },
       "SettingMultiSourceString": {
         "type": "object",
@@ -20094,12 +20896,7 @@
           "effectiveValue": {
             "type": "string"
           }
-        },
-        "required": [
-          "configurationSource",
-          "databaseSource",
-          "effectiveValue"
-        ]
+        }
       },
       "SettingsDto": {
         "type": "object",
@@ -20118,6 +20915,13 @@
             "format": "int32"
           },
           "koboProxy": {
+            "type": "boolean"
+          },
+          "maxUploadFileSizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nextUiAsDefault": {
             "type": "boolean"
           },
           "rememberMeDurationDays": {
@@ -20142,24 +20946,8 @@
               "LARGE",
               "XLARGE"
             ]
-          },
-          "maxUploadFileSizeBytes": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
           }
-        },
-        "required": [
-          "deleteEmptyCollections",
-          "deleteEmptyReadLists",
-          "kepubifyPath",
-          "koboProxy",
-          "rememberMeDurationDays",
-          "serverContextPath",
-          "serverPort",
-          "taskPoolSize",
-          "thumbnailSize"
-        ]
+        }
       },
       "SettingsUpdateDto": {
         "type": "object",
@@ -20182,6 +20970,9 @@
             "maximum": 65535
           },
           "koboProxy": {
+            "type": "boolean"
+          },
+          "nextUiAsDefault": {
             "type": "boolean"
           },
           "rememberMeDurationDays": {
@@ -20733,6 +21524,21 @@
           "width"
         ]
       },
+      "TrackerCheckResultDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message",
+          "success"
+        ]
+      },
       "TransientBookDto": {
         "type": "object",
         "properties": {
@@ -20895,6 +21701,54 @@
           "sharedAllLibraries",
           "sharedLibrariesIds"
         ]
+      },
+      "UserTrackerDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "linked": {
+            "type": "boolean"
+          },
+          "secretsSet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "tracker": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "linked",
+          "secretsSet",
+          "settings",
+          "tracker"
+        ]
+      },
+      "UserTrackerUpdateDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
       },
       "UserUpdateDto": {
         "type": "object",

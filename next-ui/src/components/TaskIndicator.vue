@@ -23,7 +23,7 @@
       >
         <v-icon icon="i-tabler:activity"></v-icon>
         <v-progress-circular
-          v-if="taskStore.count > 0"
+          v-if="hasActivity"
           indeterminate
           color="secondary"
           size="48"
@@ -36,7 +36,7 @@
     <v-card>
       <template #text>
         <SimpleDataTable
-          v-if="taskStore.count > 0"
+          v-if="hasActivity"
           :rows="rows"
           :uppercase-headers="false"
         />
@@ -62,14 +62,13 @@ import { taskNameMessage } from '@/utils/i18n/enum/task'
 const intl = useIntl()
 const taskStore = useTaskQueueStore()
 
-const rows = computed(() =>
-  Object.entries(taskStore.countByType).map(([task, count]) => ({
+const hasActivity = computed(() => taskStore.count > 0 || taskStore.backgroundJobs.length > 0)
+
+const rows = computed(() => [
+  ...Object.entries(taskStore.countByType).map(([task, count]) => ({
     header: task in taskNameMessage ? intl.formatMessage(taskNameMessage[task]!) : task,
     data: count + '',
   })),
-)
+  ...taskStore.backgroundJobs.map((job) => ({ header: job, data: '' })),
+])
 </script>
-
-<script lang="ts"></script>
-
-<style scoped></style>

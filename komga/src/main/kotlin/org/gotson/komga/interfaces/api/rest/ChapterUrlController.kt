@@ -8,6 +8,7 @@ import org.gotson.komga.domain.model.ChapterUrl
 import org.gotson.komga.domain.model.ChapterUrlBatchCheckResult
 import org.gotson.komga.domain.model.ChapterUrlCheckResult
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
+import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.infrastructure.download.GalleryDlWrapper
 import org.gotson.komga.infrastructure.download.MangaDexApiClient
 import org.springframework.http.HttpStatus
@@ -39,6 +40,7 @@ private val logger = KotlinLogging.logger {}
 @PreAuthorize("hasRole('ADMIN')")
 class ChapterUrlController(
   private val chapterUrlRepository: ChapterUrlRepository,
+  private val seriesRepository: SeriesRepository,
   private val mangaDexApiClient: MangaDexApiClient,
   private val galleryDlWrapper: GalleryDlWrapper,
 ) {
@@ -83,7 +85,7 @@ class ChapterUrlController(
     return ChapterUrlBatchCheckResult(
       results = results,
       existingCount = existingCount,
-      newCount = urls.size - existingCount,
+      newCount = results.size - existingCount,
     )
   }
 
@@ -108,7 +110,14 @@ class ChapterUrlController(
 
     // Try to find series by manga ID (stored in chapter URLs)
     // This allows querying by MangaDex ID without knowing the Komga series ID
-    val urls = chapterUrlRepository.findUrlsBySeriesIdAndLang(mangaId, lang)
+    val urls =
+      chapterUrlRepository
+        .findUrlsBySeriesIdAndLang(mangaId, lang)
+        .takeIf { it.isNotEmpty() }
+        ?: seriesRepository
+          .findByMangaDexUuid(mangaId)
+          ?.let { chapterUrlRepository.findUrlsBySeriesIdAndLang(it.id, lang) }
+        ?: emptyList()
 
     return DownloadedUrlsResponse(
       mangaId = mangaId,

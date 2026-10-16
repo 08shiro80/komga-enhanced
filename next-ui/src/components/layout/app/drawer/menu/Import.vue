@@ -48,5 +48,3 @@
     />
   </v-list-group>
 </template>
-
-<script setup lang="ts"></script>

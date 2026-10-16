@@ -67,9 +67,10 @@ class SeriesMetadataDao(
     param: String,
     value: String,
   ): String? {
-    // Bound the match to the exact query-param value: a link URL either ends with `param=value`
-    // or is followed by `&`. This prevents `title_no=83` from matching `title_no=830`. LIKE
-    // metacharacters in the literal (`_` in `title_no`) are escaped with `\`.
+    // Bound the match to the exact query-param value: the param is preceded by `?` or `&` and the
+    // value either ends the URL or is followed by `&`. This prevents `title_no=83` from matching
+    // `title_no=830` or `subtitle_no=83`. LIKE metacharacters in the literal (`_` in `title_no`)
+    // are escaped with `\`.
     val core =
       "$param=$value"
         .replace("\\", "\\\\")
@@ -82,8 +83,13 @@ class SeriesMetadataDao(
       .on(s.ID.eq(slk.SERIES_ID))
       .where(s.LIBRARY_ID.eq(libraryId))
       .and(s.DELETED_DATE.isNull)
-      .and(slk.URL.like("%$core", '\\').or(slk.URL.like("%$core&%", '\\')))
-      .limit(1)
+      .and(
+        slk.URL
+          .like("%?$core", '\\')
+          .or(slk.URL.like("%?$core&%", '\\'))
+          .or(slk.URL.like("%&$core", '\\'))
+          .or(slk.URL.like("%&$core&%", '\\')),
+      ).limit(1)
       .fetchOneInto(String::class.java)
   }
 

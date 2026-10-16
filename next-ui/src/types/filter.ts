@@ -5,6 +5,7 @@ import { MediaProfileValues } from '@/types/MediaProfile'
 import { MediaStatusValues } from '@/types/MediaStatus'
 import { SeriesStatusValues } from '@/types/SeriesStatus'
 import { ReadStatusValues } from '@/types/ReadStatus'
+import { PosterValues } from '@/types/Poster'
 
 export const filterMessages: Record<string, MessageDescriptor> = {
   any: defineMessage({
@@ -75,13 +76,24 @@ export const SchemaReadStatus = createSchemaIncludeExclude(
   v.pipe(v.string(), v.toUpperCase(), v.picklist(ReadStatusValues)),
 )
 
+export const SchemaPosterType = v.pipe(v.string(), v.toUpperCase(), v.picklist(PosterValues))
+/**
+ * Tuple representing [PosterType, isSelected].
+ */
+export const SchemaPosterMatch = v.tuple([SchemaPosterType, v.boolean()])
+/**
+ * Example payload: { i: 'i', v: ['GENERATED', true] }
+ */
+export const SchemaPoster = createSchemaIncludeExclude(SchemaPosterMatch)
+
 export const SchemaString = createSchemaIncludeExclude(v.string())
 
 export const SchemaAnyNone = v.strictObject({
   a: v.optional(v.picklist(['any', 'none'])),
 })
 
-export const SchemaAuthor = v.union([SchemaString, SchemaAnyNone])
+export const SchemaContributor = v.union([SchemaString, SchemaAnyNone])
+export const SchemaNotableEntity = v.union([SchemaString, SchemaAnyNone])
 
 const SchemaYear = v.pipe(v.string(), v.regex(/^\d{4}$/, 'Must be exactly 4 digits'))
 
@@ -163,9 +175,14 @@ export const SchemaSeriesAgeRatings = createSchemaFilterSelectRange(v.number())
 export const SchemaFilterStrings = createSchemaFilterAnyAll(SchemaString)
 
 /**
- * Schema for authors.
+ * Schema for Poster.
  */
-export const SchemaFilterContributors = createSchemaFilterAnyAll(SchemaAuthor)
+export const SchemaFilterPoster = createSchemaFilterArray(SchemaPoster)
+
+/**
+ * Schema for contributors.
+ */
+export const SchemaFilterContributors = createSchemaFilterAnyAll(SchemaContributor)
 export const SchemaFilterContributorsRecord = v.optional(
   v.record(
     v.string(),
@@ -173,6 +190,20 @@ export const SchemaFilterContributorsRecord = v.optional(
   ),
   {},
 )
+export type FilterContributorsRecord = v.InferOutput<typeof SchemaFilterContributorsRecord>
+
+/**
+ * Schema for notable entities.
+ */
+export const SchemaFilterNotableEntities = createSchemaFilterAnyAll(SchemaNotableEntity)
+export const SchemaFilterNotableEntitiesRecord = v.optional(
+  v.record(
+    v.string(),
+    v.optional(SchemaFilterNotableEntities, v.getDefaults(SchemaFilterNotableEntities)),
+  ),
+  {},
+)
+export type FilterNotableEntitiesRecord = v.InferOutput<typeof SchemaFilterNotableEntitiesRecord>
 
 export const SchemaFilterAnyAll = createSchemaFilterAnyAll(v.unknown())
 export type FilterTypeAnyAll = v.InferOutput<typeof SchemaFilterAnyAll>

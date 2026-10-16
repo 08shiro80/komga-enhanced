@@ -29,6 +29,13 @@ interface DownloadQueueRepository {
 
   fun update(download: DownloadQueue)
 
+  fun updateProgressIfDownloading(
+    id: String,
+    progressPercent: Int,
+    currentChapter: Int?,
+    totalChapters: Int?,
+  )
+
   fun count(): Long
 
   fun countByStatus(status: DownloadStatus): Long

@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-4">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Downloads view: page title',
@@ -9,7 +9,7 @@
             id: 'fork/downloads/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
 
       <v-btn
@@ -23,6 +23,39 @@
             description: 'Downloads view: add download button',
             defaultMessage: 'Add download',
             id: 'fork/downloads/add',
+          })
+        }}
+      </v-btn>
+
+      <v-btn
+        variant="text"
+        prepend-icon="i-mdi:refresh"
+        :disabled="countByStatus('FAILED') === 0"
+        class="me-2"
+        @click="retryAllFailed"
+      >
+        {{
+          $formatMessage({
+            description: 'Downloads view: retry all failed button',
+            defaultMessage: 'Retry all failed',
+            id: 'fork/downloads/retryAllFailed',
+          })
+        }}
+      </v-btn>
+
+      <v-btn
+        variant="text"
+        prepend-icon="i-mdi:cancel"
+        color="error"
+        :disabled="activeCount === 0"
+        class="me-2"
+        @click="cancelAllActive"
+      >
+        {{
+          $formatMessage({
+            description: 'Downloads view: cancel all active button',
+            defaultMessage: 'Cancel all',
+            id: 'fork/downloads/cancelAllActive',
           })
         }}
       </v-btn>
@@ -155,7 +188,7 @@
               :color="statusColor(item.status)"
               class="ms-2"
             >
-              {{ item.status }}
+              {{ statusLabel(item.status) }}
             </v-chip>
           </div>
 
@@ -274,11 +307,6 @@
             variant="outlined"
             density="comfortable"
           />
-          <v-checkbox
-            v-model="newDownload.skipIfChapterExists"
-            :label="$formatMessage(skipLabel)"
-            density="comfortable"
-          />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -389,11 +417,20 @@ const filterLabel = defineMessage({
 })
 
 const addDialog = ref(false)
-const newDownload = ref<DownloadCreateDto>({
-  sourceUrl: '',
-  libraryId: undefined,
-  priority: 0,
-  skipIfChapterExists: true,
+
+function makeNewDownload(): DownloadCreateDto {
+  return {
+    sourceUrl: '',
+    libraryId: undefined,
+    priority: 5,
+    skipIfChapterExists: true,
+  }
+}
+
+const newDownload = ref<DownloadCreateDto>(makeNewDownload())
+
+watch(addDialog, (open) => {
+  if (!open) newDownload.value = makeNewDownload()
 })
 
 const libraryItems = computed(() =>
@@ -425,6 +462,11 @@ function countByStatus(status: string): number {
   return merged.value.filter((d) => d.status === status).length
 }
 
+function statusLabel(status: string): string {
+  const tab = statusTabs.find((t) => t.value === status)
+  return tab ? intl.formatMessage(tab.label) : status
+}
+
 function formatDate(date: Date): string {
   return intl.formatDate(date, { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -437,6 +479,20 @@ async function action(id: string, act: string) {
   } catch (e) {
     messagesStore.messages.push({ message: (e as Error).message, color: 'error' })
   }
+}
+
+async function retryAllFailed() {
+  const failed = merged.value.filter((d) => d.status === 'FAILED')
+  await Promise.allSettled(failed.map((d) => action(d.id, 'retry')))
+}
+
+const activeStatuses = ['DOWNLOADING', 'PENDING', 'PAUSED']
+
+const activeCount = computed(() => merged.value.filter((d) => activeStatuses.includes(d.status)).length)
+
+async function cancelAllActive() {
+  const active = merged.value.filter((d) => activeStatuses.includes(d.status))
+  await Promise.allSettled(active.map((d) => action(d.id, 'cancel')))
 }
 
 async function remove(id: string) {
@@ -460,12 +516,6 @@ async function add() {
   try {
     await createDownload(newDownload.value)
     addDialog.value = false
-    newDownload.value = {
-      sourceUrl: '',
-      libraryId: undefined,
-      priority: 0,
-      skipIfChapterExists: true,
-    }
   } catch (e) {
     messagesStore.messages.push({ message: (e as Error).message, color: 'error' })
   }
@@ -516,11 +566,6 @@ const priorityLabel = defineMessage({
   description: 'Downloads view: priority field',
   defaultMessage: 'Priority',
   id: 'fork/downloads/field/priority',
-})
-const skipLabel = defineMessage({
-  description: 'Downloads view: skip if chapter exists field',
-  defaultMessage: 'Skip if chapter already exists',
-  id: 'fork/downloads/field/skip',
 })
 
 const clearableStatuses: { value: ClearableStatus; status: string; label: MessageDescriptor }[] = [

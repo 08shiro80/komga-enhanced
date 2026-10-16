@@ -5,14 +5,15 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gotson.komga.domain.model.LogLevel
 import org.gotson.komga.domain.model.ReadProgress
 import org.gotson.komga.domain.model.SyncState
+import org.gotson.komga.domain.model.UserTracker
 import org.gotson.komga.domain.persistence.BookMetadataRepository
 import org.gotson.komga.domain.persistence.BookRepository
 import org.gotson.komga.domain.persistence.PluginConfigRepository
-import org.gotson.komga.domain.persistence.PluginLogRepository
 import org.gotson.komga.domain.persistence.PluginRepository
 import org.gotson.komga.domain.persistence.ReadProgressRepository
 import org.gotson.komga.domain.persistence.SeriesRepository
 import org.gotson.komga.domain.persistence.SyncStateRepository
+import org.gotson.komga.domain.persistence.UserTrackerRepository
 import org.springframework.http.MediaType
 import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.scheduling.annotation.Scheduled
@@ -23,7 +24,6 @@ import org.springframework.web.client.RestClientResponseException
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 private val logger = KotlinLogging.logger {}
 
@@ -38,13 +38,14 @@ private val logger = KotlinLogging.logger {}
 class MangaSyncPullerPlugin(
   private val pluginRepository: PluginRepository,
   private val pluginConfigRepository: PluginConfigRepository,
-  private val pluginLogRepository: PluginLogRepository,
   private val bookRepository: BookRepository,
   private val bookMetadataRepository: BookMetadataRepository,
   private val seriesRepository: SeriesRepository,
   private val readProgressRepository: ReadProgressRepository,
   private val syncStateRepository: SyncStateRepository,
+  private val userTrackerRepository: UserTrackerRepository,
   private val trackerIdResolver: TrackerIdResolver,
+  private val trackerTokenProvider: TrackerTokenProvider,
   private val objectMapper: ObjectMapper,
 ) {
   private val pluginId = "manga-scrobbler"
@@ -78,22 +79,24 @@ class MangaSyncPullerPlugin(
   fun pullAllTrackers() {
     if (!isEnabled()) return
     val config = loadConfig()
-    val syncUserId = config["sync_user_id"]?.takeIf { it.isNotBlank() } ?: return
     val excludedLibs = parseExcludedLibraryIds(config)
     logger.debug { "Sync puller: checking tracker progress updates" }
 
-    pullAnilist(config, syncUserId, excludedLibs)
-    pullMal(config, syncUserId, excludedLibs)
-    pullKitsu(config, syncUserId, excludedLibs)
+    activeAccounts(UserTracker.ANILIST).forEach { pullAnilist(it, config, excludedLibs) }
+    activeAccounts(UserTracker.MAL).forEach { pullMal(it, config, excludedLibs) }
+    activeAccounts(UserTracker.KITSU).forEach { pullKitsu(it, config, excludedLibs) }
   }
 
+  private fun activeAccounts(tracker: String): List<UserTracker> = userTrackerRepository.findByTracker(tracker).filter { it.active }
+
   private fun pullAnilist(
+    account: UserTracker,
     config: Map<String, String?>,
-    userId: String,
     excludedLibs: Set<String>,
   ) {
-    val token = config["anilist_token"] ?: return
-    val states = syncStateRepository.findByTracker("anilist")
+    val userId = account.userId
+    val token = account[UserTracker.KEY_TOKEN] ?: return
+    val states = syncStateRepository.findByUserIdAndTracker(userId, UserTracker.ANILIST)
     for (state in states) {
       if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) continue
       val anilistId = trackerIdResolver.resolveFromKomgaSeriesId(state.seriesId, config).anilistId ?: continue
@@ -135,26 +138,29 @@ class MangaSyncPullerPlugin(
   }
 
   private fun pullMal(
+    account: UserTracker,
     config: Map<String, String?>,
-    userId: String,
     excludedLibs: Set<String>,
   ) {
-    val token = config["mal_access_token"] ?: return
-    val states = syncStateRepository.findByTracker("mal")
+    val userId = account.userId
+    var token = trackerTokenProvider.malToken(account) ?: return
+    val states = syncStateRepository.findByUserIdAndTracker(userId, UserTracker.MAL)
     for (state in states) {
       if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) continue
       val malId = trackerIdResolver.resolveFromKomgaSeriesId(state.seriesId, config).malId ?: continue
       try {
         val response =
-          malClient
-            .get()
-            .uri("/v2/manga/$malId/my_list_status")
-            .header("Authorization", "Bearer $token")
-            .retrieve()
-            .body(String::class.java)
+          try {
+            requestMal(malId, token)
+          } catch (e: RestClientResponseException) {
+            if (!isUnauthorized(e)) throw e
+            token = trackerTokenProvider.refreshMal(account) ?: return
+            requestMal(malId, token)
+          }
 
         val json = response?.let { objectMapper.readTree(it) }
-        val remoteProgress = json?.get("num_chapters_read")?.asInt(0) ?: continue
+        val listStatus = json?.get("my_list_status") ?: continue
+        val remoteProgress = listStatus.get("num_chapters_read")?.asInt(0) ?: continue
 
         if (remoteProgress > state.progress) {
           applyRemoteProgress(state, remoteProgress, Instant.now().epochSecond, userId, "MAL", excludedLibs)
@@ -164,29 +170,33 @@ class MangaSyncPullerPlugin(
         if (!is404) {
           logger.debug(e) { "MAL pull failed for series ${state.seriesId}" }
         }
+      } catch (e: Exception) {
+        logger.debug(e) { "MAL pull failed for series ${state.seriesId}" }
       }
     }
   }
 
   private fun pullKitsu(
+    account: UserTracker,
     config: Map<String, String?>,
-    userId: String,
     excludedLibs: Set<String>,
   ) {
-    val token = config["kitsu_token"] ?: return
-    val states = syncStateRepository.findByTracker("kitsu")
+    val userId = account.userId
+    var token = trackerTokenProvider.kitsuToken(account) ?: return
+    val kitsuUserId = trackerTokenProvider.kitsuUserId(account, token) ?: return
+    val states = syncStateRepository.findByUserIdAndTracker(userId, UserTracker.KITSU)
     for (state in states) {
       if (shouldSkipKomgaSeries(state.seriesId, excludedLibs)) continue
       val kitsuId = trackerIdResolver.resolveFromKomgaSeriesId(state.seriesId, config).kitsuId ?: continue
       try {
         val response =
-          kitsuClient
-            .get()
-            .uri("/library-entries?filter[mangaId]=$kitsuId&page[limit]=1")
-            .header("Authorization", "Bearer $token")
-            .header("Accept", "application/vnd.api+json")
-            .retrieve()
-            .body(String::class.java)
+          try {
+            requestKitsu(kitsuId, kitsuUserId, token)
+          } catch (e: RestClientResponseException) {
+            if (!isUnauthorized(e)) throw e
+            token = trackerTokenProvider.refreshKitsu(account) ?: return
+            requestKitsu(kitsuId, kitsuUserId, token)
+          }
 
         val json = response?.let { objectMapper.readTree(it) }
         val attrs = json?.get("data")?.firstOrNull()?.get("attributes")
@@ -201,6 +211,32 @@ class MangaSyncPullerPlugin(
       }
     }
   }
+
+  private fun requestMal(
+    malId: Int,
+    token: String,
+  ): String? =
+    malClient
+      .get()
+      .uri("/v2/manga/$malId?fields=my_list_status")
+      .header("Authorization", "Bearer $token")
+      .retrieve()
+      .body(String::class.java)
+
+  private fun requestKitsu(
+    kitsuId: Int,
+    kitsuUserId: String,
+    token: String,
+  ): String? =
+    kitsuClient
+      .get()
+      .uri("/library-entries?filter[userId]=$kitsuUserId&filter[mangaId]=$kitsuId&page[limit]=1")
+      .header("Authorization", "Bearer $token")
+      .header("Accept", "application/vnd.api+json")
+      .retrieve()
+      .body(String::class.java)
+
+  private fun isUnauthorized(e: RestClientResponseException): Boolean = e.statusCode.value() == 401 || e.statusCode.value() == 403
 
   private fun parseExcludedLibraryIds(config: Map<String, String?>): Set<String> =
     config["exclude_library_ids"]
@@ -239,8 +275,8 @@ class MangaSyncPullerPlugin(
       // numbering would otherwise never resolve and retry hourly without progress.
       val targetBooks =
         books.filter { book ->
-          val number = metaById[book.id]?.numberSort?.toInt()
-          number != null && number <= remoteProgress
+          val number = metaById[book.id]?.numberSort
+          number != null && number <= remoteProgress.toFloat()
         }
 
       val alreadyRead =
@@ -272,9 +308,9 @@ class MangaSyncPullerPlugin(
         state.copy(
           progress = remoteProgress,
           bookId = latestBook?.id ?: state.bookId,
-          lastSyncTimestamp = LocalDateTime.now(ZoneId.of("Z")),
-          lastUpdateTimestamp = LocalDateTime.now(ZoneId.of("Z")),
-          lastModifiedDate = LocalDateTime.now(ZoneId.of("Z")),
+          lastSyncTimestamp = LocalDateTime.now(),
+          lastUpdateTimestamp = LocalDateTime.now(),
+          lastModifiedDate = LocalDateTime.now(),
         ),
       )
       log(LogLevel.INFO, "$trackerName pull: komga series ${state.seriesId} → chapter $remoteProgress (${newProgress.size} newly marked)")

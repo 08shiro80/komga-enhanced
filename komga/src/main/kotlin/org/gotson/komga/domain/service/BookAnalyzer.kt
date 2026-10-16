@@ -416,7 +416,10 @@ class BookAnalyzer(
 
     var i = 2
     while (i < data.size - 1) {
-      if (data[i] != 0xFF.toByte()) break
+      if (data[i] != 0xFF.toByte()) {
+        output.write(data, i, data.size - i)
+        break
+      }
 
       val marker = data[i + 1].toInt() and 0xFF
 
@@ -445,9 +448,11 @@ class BookAnalyzer(
         continue
       }
 
-      if (i + totalLen <= data.size) {
-        output.write(data, i, totalLen)
+      if (i + totalLen > data.size) {
+        output.write(data, i, data.size - i)
+        break
       }
+      output.write(data, i, totalLen)
       i += totalLen
     }
 

@@ -7,12 +7,14 @@ import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.gotson.komga.infrastructure.configuration.KomgaSettingsProvider
 import org.gotson.komga.infrastructure.configuration.SettingChangedEvent
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.jdbc.DataSourceBuilder
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.context.event.EventListener
+import org.springframework.session.jdbc.config.annotation.SpringSessionDataSource
 import org.sqlite.SQLiteConfig
 import org.sqlite.SQLiteDataSource
 import javax.sql.DataSource
@@ -53,7 +55,13 @@ class DataSourcesConfiguration(
   private fun resizeRoPool() {
     if (komgaProperties.database.poolSize != null) return
     if (!komgaProperties.database.shouldSeparateReadFromWrites()) return
-    val target = settingsProvider.ifAvailable?.taskPoolSize ?: return
+    val taskPoolSize = settingsProvider.ifAvailable?.taskPoolSize ?: return
+    val defaultSize =
+      Runtime
+        .getRuntime()
+        .availableProcessors()
+        .coerceAtMost(komgaProperties.database.maxPoolSize)
+    val target = maxOf(taskPoolSize, defaultSize)
     val ds = sqliteDataSourceRO() as? HikariDataSource ?: return
     if (ds.maximumPoolSize == target) return
     logger.info { "Resizing SqliteMainPoolRO from ${ds.maximumPoolSize} to $target connections (taskPoolSize)" }
@@ -77,32 +85,54 @@ class DataSourcesConfiguration(
     else
       tasksDataSourceRW()
 
+  @Bean("thumbnailsDataSourceRW")
+  fun thumbnailsDataSourceRW(): DataSource =
+    buildDataSource("SqliteThumbnailsPoolRW", SQLiteDataSource::class.java, komgaProperties.thumbnailsDb)
+      .apply {
+        this.maximumPoolSize = 1
+      }
+
+  @Bean("thumbnailsDataSourceRO")
+  fun thumbnailsDataSourceRO(): DataSource =
+    if (komgaProperties.thumbnailsDb.shouldSeparateReadFromWrites())
+      buildDataSource("SqliteThumbnailsPoolRO", SQLiteDataSource::class.java, komgaProperties.thumbnailsDb)
+    else
+      thumbnailsDataSourceRW()
+
+  @ConditionalOnProperty(
+    value = ["komga.jdbc-session-enabled"],
+    havingValue = "true",
+    matchIfMissing = false,
+  )
+  @Bean("sessionsDataSource")
+  @SpringSessionDataSource
+  fun sessionsDataSource(): DataSource = buildDataSource("SqliteSessionsPool", SQLiteDataSource::class.java, komgaProperties.sessionsDb)
+
   private fun buildDataSource(
     poolName: String,
     dataSourceClass: Class<out SQLiteDataSource>,
     databaseProps: KomgaProperties.Database,
   ): HikariDataSource {
-    val extraPragmas =
-      databaseProps.pragmas.let {
-        if (it.isEmpty()) {
-          ""
-        } else {
-          val separator = if (databaseProps.file.contains("?")) "&" else "?"
-          separator + it.map { (key, value) -> "$key=$value" }.joinToString(separator = "&")
-        }
-      }
-
     val dataSource =
       DataSourceBuilder
         .create()
         .driverClassName("org.sqlite.JDBC")
-        .url("jdbc:sqlite:${databaseProps.file}$extraPragmas")
+        .url("jdbc:sqlite:${databaseProps.file}")
         .type(dataSourceClass)
         .build()
 
     with(dataSource) {
       setEnforceForeignKeys(true)
       setGetGeneratedKeys(false)
+    }
+    databaseProps.pragmas.forEach { (key, value) ->
+      val normalizedKey = key.replace("_", "").replace("-", "")
+      val pragma = SQLiteConfig.Pragma.values().firstOrNull { it.name.replace("_", "").equals(normalizedKey, ignoreCase = true) }
+      if (pragma != null) {
+        dataSource.config.setPragma(pragma, value)
+      } else {
+        logger.warn { "Unknown SQLite pragma '$key' for pool $poolName — ignoring" }
+      }
     }
     with(databaseProps) {
       journalMode?.let { dataSource.setJournalMode(it.name) }

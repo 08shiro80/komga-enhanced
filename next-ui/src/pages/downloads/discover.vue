@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Discover view: title',
@@ -9,7 +9,7 @@
             id: 'fork/discover/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
       <v-select
         v-model="selectedLibrary"
@@ -55,6 +55,7 @@
 <script lang="ts" setup>
 import { defineMessage } from 'vue-intl'
 import { useDisplay } from 'vuetify'
+import { useLocalStorage } from '@vueuse/core'
 import { useLibraries } from '@/colada/libraries'
 import MangaDexSearch from '@/components/downloads/MangaDexSearch.vue'
 
@@ -66,13 +67,20 @@ const libraryItems = computed(() =>
   (libraries.value ?? []).map((l) => ({ title: l.name, value: l.id })),
 )
 
-const selectedLibrary = ref<string | undefined>(undefined)
+// Persist the chosen library so navigating away / reloading keeps it (falls back to the first library).
+const selectedLibrary = useLocalStorage<string | undefined>('fork.downloads.discover.library', undefined)
 
-watchEffect(() => {
-  if (!selectedLibrary.value && libraryItems.value.length > 0) {
-    selectedLibrary.value = libraryItems.value[0]?.value
-  }
-})
+watch(
+  libraryItems,
+  () => {
+    if (libraryItems.value.length === 0) return
+    const selectionValid = libraryItems.value.some((l) => l.value === selectedLibrary.value)
+    if (!selectedLibrary.value || !selectionValid) {
+      selectedLibrary.value = libraryItems.value[0]?.value
+    }
+  },
+  { immediate: true },
+)
 
 const libraryLabel = defineMessage({
   description: 'Discover: library selector',

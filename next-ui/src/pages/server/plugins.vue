@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-3">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Plugins view: title',
@@ -9,7 +9,7 @@
             id: 'fork/plugins/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
       <v-btn
         color="primary"
@@ -81,14 +81,6 @@
               />
             </td>
             <td class="text-end text-no-wrap">
-              <v-btn
-                icon="i-mdi:text-box-search-outline"
-                variant="text"
-                size="small"
-                color="info"
-                :aria-label="$formatMessage(logsLabel)"
-                @click="openLogs(p.id, p.name)"
-              />
               <v-btn
                 v-if="p.configSchema"
                 icon="i-mdi:cog"
@@ -216,110 +208,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Logs dialog -->
-    <v-dialog
-      v-model="logsDialog"
-      max-width="820"
-    >
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          <span class="text-truncate">{{ $formatMessage(logsTitle, { name: logsPluginName }) }}</span>
-          <v-spacer />
-          <v-btn
-            variant="text"
-            size="small"
-            prepend-icon="i-mdi:delete-sweep"
-            :loading="clearingLogs"
-            @click="clearLogs()"
-          >
-            {{ $formatMessage(clearLogsLabel) }}
-          </v-btn>
-        </v-card-title>
-        <v-card-subtitle class="pb-0">
-          <v-chip-group
-            v-model="logLevelFilter"
-            column
-          >
-            <v-chip
-              :value="undefined"
-              size="small"
-              filter
-            >
-              {{ $formatMessage(allLevelsLabel) }}
-            </v-chip>
-            <v-chip
-              v-for="lvl in logLevels"
-              :key="lvl"
-              :value="lvl"
-              size="small"
-              filter
-              :color="logColor(lvl)"
-            >
-              {{ lvl }}
-            </v-chip>
-          </v-chip-group>
-        </v-card-subtitle>
-        <v-card-text style="max-height: 60vh">
-          <v-skeleton-loader
-            v-if="logsPending"
-            type="list-item@4"
-          />
-          <v-alert
-            v-else-if="(logs?.content?.length ?? 0) === 0"
-            type="info"
-            variant="tonal"
-            density="compact"
-          >
-            {{ $formatMessage(noLogsLabel) }}
-          </v-alert>
-          <v-timeline
-            v-else
-            density="compact"
-            side="end"
-            truncate-line="both"
-          >
-            <v-timeline-item
-              v-for="log in logs?.content ?? []"
-              :key="log.id"
-              :dot-color="logColor(log.logLevel)"
-              size="x-small"
-            >
-              <div class="d-flex align-center ga-2 mb-1">
-                <v-chip
-                  size="x-small"
-                  :color="logColor(log.logLevel)"
-                >
-                  {{ log.logLevel }}
-                </v-chip>
-                <span class="text-caption text-medium-emphasis">{{ formatDate(log.createdDate) }}</span>
-              </div>
-              <div class="text-body-2">{{ log.message }}</div>
-              <v-expansion-panels
-                v-if="log.exceptionTrace"
-                flat
-                class="mt-1"
-              >
-                <v-expansion-panel>
-                  <v-expansion-panel-title class="text-caption text-error px-0">
-                    {{ $formatMessage(stackTraceLabel) }}
-                  </v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <pre class="text-caption" style="white-space: pre-wrap">{{ log.exceptionTrace }}</pre>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
-              </v-expansion-panels>
-            </v-timeline-item>
-          </v-timeline>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="logsDialog = false">
-            {{ $formatMessage(closeLabel) }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <v-dialog
       v-model="uninstallDialog"
       max-width="480"
@@ -363,22 +251,18 @@
 </template>
 
 <script lang="ts" setup>
-import { useIntl, defineMessage } from 'vue-intl'
+import { defineMessage } from 'vue-intl'
 import {
-  useClearPluginLogs,
   useDeletePlugin,
   useInstallPlugin,
   usePluginConfig,
-  usePluginLogs,
   usePlugins,
   useUpdatePlugin,
   useUpdatePluginConfig,
 } from '@/colada/plugins'
 import { useMessagesStore } from '@/stores/messages'
 import EmptyStateNetworkError from '@/components/EmptyStateNetworkError.vue'
-import type { SchemaEnum2 } from '@/generated/openapi'
 
-const intl = useIntl()
 const messagesStore = useMessagesStore()
 
 const { data: plugins, error, isPending } = usePlugins()
@@ -387,46 +271,6 @@ const { mutateAsync: deletePlugin, isLoading: removing } = useDeletePlugin()
 const { mutateAsync: installPlugin, isLoading: installing } = useInstallPlugin()
 const { mutateAsync: updateConfig, isLoading: savingConfig } = useUpdatePluginConfig()
 
-const logsDialog = ref(false)
-const logsPluginId = ref<string | undefined>(undefined)
-const logsPluginName = ref('')
-const logLevelFilter = ref<SchemaEnum2 | undefined>(undefined)
-const logLevels: SchemaEnum2[] = ['DEBUG', 'INFO', 'WARN', 'ERROR']
-const { data: logs, isPending: logsPending } = usePluginLogs(logsPluginId, logLevelFilter)
-const { mutateAsync: clearPluginLogs, isLoading: clearingLogs } = useClearPluginLogs()
-
-function openLogs(id: string, name: string) {
-  logsPluginId.value = id
-  logsPluginName.value = name
-  logLevelFilter.value = undefined
-  logsDialog.value = true
-}
-
-async function clearLogs() {
-  if (!logsPluginId.value) return
-  try {
-    await clearPluginLogs(logsPluginId.value)
-  } catch (e) {
-    messagesStore.messages.push({ message: (e as Error).message, color: 'error' })
-  }
-}
-
-function logColor(level: string): string {
-  switch (level) {
-    case 'ERROR':
-      return 'error'
-    case 'WARN':
-      return 'warning'
-    case 'DEBUG':
-      return 'grey'
-    default:
-      return 'info'
-  }
-}
-
-function formatDate(date: Date): string {
-  return intl.formatDate(date, { dateStyle: 'medium', timeStyle: 'short' })
-}
 
 const installDialog = ref(false)
 const installFile = ref<File | undefined>(undefined)
@@ -493,7 +337,11 @@ async function doInstall() {
 }
 
 function openConfig(id: string) {
+  const sameAsLoaded = configPluginId.value === id
   configPluginId.value = id
+  // same plugin: reset cancelled edits to the loaded server state; different plugin: start empty
+  // and let the watch on configData fill the form once the query resolves
+  configForm.value = sameAsLoaded ? { ...(configData.value ?? {}) } : {}
   configDialog.value = true
 }
 
@@ -602,41 +450,6 @@ const savedMessage = defineMessage({
   description: 'Plugins view: config saved',
   defaultMessage: 'Configuration saved',
   id: 'fork/plugins/saved',
-})
-const logsLabel = defineMessage({
-  description: 'Plugins view: view logs',
-  defaultMessage: 'View logs',
-  id: 'fork/plugins/logs',
-})
-const logsTitle = defineMessage({
-  description: 'Plugins view: logs dialog title',
-  defaultMessage: 'Logs — {name}',
-  id: 'fork/plugins/logs/title',
-})
-const clearLogsLabel = defineMessage({
-  description: 'Plugins view: clear logs',
-  defaultMessage: 'Clear logs',
-  id: 'fork/plugins/logs/clear',
-})
-const allLevelsLabel = defineMessage({
-  description: 'Plugins view: all log levels',
-  defaultMessage: 'All',
-  id: 'fork/plugins/logs/all',
-})
-const noLogsLabel = defineMessage({
-  description: 'Plugins view: no logs',
-  defaultMessage: 'No log entries for this plugin.',
-  id: 'fork/plugins/logs/none',
-})
-const stackTraceLabel = defineMessage({
-  description: 'Plugins view: stack trace',
-  defaultMessage: 'Stack trace',
-  id: 'fork/plugins/logs/stackTrace',
-})
-const closeLabel = defineMessage({
-  description: 'Plugins view: close',
-  defaultMessage: 'Close',
-  id: 'fork/plugins/close',
 })
 </script>
 

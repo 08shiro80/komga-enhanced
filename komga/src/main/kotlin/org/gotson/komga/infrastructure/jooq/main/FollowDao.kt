@@ -2,7 +2,6 @@ package org.gotson.komga.infrastructure.jooq.main
 
 import org.gotson.komga.domain.model.Follow
 import org.gotson.komga.domain.persistence.FollowRepository
-import org.gotson.komga.language.toCurrentTimeZone
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.jooq.impl.DSL
@@ -87,6 +86,51 @@ class FollowDao(
       ).execute()
   }
 
+  override fun insertAll(follows: Collection<Follow>) {
+    if (follows.isEmpty()) return
+
+    val batch =
+      dslRW
+        .batch(
+          dslRW
+            .insertInto(table)
+            .columns(
+              idField,
+              libraryIdField,
+              urlField,
+              titleField,
+              seriesIdField,
+              enabledField,
+              addedAtField,
+              lastCheckedAtField,
+            ).values(
+              null as String?,
+              null as String?,
+              null as String?,
+              null as String?,
+              null as String?,
+              null as Boolean?,
+              null as LocalDateTime?,
+              null as LocalDateTime?,
+            ).onConflictDoNothing(),
+        )
+
+    follows.forEach { follow ->
+      batch.bind(
+        follow.id,
+        follow.libraryId,
+        follow.url,
+        follow.title,
+        follow.seriesId,
+        follow.enabled,
+        follow.addedAt,
+        follow.lastCheckedAt,
+      )
+    }
+
+    batch.execute()
+  }
+
   override fun update(follow: Follow) {
     dslRW
       .update(table)
@@ -117,14 +161,15 @@ class FollowDao(
     dslRW.deleteFrom(table).where(libraryIdField.eq(libraryId)).execute()
   }
 
-  override fun updateLastChecked(
-    id: String,
+  override fun updateLastCheckedBatch(
+    ids: Collection<String>,
     checkedAt: LocalDateTime,
   ) {
+    if (ids.isEmpty()) return
     dslRW
       .update(table)
       .set(lastCheckedAtField, checkedAt)
-      .where(idField.eq(id))
+      .where(idField.`in`(ids))
       .execute()
   }
 
@@ -144,19 +189,4 @@ class FollowDao(
       addedAt = getTimestamp(addedAtField) ?: LocalDateTime.now(),
       lastCheckedAt = getTimestamp(lastCheckedAtField),
     )
-
-  private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
-    val raw = get(field.name) ?: return null
-    return when (raw) {
-      is LocalDateTime -> raw.toCurrentTimeZone()
-      is java.sql.Timestamp -> raw.toLocalDateTime()
-      is String ->
-        try {
-          LocalDateTime.parse(raw.replace(" ", "T").substringBefore("+"))
-        } catch (_: Exception) {
-          LocalDateTime.now()
-        }
-      else -> LocalDateTime.now()
-    }
-  }
 }

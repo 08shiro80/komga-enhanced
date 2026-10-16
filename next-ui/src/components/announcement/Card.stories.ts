@@ -41,7 +41,7 @@ export const Unread: Story = {
       date_modified: new Date('2023-12-15T00:00:00Z'),
       author: {
         name: 'gotson',
-        role: 'writer',
+        url: 'https://github.com/gotson',
       },
       tags: ['upgrade', 'komga'],
       _komga: {

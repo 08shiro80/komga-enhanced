@@ -232,7 +232,8 @@ export default Vue.extend({
     this.$eventHub.$off(READPROGRESS_SERIES_DELETED, this.readProgressChanged)
   },
   async mounted() {
-    this.pageSize = this.$store.state.persistedState.browsingPageSize || this.pageSize
+    const savedPageSize = this.$store.state.persistedState.browsingPageSize
+    this.pageSize = savedPageSize !== undefined && savedPageSize !== null ? savedPageSize : this.pageSize
 
     // restore from query param
     await this.resetParams(this.$route, this.collectionId)
@@ -445,11 +446,11 @@ export default Vue.extend({
     async loadPage(collectionId: string, page: number) {
       this.selectedSeries = []
 
-      const pageRequest = {
-        page: page - 1,
-        size: this.pageSize,
-        unpaged: this.unpaged,
-      } as PageRequest
+      const pageRequest = (
+        this.pageSize === 0
+          ? {unpaged: true}
+          : {page: page - 1, size: this.pageSize, unpaged: this.unpaged}
+      ) as PageRequest
 
       let authorsFilter = [] as AuthorDto[]
       authorRoles.forEach((role: string) => {

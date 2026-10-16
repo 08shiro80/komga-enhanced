@@ -34,9 +34,10 @@ import org.gotson.komga.domain.persistence.ReadProgressRepository
 import org.gotson.komga.domain.persistence.ThumbnailBookRepository
 import org.gotson.komga.infrastructure.configuration.KomgaSettingsProvider
 import org.gotson.komga.infrastructure.hash.Hasher
-import org.gotson.komga.infrastructure.hash.KoreaderHasher
 import org.gotson.komga.infrastructure.image.ImageConverter
 import org.gotson.komga.infrastructure.image.ImageType
+import org.gotson.komga.infrastructure.koreader.KoreaderHasher
+import org.gotson.komga.language.notEquals
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Pageable
@@ -44,6 +45,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.io.File
 import java.net.URLDecoder
+import java.nio.file.attribute.BasicFileAttributes
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlin.io.path.deleteIfExists
@@ -51,6 +53,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.isWritable
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.notExists
+import kotlin.io.path.readAttributes
 import kotlin.io.path.toPath
 import kotlin.math.roundToInt
 
@@ -99,7 +102,7 @@ class BookLifecycle(
       }
 
       val mediaToPersist =
-        if (media.status == Media.Status.READY)
+        if (media.status == Media.Status.READY && (book.fileHash.isNotBlank() || isFileUnchanged(book)))
           media.copy(pages = media.pages.restoreHashFrom(previous.pages))
         else
           media
@@ -111,6 +114,14 @@ class BookLifecycle(
 
     return if (media.status == Media.Status.READY) setOf(BookAction.GENERATE_THUMBNAIL, BookAction.REFRESH_METADATA) else emptySet()
   }
+
+  private fun isFileUnchanged(book: Book): Boolean =
+    try {
+      val attrs = book.path.readAttributes<BasicFileAttributes>()
+      !attrs.getUpdatedTime().notEquals(book.fileLastModified) && attrs.size() == book.fileSize
+    } catch (e: Exception) {
+      false
+    }
 
   fun hashAndPersist(book: Book) {
     if (!libraryRepository.findById(book.libraryId).hashFiles)
@@ -530,11 +541,11 @@ class BookLifecycle(
             if (extension.isFixedLayout && matchingPositions.size == 1)
               matchingPositions.first()
             else
-              matchingPositions.firstOrNull { it.locations!!.progression == newProgression.locator.locations!!.progression }
+              matchingPositions.firstOrNull { it.locations!!.progression == newProgression.locator.locations.progression }
                 ?: run {
                   // no exact match
-                  val before = matchingPositions.filter { it.locations!!.progression!! < newProgression.locator.locations!!.progression!! }.maxByOrNull { it.locations!!.position!! }
-                  val after = matchingPositions.filter { it.locations!!.progression!! > newProgression.locator.locations!!.progression!! }.minByOrNull { it.locations!!.position!! }
+                  val before = matchingPositions.filter { it.locations!!.progression!! < newProgression.locator.locations.progression }.maxByOrNull { it.locations!!.position!! }
+                  val after = matchingPositions.filter { it.locations!!.progression!! > newProgression.locator.locations.progression }.minByOrNull { it.locations!!.position!! }
                   if (before == null || after == null || before.locations!!.position!! > after.locations!!.position!!)
                     throw IllegalArgumentException("Invalid progression")
                   before
@@ -555,7 +566,7 @@ class BookLifecycle(
               // if no koboSpan is provided, use the one we matched
               koboSpan = newProgression.locator.koboSpan ?: matchedPosition.koboSpan,
               // don't trust the provided total progression, the one from Kobo can be wrong
-              locations = newProgression.locator.locations?.copy(totalProgression = totalProgression),
+              locations = newProgression.locator.locations.copy(totalProgression = totalProgression),
             ),
           )
         }
@@ -566,6 +577,7 @@ class BookLifecycle(
   }
 
   fun deleteBookFiles(book: Book) {
+    if (book.protectedFromDeletion) return logger.info { "Cannot delete book file, book is protected: ${book.path}" }
     if (book.path.notExists()) return logger.info { "Cannot delete book file, path does not exist: ${book.path}" }
     if (!book.path.isWritable()) return logger.info { "Cannot delete book file, path is not writable: ${book.path}" }
 

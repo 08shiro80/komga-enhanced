@@ -5,6 +5,7 @@ import org.gotson.komga.domain.model.ThumbnailBook
 import org.gotson.komga.domain.persistence.ThumbnailBookRepository
 import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
 import org.gotson.komga.infrastructure.jooq.TempTable.Companion.withTempTable
+import org.gotson.komga.infrastructure.jooq.ThumbnailDataStore
 import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.jooq.main.tables.records.ThumbnailBookRecord
 import org.jooq.DSLContext
@@ -18,6 +19,7 @@ import java.net.URL
 class ThumbnailBookDao(
   dslRW: DSLContext,
   @Qualifier("dslContextRO") dslRO: DSLContext,
+  private val thumbnailDataStore: ThumbnailDataStore,
   @param:Value("#{@komgaProperties.database.batchChunkSize}") private val batchSize: Int,
 ) : SplitDslDaoBase(dslRW, dslRO),
   ThumbnailBookRepository {
@@ -47,7 +49,7 @@ class ThumbnailBookDao(
       .selectFrom(tb)
       .where(tb.BOOK_ID.eq(bookId))
       .fetchInto(tb)
-      .map { it.toDomain() }
+      .map { it.toDomain().withExternalBytes() }
 
   override fun findAllByBookIdAndType(
     bookId: String,
@@ -58,7 +60,7 @@ class ThumbnailBookDao(
       .where(tb.BOOK_ID.eq(bookId))
       .and(tb.TYPE.`in`(type.map { it.name }))
       .fetchInto(tb)
-      .map { it.toDomain() }
+      .map { it.toDomain().withExternalBytes() }
 
   override fun findByIdOrNull(thumbnailId: String): ThumbnailBook? =
     dslRO
@@ -66,6 +68,7 @@ class ThumbnailBookDao(
       .where(tb.ID.eq(thumbnailId))
       .fetchOneInto(tb)
       ?.toDomain()
+      ?.withExternalBytes()
 
   override fun findSelectedByBookIdOrNull(bookId: String): ThumbnailBook? =
     dslRO
@@ -76,6 +79,7 @@ class ThumbnailBookDao(
       .fetchInto(tb)
       .map { it.toDomain() }
       .firstOrNull()
+      ?.withExternalBytes()
 
   override fun findAllBookIdsByThumbnailTypeAndDimensionSmallerThan(
     type: ThumbnailBook.Type,
@@ -92,26 +96,31 @@ class ThumbnailBookDao(
   override fun existsById(thumbnailId: String): Boolean = dslRO.fetchExists(tb, tb.ID.eq(thumbnailId))
 
   override fun insert(thumbnail: ThumbnailBook) {
-    dslRW
-      .insertInto(tb)
-      .set(tb.ID, thumbnail.id)
-      .set(tb.BOOK_ID, thumbnail.bookId)
-      .set(tb.THUMBNAIL, thumbnail.thumbnail)
-      .set(tb.URL, thumbnail.url?.toString())
-      .set(tb.SELECTED, thumbnail.selected)
-      .set(tb.TYPE, thumbnail.type.toString())
-      .set(tb.MEDIA_TYPE, thumbnail.mediaType)
-      .set(tb.WIDTH, thumbnail.dimension.width)
-      .set(tb.HEIGHT, thumbnail.dimension.height)
-      .set(tb.FILE_SIZE, thumbnail.fileSize)
-      .execute()
+    thumbnail.thumbnail?.let { thumbnailDataStore.putBookThumbnail(thumbnail.id, it) }
+    try {
+      dslRW
+        .insertInto(tb)
+        .set(tb.ID, thumbnail.id)
+        .set(tb.BOOK_ID, thumbnail.bookId)
+        .set(tb.URL, thumbnail.url?.toString())
+        .set(tb.SELECTED, thumbnail.selected)
+        .set(tb.TYPE, thumbnail.type.toString())
+        .set(tb.MEDIA_TYPE, thumbnail.mediaType)
+        .set(tb.WIDTH, thumbnail.dimension.width)
+        .set(tb.HEIGHT, thumbnail.dimension.height)
+        .set(tb.FILE_SIZE, thumbnail.fileSize)
+        .execute()
+    } catch (e: Exception) {
+      thumbnail.thumbnail?.let { thumbnailDataStore.deleteBookThumbnail(thumbnail.id) }
+      throw e
+    }
   }
 
   override fun update(thumbnail: ThumbnailBook) {
     dslRW
       .update(tb)
       .set(tb.BOOK_ID, thumbnail.bookId)
-      .set(tb.THUMBNAIL, thumbnail.thumbnail)
+      .set(tb.THUMBNAIL, null as ByteArray?)
       .set(tb.URL, thumbnail.url?.toString())
       .set(tb.SELECTED, thumbnail.selected)
       .set(tb.TYPE, thumbnail.type.toString())
@@ -121,6 +130,11 @@ class ThumbnailBookDao(
       .set(tb.FILE_SIZE, thumbnail.fileSize)
       .where(tb.ID.eq(thumbnail.id))
       .execute()
+    val bytes = thumbnail.thumbnail
+    if (bytes != null)
+      thumbnailDataStore.putBookThumbnail(thumbnail.id, bytes)
+    else
+      thumbnailDataStore.deleteBookThumbnail(thumbnail.id)
   }
 
   @Transactional
@@ -142,16 +156,31 @@ class ThumbnailBookDao(
 
   override fun delete(thumbnailBookId: String) {
     dslRW.deleteFrom(tb).where(tb.ID.eq(thumbnailBookId)).execute()
+    thumbnailDataStore.deleteBookThumbnail(thumbnailBookId)
   }
 
   override fun deleteByBookId(bookId: String) {
+    val ids =
+      dslRW
+        .select(tb.ID)
+        .from(tb)
+        .where(tb.BOOK_ID.eq(bookId))
+        .fetch(tb.ID)
     dslRW.deleteFrom(tb).where(tb.BOOK_ID.eq(bookId)).execute()
+    thumbnailDataStore.deleteBookThumbnails(ids)
   }
 
   @Transactional
   override fun deleteByBookIds(bookIds: Collection<String>) {
-    dslRW.withTempTable(batchSize, bookIds).use {
-      dslRW.deleteFrom(tb).where(tb.BOOK_ID.`in`(it.selectTempStrings())).execute()
+    dslRW.withTempTable(batchSize, bookIds).use { tempTable ->
+      val ids =
+        dslRW
+          .select(tb.ID)
+          .from(tb)
+          .where(tb.BOOK_ID.`in`(tempTable.selectTempStrings()))
+          .fetch(tb.ID)
+      dslRW.deleteFrom(tb).where(tb.BOOK_ID.`in`(tempTable.selectTempStrings())).execute()
+      thumbnailDataStore.deleteBookThumbnails(ids)
     }
   }
 
@@ -159,11 +188,19 @@ class ThumbnailBookDao(
     bookId: String,
     type: ThumbnailBook.Type,
   ) {
+    val ids =
+      dslRW
+        .select(tb.ID)
+        .from(tb)
+        .where(tb.BOOK_ID.eq(bookId))
+        .and(tb.TYPE.eq(type.toString()))
+        .fetch(tb.ID)
     dslRW
       .deleteFrom(tb)
       .where(tb.BOOK_ID.eq(bookId))
       .and(tb.TYPE.eq(type.toString()))
       .execute()
+    thumbnailDataStore.deleteBookThumbnails(ids)
   }
 
   private fun ThumbnailBookRecord.toDomain() =
@@ -180,4 +217,10 @@ class ThumbnailBookDao(
       createdDate = createdDate,
       lastModifiedDate = lastModifiedDate,
     )
+
+  private fun ThumbnailBook.withExternalBytes(): ThumbnailBook =
+    if (thumbnail == null && url == null)
+      copy(thumbnail = thumbnailDataStore.getBookThumbnail(id))
+    else
+      this
 }

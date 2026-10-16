@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-4">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Download dashboard: page title',
@@ -9,7 +9,7 @@
             id: 'fork/dashboard/title',
           })
         }}
-      </span>
+      </h1>
     </div>
 
     <EmptyStateNetworkError v-if="downloadsError" />

@@ -1,6 +1,9 @@
 package org.gotson.komga.domain.model
 
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeParseException
 
 /**
  * Represents a downloaded chapter URL for duplicate detection.
@@ -76,9 +79,16 @@ data class ChapterUrlImportDto(
       downloadedAt =
         downloadedAt?.let {
           try {
-            LocalDateTime.parse(it.replace("Z", "").substringBefore("+"))
-          } catch (e: Exception) {
-            LocalDateTime.now()
+            OffsetDateTime
+              .parse(it)
+              .atZoneSameInstant(ZoneId.systemDefault())
+              .toLocalDateTime()
+          } catch (e: DateTimeParseException) {
+            try {
+              LocalDateTime.parse(it)
+            } catch (e2: DateTimeParseException) {
+              LocalDateTime.now()
+            }
           }
         } ?: LocalDateTime.now(),
       source = source,

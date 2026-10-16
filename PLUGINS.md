@@ -9,7 +9,7 @@ There are two kinds of plugin today:
 | Type | Interface | What it does |
 |------|-----------|--------------|
 | `METADATA` | `MetadataProviderPlugin` | Search an online source and return series metadata. Shows up in "Search Online Databases". |
-| `NOTIFIER` | `NotifierPlugin` | React to events (`DOWNLOAD_COMPLETED`, `DOWNLOAD_FAILED`) — webhook, Discord, log, … |
+| `NOTIFIER` | `NotifierPlugin` | React to events (`DOWNLOAD_COMPLETED`, `DOWNLOAD_FAILED`, `NEW_CHAPTERS_QUEUED`) — webhook, Discord, log, … |
 
 > `ANALYZER` / `PROCESSOR` interfaces exist in the SPI but have no internal
 > call-sites yet. `DOWNLOAD` is intentionally not pluggable (it is tied to gallery-dl).
@@ -135,7 +135,13 @@ the source at
 ### Logging & config
 
 Use the `PluginContext` you receive in `initialize` for logging (it writes to the
-plugin's log, visible in the Plugin Manager) and to read configuration values.
+plugin's log, visible in the Plugin Manager) and to read configuration values
+(`context.config`).
+
+To expose user-configurable settings, give your plugin a `configSchema` — a JSON-Schema
+string on the SPI (`val configSchema: String?`). Komga renders a form from it in the Plugin
+Manager, stores the entered values, and hands them back to you via `context.config`. Return
+`null` if your plugin needs no configuration.
 
 ---
 

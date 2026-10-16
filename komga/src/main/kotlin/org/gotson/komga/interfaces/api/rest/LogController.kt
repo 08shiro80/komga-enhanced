@@ -2,6 +2,7 @@ package org.gotson.komga.interfaces.api.rest
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
+import jakarta.annotation.PreDestroy
 import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.gotson.komga.infrastructure.configuration.KomgaSettingsProvider
 import org.slf4j.LoggerFactory
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.io.RandomAccessFile
 import java.nio.file.Path
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @RestController
@@ -27,6 +29,16 @@ class LogController(
   private val komgaProperties: KomgaProperties,
   private val settingsProvider: KomgaSettingsProvider,
 ) {
+  private val sseExecutor: ExecutorService =
+    Executors.newCachedThreadPool { runnable ->
+      Thread(runnable, "log-sse").apply { isDaemon = true }
+    }
+
+  @PreDestroy
+  fun shutdownSseExecutor() {
+    sseExecutor.shutdownNow()
+  }
+
   private fun applyLogLevel(level: String) {
     val newLevel =
       when (level.uppercase()) {
@@ -34,6 +46,7 @@ class LogController(
         "TRACE" -> Level.TRACE
         "INFO" -> Level.INFO
         "ERROR" -> Level.ERROR
+        "OFF" -> Level.OFF
         else -> Level.WARN
       }
     val loggerContext = LoggerFactory.getILoggerFactory() as LoggerContext
@@ -77,7 +90,7 @@ class LogController(
   ): Map<String, String> {
     val normalized =
       level.uppercase().let {
-        if (it !in setOf("DEBUG", "TRACE", "INFO", "WARN", "ERROR")) "WARN" else it
+        if (it !in setOf("DEBUG", "TRACE", "INFO", "WARN", "ERROR", "OFF")) "WARN" else it
       }
     applyLogLevel(normalized)
     settingsProvider.logLevel = normalized
@@ -88,13 +101,8 @@ class LogController(
   fun streamLogs(): SseEmitter {
     val emitter = SseEmitter(0L)
     val file = logFile().toFile()
-    val executor = Executors.newSingleThreadExecutor()
 
-    emitter.onCompletion { executor.shutdownNow() }
-    emitter.onTimeout { executor.shutdownNow() }
-    emitter.onError { executor.shutdownNow() }
-
-    executor.submit {
+    val future = sseExecutor.submit {
       try {
         RandomAccessFile(file, "r").use { raf ->
           raf.seek(maxOf(0L, raf.length() - 8192))
@@ -140,6 +148,10 @@ class LogController(
         emitter.complete()
       }
     }
+
+    emitter.onCompletion { future.cancel(true) }
+    emitter.onTimeout { future.cancel(true) }
+    emitter.onError { future.cancel(true) }
 
     return emitter
   }

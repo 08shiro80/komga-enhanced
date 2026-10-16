@@ -66,6 +66,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/account/trackers': RouteRecordInfo<
+      '/account/trackers',
+      '/account/trackers',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/account/ui': RouteRecordInfo<
       '/account/ui',
       '/account/ui',
@@ -427,6 +434,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/account/details.vue': {
       routes:
         | '/account/details'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/account/trackers.vue': {
+      routes:
+        | '/account/trackers'
       views:
         | never
       pathParamNames:

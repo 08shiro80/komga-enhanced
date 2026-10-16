@@ -1,0 +1,84 @@
+<template>
+  <FilterSearchList
+    v-model="model"
+    v-model:mode="modelMode"
+    v-model:search="search"
+    :items="infiniteItems"
+    :search-items="searchResults"
+    :search-loading="searchLoading"
+    :hide-search="hideSearch"
+    show-mode-selector
+    @load-more="loadNextPage()"
+  >
+  </FilterSearchList>
+</template>
+
+<script setup lang="ts">
+import { useInfiniteQuery, useQuery } from '@pinia/colada'
+import { authorsNamesQuery, authorsNamesQueryInfinite } from '@/colada/referential'
+import { PageRequest } from '@/types/PageRequest'
+import * as v from 'valibot'
+import { type AnyAll, filterKeys, filterMessages, SchemaContributor } from '@/types/filter'
+import type { ItemType } from '@/components/filter/List.vue'
+import { refDebounced } from '@vueuse/core'
+import { useIntl } from 'vue-intl'
+import { CONTRIBUTOR_ANYROLE } from '@/types/referential/contributor'
+
+type Contributor = v.InferOutput<typeof SchemaContributor>
+
+const intl = useIntl()
+
+const model = defineModel<Contributor[]>({ default: () => [] })
+const modelMode = defineModel<AnyAll>('mode', { default: 'anyOf' })
+
+const search = ref()
+const searchDebounced = refDebounced(search, 500)
+
+const { role } = defineProps<{
+  role?: string
+}>()
+
+const filterContext = inject(filterKeys.context, {})
+
+const apiQuery = computed(() => ({
+  ...toValue(filterContext),
+  ...(role === CONTRIBUTOR_ANYROLE ? {} : { role: role }),
+}))
+
+const { data: searchItems, isLoading: searchLoading } = useQuery(() => ({
+  ...authorsNamesQuery({
+    pageRequest: PageRequest.Unpaged(),
+    search: searchDebounced.value,
+    ...apiQuery.value,
+  }),
+  enabled: !!searchDebounced.value,
+}))
+const searchResults = computed(() => searchItems.value?.content?.map((it) => toItemType(it)))
+
+const { data: infiniteData, loadNextPage } = useInfiniteQuery(() =>
+  authorsNamesQueryInfinite(apiQuery.value),
+)
+const infiniteItems = computed(() => {
+  const itemTypes = (infiniteData.value?.pages.flatMap((it) => it?.content ?? []) ?? []).map((it) =>
+    toItemType(it),
+  )
+  return [
+    {
+      title: intl.formatMessage(filterMessages.any!),
+      value: { a: 'any' },
+      valueExclude: { a: 'none' },
+    },
+    ...itemTypes,
+  ]
+})
+
+const hideSearch = computed(() => (infiniteData.value?.pages?.[0]?.totalElements || 0) < 10)
+
+function toItemType(contributorName: string): ItemType<Contributor> {
+  return {
+    title: contributorName,
+    value: { i: 'i', v: contributorName },
+    valueExclude: { i: 'e', v: contributorName },
+  }
+}
+</script>

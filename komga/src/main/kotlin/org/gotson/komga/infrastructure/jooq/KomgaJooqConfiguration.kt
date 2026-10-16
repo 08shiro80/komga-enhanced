@@ -48,6 +48,20 @@ class KomgaJooqConfiguration {
     executeListenerProviders: ObjectProvider<ExecuteListenerProvider?>,
   ): DSLContext = createDslContext(dataSource, transactionProvider, executeListenerProviders)
 
+  @Bean("thumbnailsDslContextRW")
+  fun thumbnailsDslContextRW(
+    @Qualifier("thumbnailsDataSourceRW") dataSource: DataSource,
+    transactionProvider: ObjectProvider<TransactionProvider?>,
+    executeListenerProviders: ObjectProvider<ExecuteListenerProvider?>,
+  ): DSLContext = createDslContext(dataSource, transactionProvider, executeListenerProviders)
+
+  @Bean("thumbnailsDslContextRO")
+  fun thumbnailsDslContextRO(
+    @Qualifier("thumbnailsDataSourceRO") dataSource: DataSource,
+    transactionProvider: ObjectProvider<TransactionProvider?>,
+    executeListenerProviders: ObjectProvider<ExecuteListenerProvider?>,
+  ): DSLContext = createDslContext(dataSource, transactionProvider, executeListenerProviders)
+
   private fun createDslContext(
     dataSource: DataSource,
     transactionProvider: ObjectProvider<TransactionProvider?>,

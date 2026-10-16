@@ -25,6 +25,7 @@ class BackupLifecycle(
   private val applicationContext: org.springframework.context.ApplicationContext,
   @Qualifier("sqliteDataSourceRW") private val dataSourceRW: DataSource,
   @Qualifier("sqliteDataSourceRO") private val dataSourceRO: DataSource,
+  @Qualifier("tasksDataSourceRW") private val tasksDataSourceRW: DataSource,
 ) {
   private val backupDir: Path
     get() = Paths.get(komgaProperties.configDir.toString(), "backups")
@@ -74,8 +75,8 @@ class BackupLifecycle(
     logger.info { "Creating backup from $sourceDb to $backupFile" }
 
     try {
-      // Copy database file
-      Files.copy(sourceDb, backupFile, StandardCopyOption.REPLACE_EXISTING)
+      Files.deleteIfExists(backupFile)
+      vacuumInto(dataSourceRW, backupFile)
 
       val fileSize = backupFile.fileSize()
       logger.info { "Backup created successfully: $backupFile (${fileSize / 1024 / 1024} MB)" }
@@ -118,7 +119,8 @@ class BackupLifecycle(
     logger.info { "Creating tasks backup from $sourceDb to $backupFile" }
 
     try {
-      Files.copy(sourceDb, backupFile, StandardCopyOption.REPLACE_EXISTING)
+      Files.deleteIfExists(backupFile)
+      vacuumInto(tasksDataSourceRW, backupFile)
 
       val fileSize = backupFile.fileSize()
       logger.info { "Tasks backup created successfully: $backupFile" }
@@ -166,10 +168,9 @@ class BackupLifecycle(
           fileName = path.fileName.toString(),
           filePath = path.toString(),
           createdDate =
-            LocalDateTime.ofEpochSecond(
-              Files.getLastModifiedTime(path).toInstant().epochSecond,
-              0,
-              java.time.ZoneOffset.UTC,
+            LocalDateTime.ofInstant(
+              Files.getLastModifiedTime(path).toInstant(),
+              java.time.ZoneId.systemDefault(),
             ),
           sizeBytes = path.fileSize(),
           type = BackupType.MANUAL,
@@ -233,6 +234,18 @@ class BackupLifecycle(
 
     logger.info { "Cleaned $deleted old backups (kept $keepCount)" }
     return deleted
+  }
+
+  private fun vacuumInto(
+    ds: DataSource,
+    target: Path,
+  ) {
+    ds.connection.use { conn ->
+      conn.prepareStatement("VACUUM INTO ?").use { stmt ->
+        stmt.setString(1, target.toString())
+        stmt.execute()
+      }
+    }
   }
 
   /**
@@ -299,15 +312,20 @@ class BackupLifecycle(
     if (!backupFile.exists() || !backupFile.isRegularFile()) {
       throw IllegalArgumentException("Backup file not found: $fileName")
     }
+    if (backupFile.fileName.toString().startsWith("komga_tasks_backup_")) {
+      throw IllegalArgumentException("Cannot restore a tasks backup as the main database: $fileName")
+    }
 
     val targetDb = Paths.get(komgaProperties.configDir.toString(), "database.sqlite")
     val tempBackup = Paths.get(komgaProperties.configDir.toString(), "database.sqlite.pre-restore")
     val walFile = Paths.get(komgaProperties.configDir.toString(), "database.sqlite-wal")
     val shmFile = Paths.get(komgaProperties.configDir.toString(), "database.sqlite-shm")
 
+    var dataSourcesClosed = false
     try {
       // Close all database connections
       closeAllMainDataSources()
+      dataSourcesClosed = true
 
       // Wait for file to be unlocked with retry mechanism
       var attempts = 0
@@ -366,18 +384,7 @@ class BackupLifecycle(
       logger.info { "Restored database from backup: $fileName" }
 
       // Schedule application shutdown (user must restart manually for safety)
-      Thread {
-        try {
-          Thread.sleep(2000) // Give time for response to be sent
-          logger.info { "Shutting down application after backup restore..." }
-          val exitCode =
-            org.springframework.boot.SpringApplication
-              .exit(applicationContext, { 0 })
-          System.exit(exitCode)
-        } catch (e: Exception) {
-          logger.error(e) { "Failed to shutdown application" }
-        }
-      }.start()
+      scheduleShutdown()
 
       return RestoreInfo(
         backupFileName = fileName,
@@ -386,11 +393,28 @@ class BackupLifecycle(
       )
     } catch (e: BackupException) {
       // Re-throw BackupException as-is
+      if (dataSourcesClosed) scheduleShutdown()
       throw e
     } catch (e: Exception) {
       logger.error(e) { "Failed to restore backup: ${e.message}" }
+      if (dataSourcesClosed) scheduleShutdown()
       throw BackupException("Failed to restore backup: ${e.message}", e)
     }
+  }
+
+  private fun scheduleShutdown() {
+    Thread {
+      try {
+        Thread.sleep(2000) // Give time for response to be sent
+        logger.info { "Shutting down application after backup restore..." }
+        val exitCode =
+          org.springframework.boot.SpringApplication
+            .exit(applicationContext, { 0 })
+        System.exit(exitCode)
+      } catch (e: Exception) {
+        logger.error(e) { "Failed to shutdown application" }
+      }
+    }.start()
   }
 }
 

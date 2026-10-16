@@ -42,6 +42,7 @@ class SseController(
   private val tasksRepository: TasksRepository,
   private val backgroundJobTracker: BackgroundJobTracker,
 ) : SmartLifecycle {
+  @Volatile
   private var acceptingConnections = true
   private val emitters = Collections.synchronizedMap(HashMap<SseEmitter, KomgaUser>())
 
@@ -60,15 +61,14 @@ class SseController(
 
   @Scheduled(fixedRate = 15_000)
   fun heartbeat() {
-    if (emitters.isNotEmpty())
-      synchronized(emitters) {
-        emitters.forEach { (emitter, _) ->
-          try {
-            emitter.send(SseEmitter.event().comment("heartbeat"))
-          } catch (_: IOException) {
-          }
-        }
+    if (emitters.isEmpty()) return
+    val targets = synchronized(emitters) { emitters.keys.toList() }
+    targets.forEach { emitter ->
+      try {
+        emitter.send(SseEmitter.event().comment("heartbeat"))
+      } catch (_: IOException) {
       }
+    }
   }
 
   @Scheduled(fixedRate = 10_000)
@@ -195,6 +195,9 @@ class SseController(
           ),
           adminOnly = true,
         )
+
+      is DomainEvent.NewChaptersQueued -> Unit
+      is DomainEvent.ChapterAutoBlacklisted -> Unit
     }
   }
 
@@ -206,30 +209,37 @@ class SseController(
   ) {
     logger.debug { "Publish SSE: '$name':$data" }
 
-    synchronized(emitters) {
-      val deadEmitters = mutableListOf<SseEmitter>()
-      emitters
-        .filter { if (adminOnly) it.value.isAdmin else true }
-        .filter { if (userIdOnly != null) it.value.id == userIdOnly else true }
-        .forEach { (emitter, _) ->
-          try {
-            emitter.send(
-              SseEmitter
-                .event()
-                .name(name)
-                .data(data, MediaType.APPLICATION_JSON),
-            )
-          } catch (e: IOException) {
-            logger.debug(e) { "SSE emitter connection closed, removing from active connections" }
-            deadEmitters.add(emitter)
-          } catch (e: Exception) {
-            logger.warn(e) { "Unexpected error sending SSE event, removing emitter" }
-            deadEmitters.add(emitter)
-          }
-        }
-      // Clean up dead connections
-      deadEmitters.forEach { emitters.remove(it) }
+    val targets =
+      synchronized(emitters) {
+        emitters
+          .filter { if (adminOnly) it.value.isAdmin else true }
+          .filter { if (userIdOnly != null) it.value.id == userIdOnly else true }
+          .keys
+          .toList()
+      }
+
+    val deadEmitters = mutableListOf<SseEmitter>()
+    targets.forEach { emitter ->
+      try {
+        emitter.send(
+          SseEmitter
+            .event()
+            .name(name)
+            .data(data, MediaType.APPLICATION_JSON),
+        )
+      } catch (e: IOException) {
+        logger.debug(e) { "SSE emitter connection closed, removing from active connections" }
+        deadEmitters.add(emitter)
+      } catch (e: Exception) {
+        logger.warn(e) { "Unexpected error sending SSE event, removing emitter" }
+        deadEmitters.add(emitter)
+      }
     }
+
+    if (deadEmitters.isNotEmpty())
+      synchronized(emitters) {
+        deadEmitters.forEach { emitters.remove(it) }
+      }
   }
 
   override fun start() = Unit

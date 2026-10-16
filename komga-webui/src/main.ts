@@ -36,6 +36,7 @@ import komgaFonts from './plugins/komga-fonts.plugin'
 import komgaPlugins from './plugins/komga-plugins.plugin'
 import komgaImport from './plugins/komga-import.plugin'
 import komgaFollows from './plugins/komga-follows.plugin'
+import komgaTrackers from './plugins/komga-trackers.plugin'
 import vuetify from './plugins/vuetify'
 import logger from './plugins/logger.plugin'
 import './public-path'
@@ -88,6 +89,7 @@ Vue.use(komgaFonts, {http: Vue.prototype.$http})
 Vue.use(komgaPlugins, {http: Vue.prototype.$http})
 Vue.use(komgaImport, {http: Vue.prototype.$http})
 Vue.use(komgaFollows, {http: Vue.prototype.$http})
+Vue.use(komgaTrackers, {http: Vue.prototype.$http})
 
 Vue.config.productionTip = false
 

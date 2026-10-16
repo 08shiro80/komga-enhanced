@@ -20,32 +20,30 @@ class MangaDexRateLimiter {
   }
 
   fun waitIfNeeded() {
-    lock.withLock {
-      val now = Instant.now()
-
-      val oneSecondAgo = now.minusMillis(ONE_SECOND_MILLIS)
-      while (requestTimestamps.isNotEmpty() && requestTimestamps.peek().isBefore(oneSecondAgo)) {
-        requestTimestamps.poll()
-      }
-
-      val requestsInLastSecond = requestTimestamps.size
-
-      if (requestsInLastSecond >= MAX_REQUESTS_PER_SECOND) {
-        val oldest = requestTimestamps.peek()
-        if (oldest != null) {
-          val millisSinceOldest = now.toEpochMilli() - oldest.toEpochMilli()
-          val waitTimeMillis = ONE_SECOND_MILLIS - millisSinceOldest + 50
-          if (waitTimeMillis > 0) {
-            logger.debug { "MangaDex rate limit: waiting ${waitTimeMillis}ms" }
-            Thread.sleep(waitTimeMillis)
-          }
-        }
-        while (requestTimestamps.isNotEmpty() && requestTimestamps.peek().isBefore(Instant.now().minusMillis(ONE_SECOND_MILLIS))) {
+    while (true) {
+      var waitTimeMillis = 0L
+      lock.withLock {
+        val now = Instant.now()
+        val oneSecondAgo = now.minusMillis(ONE_SECOND_MILLIS)
+        while (requestTimestamps.isNotEmpty() && requestTimestamps.peek().isBefore(oneSecondAgo)) {
           requestTimestamps.poll()
         }
+
+        if (requestTimestamps.size < MAX_REQUESTS_PER_SECOND) {
+          requestTimestamps.offer(now)
+          return
+        }
+
+        val oldest = requestTimestamps.peek()
+        if (oldest != null) {
+          waitTimeMillis = ONE_SECOND_MILLIS - (now.toEpochMilli() - oldest.toEpochMilli()) + 50
+        }
       }
 
-      requestTimestamps.offer(Instant.now())
+      if (waitTimeMillis > 0) {
+        logger.debug { "MangaDex rate limit: waiting ${waitTimeMillis}ms" }
+        Thread.sleep(waitTimeMillis)
+      }
     }
   }
 

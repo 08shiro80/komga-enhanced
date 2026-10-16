@@ -14,7 +14,7 @@ export const QUERY_KEYS_CHAPTER_URLS = {
 
 export function useSeriesChapterUrls(seriesId: Ref<string | undefined>) {
   return useQuery({
-    key: () => ['chapter-urls', seriesId.value ?? ''],
+    key: () => QUERY_KEYS_CHAPTER_URLS.bySeries(seriesId.value ?? ''),
     query: () => komgaGetChapterUrlsForSeries({ path: { seriesId: seriesId.value! } }),
     enabled: () => !!seriesId.value,
     staleTime: STALE_TIME.DEFAULT,

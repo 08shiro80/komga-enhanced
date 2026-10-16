@@ -69,9 +69,16 @@ class LibraryContentLifecycle(
   private val thumbnailSeriesRepository: ThumbnailSeriesRepository,
   private val chapterUrlImporter: ChapterUrlImporter,
 ) {
+  private val scanLock = Any()
+
   fun scanRootFolder(
     library: Library,
     scanDeep: Boolean = false,
+  ) = synchronized(scanLock) { scanRootFolderLocked(library, scanDeep) }
+
+  private fun scanRootFolderLocked(
+    library: Library,
+    scanDeep: Boolean,
   ) {
     logger.info { "Scan root folder for library: $library" }
     measureTime {
@@ -203,6 +210,7 @@ class LibraryContentLifecycle(
                         fileLastModified = newBook.fileLastModified,
                         fileSize = newBook.fileSize,
                         fileHash = hash ?: "",
+                        fileHashKoreader = "",
                       )
                     transactionTemplate.executeWithoutResult {
                       mediaRepository.findById(existingBook.id).let {
@@ -301,23 +309,52 @@ class LibraryContentLifecycle(
   fun scanSeriesFolder(
     library: Library,
     seriesPath: java.nio.file.Path,
+  ) = synchronized(scanLock) { scanSeriesFolderLocked(library, seriesPath) }
+
+  private fun scanSeriesFolderLocked(
+    library: Library,
+    seriesPath: java.nio.file.Path,
   ) {
     logger.info { "Targeted scan for series folder: $seriesPath" }
+    val dir = seriesPath.toFile()
+    if (!dir.isDirectory) return logger.warn { "Path is not a directory: $seriesPath" }
+    if (dir.name.startsWith(".") || library.scanDirectoryExclusions.any { seriesPath.toString().contains(it, true) }) {
+      return logger.info { "Series folder is excluded from scanning, skipping: $seriesPath" }
+    }
+    if (!library.oneshotsDirectory.isNullOrBlank() && seriesPath.toString().contains(library.oneshotsDirectory, true)) {
+      logger.info { "Series folder is in the oneshots directory, falling back to a library scan: $seriesPath" }
+      return taskEmitter.scanLibrary(library.id)
+    }
     val seriesUrl = seriesPath.toUri().toURL()
 
+    val scanForExtensions =
+      buildSet {
+        if (library.scanCbx) addAll(listOf("cbz", "zip", "cbr", "rar"))
+        if (library.scanPdf) add("pdf")
+        if (library.scanEpub) add("epub")
+      }
+    val dirUpdated =
+      java.nio.file.Files
+        .readAttributes(seriesPath, java.nio.file.attribute.BasicFileAttributes::class.java)
+        .getUpdatedTime()
+    val files = dir.listFiles() ?: return logger.warn { "Could not list series folder, skipping: $seriesPath" }
+    val scannedBooks =
+      files
+        .filter { it.isFile && !it.name.startsWith(".") && it.extension.lowercase() in scanForExtensions }
+        .mapNotNull { fileSystemScanner.scanFile(it.toPath()) }
+        .map { it.copy(libraryId = library.id) }
+    val newestBook = scannedBooks.maxOfOrNull { it.fileLastModified }
+    val seriesFileLastModified = if (library.scanForceModifiedTime && newestBook != null) maxOf(dirUpdated, newestBook) else dirUpdated
+
+    var seriesCreated = false
     val series =
       seriesRepository.findNotDeletedByLibraryIdAndUrlOrNull(library.id, seriesUrl)
         ?: run {
-          val dir = seriesPath.toFile()
-          if (!dir.isDirectory) return logger.warn { "Path is not a directory: $seriesPath" }
-          val attrs =
-            java.nio.file.Files
-              .readAttributes(seriesPath, java.nio.file.attribute.BasicFileAttributes::class.java)
           val newSeries =
             Series(
               name = dir.name.ifBlank { seriesPath.toString() },
               url = seriesUrl,
-              fileLastModified = LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), java.time.ZoneId.systemDefault()),
+              fileLastModified = seriesFileLastModified,
               libraryId = library.id,
             )
           val restored = tryRestoreByMangaDexUuid(newSeries, library.id)
@@ -326,46 +363,60 @@ class LibraryContentLifecycle(
             restored
           } else {
             logger.info { "Creating new series for download: ${newSeries.name}" }
+            seriesCreated = true
             seriesLifecycle.createSeries(newSeries)
           }
         }
 
-    val existingBooks = bookRepository.findAllBySeriesId(series.id)
-    val existingBooksUrls = existingBooks.filterNot { it.deletedDate != null }.map { it.url }.toSet()
+    val existingBooks = bookRepository.findAllBySeriesId(series.id).filter { it.deletedDate == null }
+    val scannedUrls = scannedBooks.map { it.url }.toSet()
 
-    val newBooks =
-      seriesPath
-        .toFile()
-        .listFiles()
-        ?.filter { it.isFile && it.extension.lowercase() in setOf("cbz", "zip", "cbr", "rar") }
-        ?.map { fileSystemScanner.scanFile(it.toPath()) }
-        ?.filterNotNull()
-        ?.filter { it.url !in existingBooksUrls }
-        ?.map { it.copy(libraryId = library.id) }
-        ?: emptyList()
+    val missingBooks = existingBooks.filter { it.url !in scannedUrls }
+    if (missingBooks.isNotEmpty()) {
+      logger.info { "Soft deleting books not on disk anymore: $missingBooks" }
+      bookLifecycle.softDeleteMany(missingBooks)
+    }
 
+    val existingByUrl = existingBooks.associateBy { it.url }
+    var outdatedBooks = 0
+    scannedBooks.forEach { scanned ->
+      val existing = existingByUrl[scanned.url] ?: return@forEach
+      if (scanned.fileLastModified.notEquals(existing.fileLastModified) && updateChangedBook(existing, scanned)) outdatedBooks++
+    }
+
+    val newBooks = scannedBooks.filter { it.url !in existingByUrl }
     if (newBooks.isNotEmpty()) {
-      logger.info { "Adding ${newBooks.size} new books to series ${series.name}" }
+      logger.info { "Adding ${newBooks.size} new books to series ${series.name}: ${newBooks.map { it.name }}" }
       seriesLifecycle.addBooks(series, newBooks)
-      taskEmitter.refreshSeriesMetadata(series.id)
+      if (seriesCreated) tryRestoreSeries(series, newBooks)
+      tryRestoreBooks(newBooks)
+    }
 
-      newBooks.forEach { book ->
-        taskEmitter.analyzeBook(bookRepository.findByIdOrNull(book.id) ?: book)
+    if (newBooks.isEmpty() && missingBooks.isEmpty() && outdatedBooks == 0) {
+      logger.info { "No new, changed or removed books in $seriesPath" }
+    } else {
+      if (newBooks.isNotEmpty() || missingBooks.isNotEmpty()) {
+        seriesLifecycle.sortBooks(series)
+        taskEmitter.refreshSeriesMetadata(series.id)
       }
 
       // Mirror ScanLibrary post-scan tasks so library settings (hashFiles, hashPages,
       // hashKoreader, repairExtensions, convert, duplicate pages) are honored after a download.
       // Each emitter filters internally by library flag / book state, so this is idempotent.
+      taskEmitter.analyzeUnknownAndOutdatedBooks(library)
       taskEmitter.repairExtensions(library, LOW_PRIORITY)
       taskEmitter.findBooksToConvert(library, LOWEST_PRIORITY)
       taskEmitter.findBooksWithMissingPageHash(library, LOWEST_PRIORITY)
       taskEmitter.findDuplicatePagesToDelete(library, LOWEST_PRIORITY)
       taskEmitter.hashBooksWithoutHash(library)
       taskEmitter.hashBooksWithoutHashKoreader(library)
-    } else {
-      logger.info { "No new books in $seriesPath, checking chapter URLs" }
     }
-    seriesLifecycle.sortBooks(series)
+
+    seriesRepository.findByIdOrNull(series.id)?.let { current ->
+      if (seriesFileLastModified.notEquals(current.fileLastModified)) {
+        seriesRepository.update(current.copy(fileLastModified = seriesFileLastModified))
+      }
+    }
 
     taskEmitter.refreshSeriesLocalArtwork(series.id)
 
@@ -380,6 +431,44 @@ class LibraryContentLifecycle(
         logger.warn(e) { "Failed to import chapter URLs for ${series.name}" }
       }
     }
+  }
+
+  private fun updateChangedBook(
+    existingBook: Book,
+    newBook: Book,
+  ): Boolean {
+    val hash =
+      if (existingBook.fileSize == newBook.fileSize && existingBook.fileHash.isNotBlank()) {
+        hasher.computeHash(newBook.path)
+      } else {
+        null
+      }
+    if (hash == existingBook.fileHash) {
+      logger.info { "Book changed on disk, but still has the same hash, no need to reset media status: $existingBook" }
+      bookRepository.update(
+        existingBook.copy(
+          fileLastModified = newBook.fileLastModified,
+          fileSize = newBook.fileSize,
+          fileHash = hash,
+        ),
+      )
+      return false
+    }
+    logger.info { "Book changed on disk, update and reset media status: $existingBook" }
+    transactionTemplate.executeWithoutResult {
+      mediaRepository.findById(existingBook.id).let {
+        mediaRepository.update(it.copy(status = Media.Status.OUTDATED))
+      }
+      bookRepository.update(
+        existingBook.copy(
+          fileLastModified = newBook.fileLastModified,
+          fileSize = newBook.fileSize,
+          fileHash = hash ?: "",
+          fileHashKoreader = "",
+        ),
+      )
+    }
+    return true
   }
 
   /**
@@ -536,32 +625,35 @@ class LibraryContentLifecycle(
 
         if (match != null) {
           // restore book
-          logger.info { "Match found, restore $match into $bookToAdd" }
+          logger.info { "Match found, restore $match into $bookWithHash" }
           transactionTemplate.executeWithoutResult {
+            // copy koreader hash
+            bookRepository.update(bookWithHash.copy(fileHashKoreader = match.fileHashKoreader))
+
             // copy media
-            mediaRepository.copy(match.id, bookToAdd.id)
+            mediaRepository.copy(match.id, bookWithHash.id)
 
             // copy generated and user uploaded thumbnails
             thumbnailBookRepository.findAllByBookIdAndType(match.id, setOf(ThumbnailBook.Type.GENERATED, ThumbnailBook.Type.USER_UPLOADED)).forEach { deleted ->
-              thumbnailBookRepository.update(deleted.copy(bookId = bookToAdd.id))
+              thumbnailBookRepository.update(deleted.copy(bookId = bookWithHash.id))
             }
 
             // copy metadata
             bookMetadataRepository.findById(match.id).let { deleted ->
-              val newlyAdded = bookMetadataRepository.findById(bookToAdd.id)
+              val newlyAdded = bookMetadataRepository.findById(bookWithHash.id)
               bookMetadataRepository.update(
                 deleted.copy(
-                  bookId = bookToAdd.id,
+                  bookId = bookWithHash.id,
                   title = if (deleted.titleLock) deleted.title else newlyAdded.title,
                 ),
               )
-              if (!deleted.titleLock) taskEmitter.refreshBookMetadata(bookToAdd, setOf(BookMetadataPatchCapability.TITLE))
+              if (!deleted.titleLock) taskEmitter.refreshBookMetadata(bookWithHash, setOf(BookMetadataPatchCapability.TITLE))
             }
 
             // copy read progress
             readProgressRepository
               .findAllByBookId(match.id)
-              .map { it.copy(bookId = bookToAdd.id) }
+              .map { it.copy(bookId = bookWithHash.id) }
               .forEach { readProgressRepository.save(it) }
 
             // replace deleted book by new book in read lists
@@ -572,7 +664,7 @@ class LibraryContentLifecycle(
                   rl.copy(
                     bookIds =
                       rl.bookIds.values
-                        .map { if (it == match.id) bookToAdd.id else it }
+                        .map { if (it == match.id) bookWithHash.id else it }
                         .toIndexedMap(),
                   ),
                 )

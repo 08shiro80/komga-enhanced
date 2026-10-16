@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center flex-wrap ga-2 mb-3">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Backup view: title',
@@ -9,7 +9,7 @@
             id: 'fork/backup/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
       <v-btn
         color="primary"
@@ -330,6 +330,10 @@ async function executeDelete() {
 }
 
 async function clean() {
+  if (!Number.isInteger(keepCount.value) || keepCount.value < 1) {
+    messagesStore.messages.push({ message: 'Keep count must be at least 1', color: 'error' })
+    return
+  }
   try {
     await cleanBackups(keepCount.value)
     cleanDialog.value = false

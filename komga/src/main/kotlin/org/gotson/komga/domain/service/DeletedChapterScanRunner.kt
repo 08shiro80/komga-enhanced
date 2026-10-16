@@ -1,6 +1,7 @@
 package org.gotson.komga.domain.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PreDestroy
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.concurrent.Executors
@@ -52,9 +53,22 @@ class DeletedChapterScanRunner(
       } catch (e: Exception) {
         logger.error(e) { "Deleted-chapters scan failed for library $libraryId" }
         progress.updateAndGet { it.copy(running = false, error = e.message ?: "Unknown error", finishedAt = Instant.now()) }
+      } finally {
+        progress.updateAndGet {
+          if (it.running) {
+            it.copy(running = false, error = it.error ?: "Scan aborted unexpectedly", finishedAt = Instant.now())
+          } else {
+            it
+          }
+        }
       }
     }
     return true
+  }
+
+  @PreDestroy
+  fun shutdown() {
+    executor.shutdown()
   }
 }
 

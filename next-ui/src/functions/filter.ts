@@ -1,8 +1,12 @@
 import {
+  type FilterContributorsRecord,
   type FilterIncludeExclude,
+  type FilterNotableEntitiesRecord,
   type FilterType,
   SchemaAnyNone,
   SchemaFilterContributors,
+  SchemaFilterNotableEntities,
+  SchemaFilterPoster,
   SchemaFilterReadStatus,
   SchemaFilterStrings,
   SchemaSeriesAgeRatings,
@@ -10,7 +14,14 @@ import {
 } from '@/types/filter'
 import type { InferOutput } from 'valibot'
 import * as v from 'valibot'
-import { CONTRIBUTOR_ANYROLE } from '@/types/referential'
+import { CONTRIBUTOR_ANYROLE } from '@/types/referential/contributor'
+import type { AuthorDto, NotableEntityDto } from '@/generated/openapi'
+import {
+  QueryParamContributors,
+  QueryParamNotableEntities,
+  type SupportedFilters,
+} from '@/composables/filter'
+import { NOTABLE_ENTITY_ANYKIND } from '@/types/referential/notableEntity'
 
 export function clearFilter(filter: FilterType) {
   if ('v' in filter) filter.v = []
@@ -47,7 +58,7 @@ export function valuesToConditions(value: string[] | undefined, key: string) {
   }
 }
 
-export function schemaFilterAuthorsToConditions(
+export function schemaFilterContributorsToConditions(
   filter: InferOutput<typeof SchemaFilterContributors>,
   role?: string,
 ) {
@@ -58,7 +69,7 @@ export function schemaFilterAuthorsToConditions(
         author: {
           operator: it.a === 'any' ? 'is' : 'isNot',
           value: {
-            role: role,
+            ...(role === CONTRIBUTOR_ANYROLE ? {} : { role: role }),
           },
         },
       }
@@ -85,6 +96,44 @@ export function schemaFilterAuthorsToConditions(
     }
 }
 
+export function schemaFilterNotableEntitiesToConditions(
+  filter: InferOutput<typeof SchemaFilterNotableEntities>,
+  kind?: string,
+) {
+  if (filter.v.length === 0) return null
+  const list = filter.v.map((it) => {
+    if (v.is(SchemaAnyNone, it)) {
+      return {
+        notableEntity: {
+          operator: it.a === 'any' ? 'is' : 'isNot',
+          value: {
+            ...(kind === NOTABLE_ENTITY_ANYKIND ? {} : { kind: kind }),
+          },
+        },
+      }
+    } else {
+      return {
+        notableEntity: {
+          operator: it.i === 'e' ? 'isNot' : 'is',
+          value: {
+            name: it.v,
+            ...(kind === NOTABLE_ENTITY_ANYKIND ? {} : { kind: kind }),
+          },
+        },
+      }
+    }
+  })
+
+  if (filter.m === 'allOf')
+    return {
+      allOf: list,
+    }
+  else
+    return {
+      anyOf: list,
+    }
+}
+
 export function schemaFilterReadStatusToConditions(
   filter: InferOutput<typeof SchemaFilterReadStatus>,
 ) {
@@ -94,6 +143,24 @@ export function schemaFilterReadStatusToConditions(
       readStatus: {
         operator: it.i === 'e' ? 'isNot' : 'is',
         value: it.v,
+      },
+    }
+  })
+  return {
+    anyOf: list,
+  }
+}
+
+export function schemaFilterPosterToConditions(filter: InferOutput<typeof SchemaFilterPoster>) {
+  if (filter.v.length === 0) return null
+  const list = filter.v.map((it) => {
+    return {
+      poster: {
+        operator: it.i === 'e' ? 'isNot' : 'is',
+        value: {
+          type: it.v[0] === 'ANYTYPE' ? undefined : it.v[0],
+          selected: it.v[1],
+        },
       },
     }
   })
@@ -238,5 +305,43 @@ export function schemaFilterAgeRatingToConditions(
   if (conds.length === 0) return null
   return {
     allOf: conds,
+  }
+}
+
+/**
+ * Transforms a {@link AuthorDto} to a valid Vue Router route query param for filtering purpose.
+ * @param contributor
+ */
+export function contributorToContributorsQuery(contributor: AuthorDto) {
+  return {
+    [QueryParamContributors]: JSON.stringify({
+      [contributor.role]: { m: 'anyOf', v: [{ i: 'i', v: contributor.name }] },
+    } satisfies FilterContributorsRecord),
+  }
+}
+
+/**
+ * Transforms a {@link NotableEntityDto} to a valid Vue Router route query param for filtering purpose.
+ * @param notableEntity
+ */
+export function notableEntityToQuery(notableEntity: NotableEntityDto) {
+  return {
+    [QueryParamNotableEntities]: JSON.stringify({
+      [notableEntity.kind]: { m: 'anyOf', v: [{ i: 'i', v: notableEntity.name }] },
+    } satisfies FilterNotableEntitiesRecord),
+  }
+}
+
+/**
+ * Transforms a filter into its corresponding query param for filtering purpose.
+ * @param filter
+ * @param value
+ */
+export function filterToQuery<K extends keyof SupportedFilters>(
+  filter: K,
+  value: SupportedFilters[K],
+) {
+  return {
+    [filter]: JSON.stringify(value),
   }
 }

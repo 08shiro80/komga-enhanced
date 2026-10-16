@@ -6,6 +6,7 @@ import org.gotson.komga.domain.persistence.PluginConfigRepository
 import org.gotson.komga.infrastructure.configuration.KomgaProperties
 import org.springframework.stereotype.Component
 import java.io.File
+import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -67,6 +68,13 @@ class GalleryDlUpdateExecutor(
   private fun update(url: String): GalleryDlUpdateResult {
     val requested = url.trim()
     if (requested.isEmpty()) return GalleryDlUpdateResult(false, "No URL provided")
+    if (!isAllowedInstallTarget(requested)) {
+      return GalleryDlUpdateResult(
+        false,
+        "Rejected install target: only a bare gallery-dl pin (e.g. gallery-dl==1.27.0) or an https URL " +
+          "on an allowed host (${ALLOWED_INSTALL_HOSTS.joinToString(", ")}) is permitted",
+      )
+    }
 
     val configDir =
       komgaProperties.configDir
@@ -280,9 +288,31 @@ class GalleryDlUpdateExecutor(
     }
   }
 
+  private fun isAllowedInstallTarget(value: String): Boolean {
+    if (value.startsWith("-")) return false
+    if (PACKAGE_SPEC_REGEX.matches(value)) return true
+    val uri =
+      try {
+        URI(value)
+      } catch (_: Exception) {
+        return false
+      }
+    if (!"https".equals(uri.scheme, ignoreCase = true)) return false
+    val host = uri.host?.lowercase() ?: return false
+    return ALLOWED_INSTALL_HOSTS.any { host == it || host.endsWith(".$it") }
+  }
+
   companion object {
     private const val PLUGIN_ID = "gallery-dl-downloader"
     private const val GALLERY_DL_PATH_KEY = "gallery_dl_path"
     private const val MANIFEST_FILE = "_komga_fork_files.txt"
+    private val PACKAGE_SPEC_REGEX = Regex("""^gallery[-_]dl(==[\w.]+)?$""")
+    private val ALLOWED_INSTALL_HOSTS =
+      listOf(
+        "codeberg.org",
+        "github.com",
+        "pypi.org",
+        "files.pythonhosted.org",
+      )
   }
 }

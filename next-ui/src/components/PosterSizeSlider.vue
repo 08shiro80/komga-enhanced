@@ -14,8 +14,7 @@
     color="surface-darken"
     hide-details
     thumb-size="15"
-    max-width="80"
-    min-width="50"
+    class="poster-slider flex-grow-0 flex-shrink-0"
   />
 </template>
 
@@ -27,6 +26,10 @@ const display = useDisplay()
 const appStore = useAppStore()
 </script>
 
-<script lang="ts"></script>
-
-<style scoped></style>
+<style scoped>
+.poster-slider {
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+}
+</style>

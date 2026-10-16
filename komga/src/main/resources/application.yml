@@ -21,7 +21,9 @@ komga:
     busy-timeout: 30s
     pragmas:
       synchronous: NORMAL
-      cache_size: 2000
+      cache_size: -32768
+      temp_store: MEMORY
+      mmap_size: 134217728
   lucene:
     data-directory: \${komga.config-dir}/lucene
   fonts:
@@ -32,11 +34,24 @@ komga:
     busy-timeout: 30s
     pragmas:
       synchronous: NORMAL
-  download:
-    enabled: true
-    follow-list-filename: "follow.txt"
+  thumbnails-db:
+    file: \${komga.config-dir}/thumbnails.sqlite
+    busy-timeout: 30s
+    pragmas:
+      synchronous: NORMAL
+  sessions-db:
+    file: \${komga.config-dir}/sessions.sqlite
+    pragmas:
+      synchronous: NORMAL
+  jdbc-session-enabled: false
 
 spring:
+  session:
+    jdbc:
+      # top of every hour
+      cleanup-cron: "0 0 * * * *"
+      initialize-schema: never
+    timeout: 7d
   flyway:
     enabled: true
     locations: classpath:db/migration/{vendor}
@@ -71,7 +86,6 @@ spring:
       max-in-memory-size: 10MB
 
 server:
-  servlet.session.timeout: 7d
   forward-headers-strategy: framework
   shutdown: graceful
   error:

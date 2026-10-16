@@ -57,8 +57,10 @@ class GalleryDlProcess {
         applyEnv(ProcessBuilder(), galleryDlPath)
           .command("gallery-dl", "--version")
           .start()
-      process.waitFor(2, TimeUnit.SECONDS)
-      if (process.exitValue() == 0) {
+      if (!process.waitFor(10, TimeUnit.SECONDS)) {
+        process.destroyForcibly()
+        getPythonCommand(galleryDlPath)
+      } else if (process.exitValue() == 0) {
         listOf("gallery-dl")
       } else {
         getPythonCommand(galleryDlPath)
@@ -90,8 +92,12 @@ class GalleryDlProcess {
             applyEnv(ProcessBuilder(), galleryDlPath)
               .command(python, "-m", "gallery_dl", "--version")
               .start()
-          process.waitFor(2, TimeUnit.SECONDS)
-          process.exitValue() == 0
+          if (!process.waitFor(10, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            false
+          } else {
+            process.exitValue() == 0
+          }
         } catch (e: Exception) {
           false
         }
@@ -117,11 +123,9 @@ class GalleryDlProcess {
     }
 
     if (chapterNaming != null) {
-      // Sites that use chapter_string instead of a numeric chapter must keep their own directory
-      // template — the global chapterNaming override would clobber it and break their folders.
-      val chapterStringSites = setOf("dm5", "komiic", "tonarinoyj")
       for ((site, cfg) in websiteConfigs.toList()) {
-        if (site !in chapterStringSites) {
+        val defaultDirectory = (cfg["directory"] as? List<*>)?.joinToString() ?: ""
+        if (defaultDirectory.contains("{chapter:")) {
           websiteConfigs[site] = cfg.toMutableMap().apply { put("directory", listOf(chapterNaming)) }
         }
       }
@@ -189,27 +193,6 @@ class GalleryDlProcess {
     return tempFile
   }
 
-  fun createCoverConfigFile(
-    mangadexUsername: String?,
-    mangadexPassword: String?,
-  ): File {
-    val tempFile = secureTempFile("gallery-dl-cover-")
-    val config =
-      mutableMapOf<String, Any>(
-        "extractor" to
-          mutableMapOf<String, Any>(
-            "base-directory" to "",
-            "mangadex" to
-              mutableMapOf<String, Any>("lang" to "en").apply {
-                if (!mangadexUsername.isNullOrBlank()) this["username"] = mangadexUsername
-                if (!mangadexPassword.isNullOrBlank()) this["password"] = mangadexPassword
-              },
-          ),
-      )
-    tempFile.writeText(objectMapper.writeValueAsString(config))
-    return tempFile
-  }
-
   fun getDefaultWebsiteConfigs(defaultLanguage: String): Map<String, Map<String, Any>> =
     mapOf(
       "mangadex" to
@@ -225,6 +208,12 @@ class GalleryDlProcess {
       "mangahere" to
         mapOf(
           "directory" to listOf("c{chapter:>03}{chapter_minor} [{group:J, }]"),
+          "filename" to "{page:>03}.{extension}",
+        ),
+      "mangadot" to
+        mapOf(
+          "lang" to defaultLanguage,
+          "directory" to listOf("{volume:?v/ /}c{chapter:>03}{chapter_minor} [{group:J, }]"),
           "filename" to "{page:>03}.{extension}",
         ),
       "comick" to

@@ -4,7 +4,7 @@
 
 import { type DefaultBodyType, http, type HttpHandler, HttpResponse, type HttpResponseResolver, type RequestHandlerOptions as RequestHandlerOptions2 } from 'msw';
 
-import type { AddBlacklistData, AddBlacklistResponses, AddFollowData, AddFollowResponses, AddFollowsBatchData, AddFollowsBatchResponses, AddLibraryData, AddLibraryResponses, AddUserData, AddUserResponses, AddUserUploadedBookThumbnailData, AddUserUploadedBookThumbnailResponses, AddUserUploadedCollectionThumbnailData, AddUserUploadedCollectionThumbnailResponses, AddUserUploadedReadListThumbnailData, AddUserUploadedReadListThumbnailResponses, AddUserUploadedSeriesThumbnailData, AddUserUploadedSeriesThumbnailResponses, AnalyzeTransientBookResponses, ApplyCoverData, ApplyCoverResponses, ApplyMetadataData, ApplyMetadataResponses, BlacklistBookResponses, BookAnalyzeResponses, BookRefreshMetadataResponses, BooksRegenerateThumbnailsResponses, CheckComponentResponses, CheckFollowsNowResponses, CheckUrlResponses, CheckUrlsData, CheckUrlsResponses, ClaimServerResponses, CleanOldBackupsResponses, ClearCancelledDownloadsResponses, ClearCompletedDownloadsResponses, ClearFailedDownloadsResponses, ClearPendingDownloadsResponses, ClearPluginLogsResponses, ClientOptions, ConvertHeaderSessionToCookieResponses, CreateApiKeyForCurrentUserData, CreateApiKeyForCurrentUserResponses, CreateBackupResponses, CreateCollectionData, CreateCollectionResponses, CreateDownloadData, CreateDownloadResponses, CreateFullBackupResponses, CreateOrUpdateKnownPageHashData, CreateOrUpdateKnownPageHashResponses, CreateReadListData, CreateReadListResponses, DeleteAllChapterUrlsResponses, DeleteAllKnownPageHashesResponses, DeleteApiKeyByKeyIdResponses, DeleteBackupResponses, DeleteBookFileResponses, DeleteBookReadProgressResponses, DeleteChapterUrlResponses, DeleteChapterUrlsByDateRangeResponses, DeleteChapterUrlsForSeriesResponses, DeleteCollectionByIdResponses, DeletedChaptersScanStatusResponses, DeleteDownloadResponses, DeleteDuplicatePagesByPageHashResponses, DeleteFollowResponses, DeleteFollowsBatchData, DeleteFollowsBatchResponses, DeleteGlobalSettingsData, DeleteGlobalSettingsResponses, DeleteKnownPageHashResponses, DeleteLibraryByIdResponses, DeleteOversizedPageData, DeleteOversizedPageResponses, DeleteOversizedPagesBatchData, DeleteOversizedPagesBatchResponses, DeletePluginResponses, DeleteReadListByIdResponses, DeleteSeriesFileResponses, DeleteSingleMatchByPageHashData, DeleteSingleMatchByPageHashResponses, DeleteSyncPointsForCurrentUserResponses, DeleteUserByIdResponses, DeleteUserSettingsData, DeleteUserSettingsResponses, DeleteUserUploadedBookThumbnailResponses, DeleteUserUploadedCollectionThumbnailResponses, DeleteUserUploadedReadListThumbnailResponses, DeleteUserUploadedSeriesThumbnailResponses, DownloadBackupResponses, DownloadBookFile1Responses, DownloadBookFileResponses, DownloadLogsResponses, DownloadReadListAsZipResponses, DownloadSeriesAsZipResponses, EmptyTaskQueueResponses, FollowMangaOnMangaDexResponses, ForceResyncMangaDexSubscriptionResponses, GetActuatorInfoResponses, GetAgeRatingsResponses, GetAllDownloadsResponses, GetAllPluginsResponses, GetAnnouncementsResponses, GetApiKeysForCurrentUserResponses, GetAuthenticationActivityForCurrentUserResponses, GetAuthenticationActivityResponses, GetAuthorsNamesResponses, GetAuthorsResponses, GetAuthorsRolesResponses, GetBlacklistResponses, GetBookByIdResponses, GetBookEpubResourceResponses, GetBookPageRawByNumberResponses, GetBookPagesResponses, GetBookPositionsResponses, GetBookProgressionResponses, GetBooksByReadListIdResponses, GetBooksData, GetBooksDuplicatesResponses, GetBookSiblingNextInReadListResponses, GetBookSiblingNextResponses, GetBookSiblingPreviousInReadListResponses, GetBookSiblingPreviousResponses, GetBooksLatestResponses, GetBooksOnDeckResponses, GetBooksResponses, GetBookThumbnailsResponses, GetBookWebPubManifestDivinaResponses, GetBookWebPubManifestEpubResponses, GetBookWebPubManifestPdfResponses, GetBookWebPubManifestResponses, GetChapterUrlsByDateRangeResponses, GetChapterUrlsForSeriesResponses, GetClaimStatusResponses, GetCollectionByIdResponses, GetCollectionsBySeriesIdResponses, GetCollectionsResponses, GetCollectionThumbnailsResponses, GetCurrentUserResponses, GetDirectoryListingData, GetDirectoryListingResponses, GetDownloadByIdResponses, GetDownloadedUrlsResponses, GetFollowsBySeriesResponses, GetFollowScheduleResponses, GetFollowsResponses, GetFontFamilyAsCssResponses, GetFontFileResponses, GetFontsResponses, GetForkReleasesResponses, GetGalleryDlForkUpdatesResponses, GetGenresResponses, GetGlobalSettingsResponses, GetHistoricalEventsResponses, GetKnownPageHashesResponses, GetLanguagesResponses, GetLatestAuthenticationActivityByUserIdResponses, GetLibrariesResponses, GetLibraryByIdResponses, GetLogLevelResponses, GetLogsResponses, GetMangaDexFollowsResponses, GetMetadataResponses, GetMihonReadProgressByReadListIdResponses, GetMihonReadProgressBySeriesIdResponses, GetNewChaptersResponses, GetOAuth2ProvidersResponses, GetOversizedPagesResponses, GetPageByTransientBookIdResponses, GetPageHashMatchesResponses, GetPluginByIdResponses, GetPluginConfigResponses, GetPluginLogsResponses, GetPublishersResponses, GetReadListByIdResponses, GetReadListsByBookIdResponses, GetReadListsResponses, GetReadListThumbnailsResponses, GetReleasesResponses, GetSeriesAlphabeticalGroupsData, GetSeriesAlphabeticalGroupsResponses, GetSeriesByCollectionIdResponses, GetSeriesByIdResponses, GetSeriesData, GetSeriesLatestResponses, GetSeriesMetadataSourcesResponses, GetSeriesNewResponses, GetSeriesReleaseYearsResponses, GetSeriesResponses, GetSeriesThumbnailsResponses, GetSeriesUpdatedResponses, GetServerSettingsResponses, GetSharingLabelsResponses, GetSinglePageBooksResponses, GetStatsResponses, GetTagsResponses, GetUnknownPageHashesResponses, GetUserSettingsResponses, GetUsersResponses, HealthCheckResponses, IgnoreOversizedPageData, IgnoreOversizedPageResponses, IgnoreOversizedPagesBatchData, IgnoreOversizedPagesBatchResponses, IgnoreResponses, ImportBooksData, ImportBooksResponses, ImportFollowTxtResponses, ImportTachiyomiData, ImportTachiyomiResponses, InstallPluginData, InstallPluginResponses, IsBookBlacklistedResponses, LibraryAnalyzeResponses, LibraryEmptyTrashResponses, LibraryRefreshMetadataResponses, LibraryScanDeletedChaptersPreviewResponses, LibraryScanDeletedChaptersResponses, LibraryScanDeletedChaptersRunResponses, LibraryScanResponses, ListBackupsResponses, ListFixesResponses, ListMangaDexTagsResponses, MangaDexDownloadableCheckData, MangaDexDownloadableCheckResponses, MarkAnnouncementsReadData, MarkAnnouncementsReadResponses, MarkBookReadProgressData, MarkBookReadProgressResponses, MarkBookThumbnailSelectedResponses, MarkCollectionThumbnailSelectedResponses, MarkReadListThumbnailSelectedResponses, MarkSeriesAsReadResponses, MarkSeriesAsUnreadResponses, MarkSeriesThumbnailSelectedResponses, MatchComicRackListData, MatchComicRackListResponses, MatchSeriesNowResponses, MigrateToUuidFoldersResponses, PerformActionData, PerformActionResponses, PingResponses, PostLogout1Responses, PostLogoutResponses, ProtectBookResponses, QueueLibraryMatchResponses, QueueSeriesMatchResponses, RemoveBlacklistResponses, RepairAllResponses, RepairComicInfoResponses, RepairComicInfoStatusResponses, RepairResponses, RescanFlaggedResponses, RestoreBackupResponses, SaveGlobalSettingData, SaveGlobalSettingResponses, SaveUserSettingData, SaveUserSettingResponses, ScanTransientBooksData, ScanTransientBooksResponses, SearchMangaDexAdvancedData, SearchMangaDexAdvancedResponses, SearchMetadataResponses, SeriesAnalyzeResponses, SeriesRefreshMetadataResponses, SeriesScanDeletedChaptersPreviewResponses, SetLogLevelResponses, SplitAllStatusResponses, SplitAllTallPagesData, SplitAllTallPagesResponses, SplitTallPagesResponses, StatusResponses, StreamLogsResponses, SyncFollowsToMangaDexResponses, TestMetadataExtractionResponses, UnblacklistBookResponses, UnfollowMangaOnMangaDexResponses, UnignoreOversizedPageData, UnignoreOversizedPageResponses, UnignoreResponses, UnprotectBookResponses, UpdateBookMetadataByBatchData, UpdateBookMetadataByBatchResponses, UpdateBookMetadataData, UpdateBookMetadataResponses, UpdateBookProgressionData, UpdateBookProgressionResponses, UpdateCollectionByIdData, UpdateCollectionByIdResponses, UpdateFollowData, UpdateFollowResponses, UpdateFollowScheduleData, UpdateFollowScheduleResponses, UpdateLibraryByIdData, UpdateLibraryByIdResponses, UpdateMihonReadProgressByReadListIdData, UpdateMihonReadProgressByReadListIdResponses, UpdateMihonReadProgressBySeriesIdData, UpdateMihonReadProgressBySeriesIdResponses, UpdatePasswordByUserIdData, UpdatePasswordByUserIdResponses, UpdatePasswordForCurrentUserData, UpdatePasswordForCurrentUserResponses, UpdatePluginConfigData, UpdatePluginConfigResponses, UpdatePluginData, UpdatePluginResponses, UpdateReadListByIdData, UpdateReadListByIdResponses, UpdateSeriesMetadataData, UpdateSeriesMetadataResponses, UpdateServerSettingsData, UpdateServerSettingsResponses, UpdateUserByIdData, UpdateUserByIdResponses, VerifyAllResponses } from './types.gen';
+import type { AddBlacklistData, AddBlacklistResponses, AddFollowData, AddFollowResponses, AddFollowsBatchData, AddFollowsBatchResponses, AddLibraryData, AddLibraryResponses, AddUserData, AddUserResponses, AddUserUploadedBookThumbnailData, AddUserUploadedBookThumbnailResponses, AddUserUploadedCollectionThumbnailData, AddUserUploadedCollectionThumbnailResponses, AddUserUploadedReadListThumbnailData, AddUserUploadedReadListThumbnailResponses, AddUserUploadedSeriesThumbnailData, AddUserUploadedSeriesThumbnailResponses, AnalyzeTransientBookResponses, ApplyCoverData, ApplyCoverResponses, ApplyMetadataData, ApplyMetadataResponses, BlacklistBookResponses, BookAnalyzeResponses, BookRefreshMetadataResponses, BooksRegenerateThumbnailsResponses, CheckComponentResponses, CheckFollowsNowResponses, CheckUrlResponses, CheckUrlsData, CheckUrlsResponses, ClaimServerResponses, CleanOldBackupsResponses, ClearCancelledDownloadsResponses, ClearCompletedDownloadsResponses, ClearFailedDownloadsResponses, ClearPendingDownloadsResponses, ClearPluginLogsResponses, ClientOptions, ConvertHeaderSessionToCookieResponses, CreateApiKeyForCurrentUserData, CreateApiKeyForCurrentUserResponses, CreateBackupResponses, CreateCollectionData, CreateCollectionResponses, CreateDownloadData, CreateDownloadResponses, CreateFullBackupResponses, CreateOrUpdateKnownPageHashData, CreateOrUpdateKnownPageHashResponses, CreateReadListData, CreateReadListResponses, DeleteAllChapterUrlsResponses, DeleteAllKnownPageHashesResponses, DeleteApiKeyByKeyIdResponses, DeleteBackupResponses, DeleteBookFileResponses, DeleteBookReadProgressResponses, DeleteChapterUrlResponses, DeleteChapterUrlsByDateRangeResponses, DeleteChapterUrlsForSeriesResponses, DeleteCollectionByIdResponses, DeletedChaptersScanStatusResponses, DeleteDownloadResponses, DeleteDuplicatePagesByPageHashResponses, DeleteFollowResponses, DeleteFollowsBatchData, DeleteFollowsBatchResponses, DeleteGlobalSettingsData, DeleteGlobalSettingsResponses, DeleteKnownPageHashResponses, DeleteLibraryByIdResponses, DeleteOversizedPageData, DeleteOversizedPageResponses, DeleteOversizedPagesBatchData, DeleteOversizedPagesBatchResponses, DeletePluginResponses, DeleteReadListByIdResponses, DeleteSeriesFileResponses, DeleteSingleMatchByPageHashData, DeleteSingleMatchByPageHashResponses, DeleteSyncPointsForCurrentUserResponses, DeleteTrackerResponses, DeleteUserByIdResponses, DeleteUserSettingsData, DeleteUserSettingsResponses, DeleteUserUploadedBookThumbnailResponses, DeleteUserUploadedCollectionThumbnailResponses, DeleteUserUploadedReadListThumbnailResponses, DeleteUserUploadedSeriesThumbnailResponses, DownloadBackupResponses, DownloadBookFile1Responses, DownloadBookFileResponses, DownloadLogsResponses, DownloadReadListAsZipResponses, DownloadSeriesAsZipResponses, EmptyTaskQueueResponses, FollowMangaOnMangaDexResponses, ForceResyncMangaDexSubscriptionResponses, GetActuatorInfoResponses, GetAgeRatingsResponses, GetAllDownloadsResponses, GetAllPluginsResponses, GetAnnouncementsResponses, GetApiKeysForCurrentUserResponses, GetAuthenticationActivityForCurrentUserResponses, GetAuthenticationActivityResponses, GetAuthorsNamesResponses, GetAuthorsResponses, GetAuthorsRolesResponses, GetBlacklistResponses, GetBookByIdResponses, GetBookEpubResourceResponses, GetBookPageRawByNumberResponses, GetBookPagesResponses, GetBookPositionsResponses, GetBookProgressionResponses, GetBooksByReadListIdResponses, GetBooksData, GetBooksDuplicatesResponses, GetBookSiblingNextInReadListResponses, GetBookSiblingNextResponses, GetBookSiblingPreviousInReadListResponses, GetBookSiblingPreviousResponses, GetBooksLatestResponses, GetBooksOnDeckResponses, GetBooksResponses, GetBookThumbnailsResponses, GetBookWebPubManifestDivinaResponses, GetBookWebPubManifestEpubResponses, GetBookWebPubManifestPdfResponses, GetBookWebPubManifestResponses, GetChapterUrlsByDateRangeResponses, GetChapterUrlsForSeriesResponses, GetClaimStatusResponses, GetCollectionByIdResponses, GetCollectionsBySeriesIdResponses, GetCollectionsResponses, GetCollectionThumbnailsResponses, GetCurrentUserResponses, GetDirectoryListingData, GetDirectoryListingResponses, GetDownloadByIdResponses, GetDownloadedUrlsResponses, GetFollowsBySeriesResponses, GetFollowScheduleResponses, GetFollowsResponses, GetFontFamilyAsCssResponses, GetFontFileResponses, GetFontsResponses, GetForkReleasesResponses, GetGalleryDlForkUpdatesResponses, GetGenresResponses, GetGlobalSettingsResponses, GetHistoricalEventsResponses, GetKnownPageHashesResponses, GetLanguagesResponses, GetLatestAuthenticationActivityByUserIdResponses, GetLibrariesResponses, GetLibraryByIdResponses, GetLogLevelResponses, GetLogsResponses, GetMangaDexFollowsResponses, GetMetadataResponses, GetMihonReadProgressByReadListIdResponses, GetMihonReadProgressBySeriesIdResponses, GetNewChaptersResponses, GetNotableEntitiesKindsResponses, GetNotableEntitiesNamesResponses, GetNotableEntitiesResponses, GetOAuth2ProvidersResponses, GetOversizedPagesResponses, GetPageByTransientBookIdResponses, GetPageHashMatchesResponses, GetPluginByIdResponses, GetPluginConfigResponses, GetPluginLogsResponses, GetPublishersResponses, GetReadListByIdResponses, GetReadListsByBookIdResponses, GetReadListsResponses, GetReadListThumbnailsResponses, GetReleasesResponses, GetSeriesAlphabeticalGroupsData, GetSeriesAlphabeticalGroupsResponses, GetSeriesByCollectionIdResponses, GetSeriesByIdResponses, GetSeriesData, GetSeriesLatestResponses, GetSeriesMetadataSourcesResponses, GetSeriesNewResponses, GetSeriesReleaseYearsResponses, GetSeriesResponses, GetSeriesThumbnailsResponses, GetSeriesUpdatedResponses, GetServerSettingsResponses, GetSharingLabelsResponses, GetSinglePageBooksResponses, GetStatsResponses, GetTagsResponses, GetTrackersResponses, GetUnknownPageHashesResponses, GetUserSettingsResponses, GetUsersResponses, HealthCheckResponses, IgnoreOversizedPageData, IgnoreOversizedPageResponses, IgnoreOversizedPagesBatchData, IgnoreOversizedPagesBatchResponses, IgnoreResponses, ImportBooksData, ImportBooksResponses, ImportFollowTxtResponses, ImportTachiyomiData, ImportTachiyomiResponses, InstallPluginData, InstallPluginResponses, IsBookBlacklistedResponses, LibraryAnalyzeResponses, LibraryEmptyTrashResponses, LibraryRefreshMetadataResponses, LibraryScanDeletedChaptersPreviewResponses, LibraryScanDeletedChaptersResponses, LibraryScanDeletedChaptersRunResponses, LibraryScanResponses, ListBackupsResponses, ListFixesResponses, ListMangaDexTagsResponses, MangaDexDownloadableCheckData, MangaDexDownloadableCheckResponses, MarkAnnouncementsReadData, MarkAnnouncementsReadResponses, MarkBookReadProgressData, MarkBookReadProgressResponses, MarkBookThumbnailSelectedResponses, MarkCollectionThumbnailSelectedResponses, MarkReadListThumbnailSelectedResponses, MarkSeriesAsReadResponses, MarkSeriesAsUnreadResponses, MarkSeriesThumbnailSelectedResponses, MatchComicRackListData, MatchComicRackListResponses, MatchSeriesNowResponses, MigrateToUuidFoldersResponses, PerformActionData, PerformActionResponses, PingResponses, PostLogout1Responses, PostLogoutResponses, ProtectBookResponses, QueueLibraryMatchResponses, QueueSeriesMatchResponses, RemoveBlacklistResponses, RepairAllResponses, RepairComicInfoResponses, RepairComicInfoStatusResponses, RepairResponses, RescanFlaggedResponses, RestoreBackupResponses, SaveGlobalSettingData, SaveGlobalSettingResponses, SaveUserSettingData, SaveUserSettingResponses, ScanTransientBooksData, ScanTransientBooksResponses, SearchMangaDexAdvancedData, SearchMangaDexAdvancedResponses, SearchMetadataResponses, SeriesAnalyzeResponses, SeriesRefreshMetadataResponses, SeriesScanDeletedChaptersPreviewResponses, SetLogLevelResponses, SplitAllStatusResponses, SplitAllTallPagesData, SplitAllTallPagesResponses, SplitTallPagesResponses, StatusResponses, StreamLogsResponses, SyncFollowsToMangaDexResponses, TestMetadataExtractionResponses, TestTrackerResponses, UnblacklistBookResponses, UnfollowMangaOnMangaDexResponses, UnignoreOversizedPageData, UnignoreOversizedPageResponses, UnignoreResponses, UnprotectBookResponses, UpdateBookMetadataByBatchData, UpdateBookMetadataByBatchResponses, UpdateBookMetadataData, UpdateBookMetadataResponses, UpdateBookProgressionData, UpdateBookProgressionResponses, UpdateCollectionByIdData, UpdateCollectionByIdResponses, UpdateFollowData, UpdateFollowResponses, UpdateFollowScheduleData, UpdateFollowScheduleResponses, UpdateLibraryByIdData, UpdateLibraryByIdResponses, UpdateMihonReadProgressByReadListIdData, UpdateMihonReadProgressByReadListIdResponses, UpdateMihonReadProgressBySeriesIdData, UpdateMihonReadProgressBySeriesIdResponses, UpdatePasswordByUserIdData, UpdatePasswordByUserIdResponses, UpdatePasswordForCurrentUserData, UpdatePasswordForCurrentUserResponses, UpdatePluginConfigData, UpdatePluginConfigResponses, UpdatePluginData, UpdatePluginResponses, UpdateReadListByIdData, UpdateReadListByIdResponses, UpdateSeriesMetadataData, UpdateSeriesMetadataResponses, UpdateServerSettingsData, UpdateServerSettingsResponses, UpdateTrackerData, UpdateTrackerResponses, UpdateUserByIdData, UpdateUserByIdResponses, VerifyAllResponses } from './types.gen';
 
 export type RequestHandlerOptions = RequestHandlerOptions2 & {
     baseUrl?: ClientOptions['baseUrl'];
@@ -105,17 +105,36 @@ export function handleGetAnnouncements(response?: HandleGetAnnouncementsResponse
         if (typeof response === 'function') {
             return response(info);
         }
-        const body = response?.body;
+        const body = response?.body ?? {
+            version: 'https://jsonfeed.org/version/1',
+            title: 'Announcements',
+            home_page_url: 'https://komga.org/blog',
+            description: 'Latest Komga announcements',
+            items: [{
+                    id: 'https://komga.org/blog/ebook-drop2',
+                    url: 'https://komga.org/blog/ebook-drop2',
+                    title: 'eBook drop 2',
+                    summary: 'Version 1.9.0 contains the second feature drop for Ebooks support.',
+                    content_html: '<p>A longer text…</p>',
+                    date_modified: '2023-12-15T00:00:00Z',
+                    author: { name: 'gotson', url: 'https://github.com/gotson' },
+                    tags: ['upgrade', 'komga'],
+                    _komga: { read: false }
+                }, {
+                    id: 'https://komga.org/blog/ebook-support',
+                    url: 'https://komga.org/blog/ebook-support',
+                    title: 'eBook support',
+                    summary: 'Version 1.8.0 is bringing a long awaited feature: proper eBook support!',
+                    content_html: '<p>A longer text…</p>',
+                    date_modified: '2023-11-29T00:00:00Z',
+                    author: { name: 'gotson', url: 'https://github.com/gotson' },
+                    tags: ['upgrade', 'komga'],
+                    _komga: { read: true }
+                }]
+        };
         if (body !== undefined) {
             return HttpResponse.json(body, { status: response?.status ?? 200 });
         }
-        if (options?.responseFallback === 'passthrough') {
-            return;
-        }
-        return new Response('Not Implemented', {
-            status: 501,
-            statusText: 'Not Implemented'
-        });
     }, options);
 }
 
@@ -7109,6 +7128,126 @@ export function handleEmptyTaskQueue(response?: HandleEmptyTaskQueueResponse | H
     }, options);
 }
 
+export type HandleGetTrackersResponse = {
+    body: GetTrackersResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/v1/trackers` operation.
+ */
+export function handleGetTrackers(response?: HandleGetTrackersResponse | HttpResponseResolver<never, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.get<never, never>(`${options?.baseUrl ?? '*'}/api/v1/trackers`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleDeleteTrackerResponse = {
+    body: DeleteTrackerResponses[204];
+    status?: 204;
+};
+
+/**
+ * Handler for the `DELETE /api/v1/trackers/{tracker}` operation.
+ */
+export function handleDeleteTracker(response?: HandleDeleteTrackerResponse | HttpResponseResolver<{
+    tracker: string;
+}, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.delete<{
+        tracker: string;
+    }, never>(`${options?.baseUrl ?? '*'}/api/v1/trackers/:tracker`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return new HttpResponse(body, { status: response?.status ?? 204 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleUpdateTrackerResponse = {
+    body: UpdateTrackerResponses[204];
+    status?: 204;
+};
+
+/**
+ * Handler for the `PUT /api/v1/trackers/{tracker}` operation.
+ */
+export function handleUpdateTracker(response?: HandleUpdateTrackerResponse | HttpResponseResolver<{
+    tracker: string;
+}, UpdateTrackerData['body']>, options?: RequestHandlerOptions): HttpHandler {
+    return http.put<{
+        tracker: string;
+    }, UpdateTrackerData['body']>(`${options?.baseUrl ?? '*'}/api/v1/trackers/:tracker`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return new HttpResponse(body, { status: response?.status ?? 204 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleTestTrackerResponse = {
+    body: TestTrackerResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/v1/trackers/{tracker}/test` operation.
+ */
+export function handleTestTracker(response?: HandleTestTrackerResponse | HttpResponseResolver<{
+    tracker: string;
+}, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.post<{
+        tracker: string;
+    }, never>(`${options?.baseUrl ?? '*'}/api/v1/trackers/:tracker/test`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
 export type HandleScanTransientBooksResponse = {
     body: ScanTransientBooksResponses[200];
     status?: 200;
@@ -7892,6 +8031,87 @@ export function handleUpdatePasswordByUserId(response?: HandleUpdatePasswordByUs
         const body = response?.body;
         if (body !== undefined) {
             return new HttpResponse(body, { status: response?.status ?? 204 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleGetNotableEntitiesResponse = {
+    body: GetNotableEntitiesResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/v3/notable-entities` operation.
+ */
+export function handleGetNotableEntities(response?: HandleGetNotableEntitiesResponse | HttpResponseResolver<never, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.get<never, never>(`${options?.baseUrl ?? '*'}/api/v3/notable-entities`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleGetNotableEntitiesKindsResponse = {
+    body: GetNotableEntitiesKindsResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/v3/notable-entities/kinds` operation.
+ */
+export function handleGetNotableEntitiesKinds(response?: HandleGetNotableEntitiesKindsResponse | HttpResponseResolver<never, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.get<never, never>(`${options?.baseUrl ?? '*'}/api/v3/notable-entities/kinds`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
+        }
+        if (options?.responseFallback === 'passthrough') {
+            return;
+        }
+        return new Response('Not Implemented', {
+            status: 501,
+            statusText: 'Not Implemented'
+        });
+    }, options);
+}
+
+export type HandleGetNotableEntitiesNamesResponse = {
+    body: GetNotableEntitiesNamesResponses[200];
+    status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/v3/notable-entities/names` operation.
+ */
+export function handleGetNotableEntitiesNames(response?: HandleGetNotableEntitiesNamesResponse | HttpResponseResolver<never, never>, options?: RequestHandlerOptions): HttpHandler {
+    return http.get<never, never>(`${options?.baseUrl ?? '*'}/api/v3/notable-entities/names`, info => {
+        if (typeof response === 'function') {
+            return response(info);
+        }
+        const body = response?.body;
+        if (body !== undefined) {
+            return HttpResponse.json(body, { status: response?.status ?? 200 });
         }
         if (options?.responseFallback === 'passthrough') {
             return;
@@ -8865,6 +9085,22 @@ export type MswHandlerFactories = {
      */
     emptyTaskQueue: typeof handleEmptyTaskQueue;
     /**
+     * Handler for the `GET /api/v1/trackers` operation.
+     */
+    getTrackers: typeof handleGetTrackers;
+    /**
+     * Handler for the `DELETE /api/v1/trackers/{tracker}` operation.
+     */
+    deleteTracker: typeof handleDeleteTracker;
+    /**
+     * Handler for the `PUT /api/v1/trackers/{tracker}` operation.
+     */
+    updateTracker: typeof handleUpdateTracker;
+    /**
+     * Handler for the `POST /api/v1/trackers/{tracker}/test` operation.
+     */
+    testTracker: typeof handleTestTracker;
+    /**
      * Handler for the `POST /api/v1/transient-books` operation.
      */
     scanTransientBooks: typeof handleScanTransientBooks;
@@ -8976,6 +9212,18 @@ export type MswHandlerFactories = {
      * Handler for the `PATCH /api/v2/users/{id}/password` operation.
      */
     updatePasswordByUserId: typeof handleUpdatePasswordByUserId;
+    /**
+     * Handler for the `GET /api/v3/notable-entities` operation.
+     */
+    getNotableEntities: typeof handleGetNotableEntities;
+    /**
+     * Handler for the `GET /api/v3/notable-entities/kinds` operation.
+     */
+    getNotableEntitiesKinds: typeof handleGetNotableEntitiesKinds;
+    /**
+     * Handler for the `GET /api/v3/notable-entities/names` operation.
+     */
+    getNotableEntitiesNames: typeof handleGetNotableEntitiesNames;
 };
 
 export type CreateMswHandlersResult = {
@@ -9233,6 +9481,10 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
         updateServerSettings: wrap(handleUpdateServerSettings),
         deleteSyncPointsForCurrentUser: wrap(handleDeleteSyncPointsForCurrentUser),
         emptyTaskQueue: wrap(handleEmptyTaskQueue),
+        getTrackers: wrap(handleGetTrackers),
+        deleteTracker: wrap(handleDeleteTracker),
+        updateTracker: wrap(handleUpdateTracker),
+        testTracker: wrap(handleTestTracker),
         scanTransientBooks: wrap(handleScanTransientBooks),
         analyzeTransientBook: wrap(handleAnalyzeTransientBook),
         getPageByTransientBookId: wrap(handleGetPageByTransientBookId),
@@ -9260,7 +9512,10 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
         deleteUserById: wrap(handleDeleteUserById),
         updateUserById: wrap(handleUpdateUserById),
         getLatestAuthenticationActivityByUserId: wrap(handleGetLatestAuthenticationActivityByUserId),
-        updatePasswordByUserId: wrap(handleUpdatePasswordByUserId)
+        updatePasswordByUserId: wrap(handleUpdatePasswordByUserId),
+        getNotableEntities: wrap(handleGetNotableEntities),
+        getNotableEntitiesKinds: wrap(handleGetNotableEntitiesKinds),
+        getNotableEntitiesNames: wrap(handleGetNotableEntitiesNames)
     };
     const all: CreateMswHandlersResult['all'] = (options = {}) => {
         type OverrideValue<R> = R | [
@@ -9430,6 +9685,7 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
             invoke(pick.getSeriesThumbnail, overrides.getSeriesThumbnail),
             invoke(pick.getSeriesThumbnails, overrides.getSeriesThumbnails),
             invoke(pick.addUserUploadedSeriesThumbnail, overrides.addUserUploadedSeriesThumbnail),
+            invoke(pick.testTracker, overrides.testTracker),
             invoke(pick.analyzeTransientBook, overrides.analyzeTransientBook),
             invoke(pick.updatePasswordByUserId, overrides.updatePasswordByUserId),
             invoke(pick.cleanOldBackups, overrides.cleanOldBackups),
@@ -9474,6 +9730,8 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
             invoke(pick.getSeriesReleaseYears, overrides.getSeriesReleaseYears),
             invoke(pick.getAuthenticationActivity, overrides.getAuthenticationActivity),
             invoke(pick.getCurrentUser, overrides.getCurrentUser),
+            invoke(pick.getNotableEntitiesKinds, overrides.getNotableEntitiesKinds),
+            invoke(pick.getNotableEntitiesNames, overrides.getNotableEntitiesNames),
             invoke(pick.deleteBackup, overrides.deleteBackup),
             invoke(pick.getBookById, overrides.getBookById),
             invoke(pick.deleteChapterUrl, overrides.deleteChapterUrl),
@@ -9495,6 +9753,8 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
             invoke(pick.getReadListById, overrides.getReadListById),
             invoke(pick.updateReadListById, overrides.updateReadListById),
             invoke(pick.getSeriesById, overrides.getSeriesById),
+            invoke(pick.deleteTracker, overrides.deleteTracker),
+            invoke(pick.updateTracker, overrides.updateTracker),
             invoke(pick.deleteUserById, overrides.deleteUserById),
             invoke(pick.updateUserById, overrides.updateUserById),
             invoke(pick.getAnnouncements, overrides.getAnnouncements),
@@ -9527,6 +9787,7 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
             invoke(pick.getServerSettings, overrides.getServerSettings),
             invoke(pick.updateServerSettings, overrides.updateServerSettings),
             invoke(pick.emptyTaskQueue, overrides.emptyTaskQueue),
+            invoke(pick.getTrackers, overrides.getTrackers),
             invoke(pick.scanTransientBooks, overrides.scanTransientBooks),
             invoke(pick.getAgeRatings, overrides.getAgeRatings),
             invoke(pick.getAuthors, overrides.getAuthors),
@@ -9537,6 +9798,7 @@ export function createMswHandlers(config: RequestHandlerOptions = {}): CreateMsw
             invoke(pick.getTags, overrides.getTags),
             invoke(pick.getUsers, overrides.getUsers),
             invoke(pick.addUser, overrides.addUser),
+            invoke(pick.getNotableEntities, overrides.getNotableEntities),
             invoke(pick.getActuatorInfo, overrides.getActuatorInfo),
             invoke(pick.postLogout, overrides.postLogout),
             invoke(pick.postLogout1, overrides.postLogout1)

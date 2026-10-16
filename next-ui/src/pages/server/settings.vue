@@ -14,7 +14,7 @@
       <v-card max-width="600px">
         <v-card-text>
           <ServerSettings
-            :settings="settings"
+            :settings="effectiveSettings"
             :loading="loading"
             @update-settings="(s) => saveSettings(s)"
           />
@@ -97,7 +97,10 @@ import { komgaBooksRegenerateThumbnails, komgaEmptyTaskQueue } from '@/generated
 import { useMutation } from '@pinia/colada'
 import { defineMessage } from 'vue-intl'
 import { ApiBaseUrl } from '@/api/base'
-import type { SettingsUpdateDtoExtended, ThumbnailRegenerate } from '@/types/ThumbnailRegenerate'
+import type { SettingsUpdateDtoExtended, ThumbnailRegenerate } from '@/types/Settings'
+import { useClientSettingsGlobal, useUpdateClientSettingsGlobal } from '@/colada/client-settings'
+import { pick } from '@/functions/pick'
+import type { ClientSettingGlobalSettings } from '@/types/ClientSettingsGlobal'
 
 const messagesStore = useMessagesStore()
 
@@ -120,11 +123,18 @@ async function cancelAllTasks() {
 async function shutdown() {
   shutdownDialog.value = false
   try {
-    await fetch(`${ApiBaseUrl.noSlash}/actuator/shutdown`, {
+    const response = await fetch(`${ApiBaseUrl.noSlash}/actuator/shutdown`, {
       method: 'POST',
       credentials: 'include',
     })
-    messagesStore.messages.push({ message: shutdownStartedMessage })
+    if (response.ok) {
+      messagesStore.messages.push({ message: shutdownStartedMessage })
+    } else {
+      messagesStore.messages.push({
+        message: `Shutdown request failed (HTTP ${response.status})`,
+        color: 'error',
+      })
+    }
   } catch {
     // the connection typically drops as the server stops — treat as initiated
     messagesStore.messages.push({ message: shutdownStartedMessage })
@@ -158,11 +168,29 @@ const shutdownStartedMessage = defineMessage({
 })
 
 const { data: settings, error, isPending } = useSettings()
-const { mutateAsync } = useUpdateSettings()
+const { globalSettings } = useClientSettingsGlobal()
+
+const effectiveSettings = computed(() => ({
+  ...settings.value,
+  oauth2: globalSettings.value['komga.nextui.oauth2'].value,
+}))
+
+const { mutateAsync: mutateServerSettings } = useUpdateSettings()
+const { mutateAsync: mutateGlobalSettings } = useUpdateClientSettingsGlobal()
 
 function saveSettings(settings: SettingsUpdateDtoExtended) {
   loading.value = true
-  mutateAsync(settings)
+
+  const globalUpdate = {
+    'komga.nextui.oauth2': {
+      allowUnauthorized: true,
+      value: pick(settings, 'oauth2').oauth2,
+    },
+  } satisfies ClientSettingGlobalSettings
+
+  void mutateGlobalSettings(globalUpdate)
+
+  mutateServerSettings(settings)
     .then(() => {
       messagesStore.messages.push({
         description: 'Snackbar notification shown upon successful server settings update',

@@ -125,11 +125,12 @@ class ComicInfoGenerator {
       org.gotson.komga.infrastructure.util.CbzSafeWriter.safelyReplace(cbzPath, releaseTarget = { zin.close() }) { outStream ->
         ZipOutputStream(outStream).use { zipOut ->
           zipOut.setComment(zipComment)
+          val writtenEntries = mutableSetOf("ComicInfo.xml")
           zipOut.putNextEntry(ZipEntry("ComicInfo.xml"))
           zipOut.write(comicInfoXml.toByteArray(Charsets.UTF_8))
           zipOut.closeEntry()
           for (entry in zin.entries()) {
-            if (entry.name == "ComicInfo.xml") continue
+            if (!writtenEntries.add(entry.name)) continue
             copyEntry(zin, entry, zipOut, useStored)
           }
         }

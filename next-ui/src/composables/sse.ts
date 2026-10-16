@@ -3,19 +3,28 @@ import { ApiBaseUrl } from '@/api/base'
 import { logger } from '@/services/logtape'
 import { useAppStore } from '@/stores/app'
 import * as v from 'valibot'
-import { entitiesChanged, entityChanged } from '@/colada/cache'
-import { QUERY_KEYS_BOOKS } from '@/colada/books'
-import { QUERY_KEYS_SERIES } from '@/colada/series'
-import { QUERY_KEYS_COLLECTIONS } from '@/colada/collections'
-import { QUERY_KEYS_READLIST } from '@/colada/readlists'
+import {
+  clearBook,
+  clearAllBooks,
+  clearSeries,
+  clearAllSeries,
+  clearAllLibraries,
+  clearAllReadLists,
+  clearReadList,
+  clearAllCollections,
+  clearCollection,
+  clearThumbnailBook,
+  clearThumbnailSeries,
+  clearThumbnailReadList,
+  clearThumbnailCollection,
+  clearAllDownloads,
+} from '@/colada/cache'
 import { useCurrentUser, userLoggedOut } from '@/colada/users'
-import { QUERY_KEYS_LIBRARIES } from '@/colada/libraries'
 import { useMessagesStore } from '@/stores/messages'
 import { defineMessage } from 'vue-intl'
 import { useErrorCodeFormatter } from '@/composables/errorCodeFormatter'
 import { useImageCacheStore } from '@/stores/image-cache'
 import { useTaskQueueStore } from '@/stores/task-queue'
-import { QUERY_KEYS_DOWNLOADS } from '@/colada/downloads'
 import { useDownloadsStore } from '@/stores/downloads'
 const namedEvents = [
   'LibraryAdded',
@@ -132,6 +141,7 @@ const SSETaskQueueSchema = v.object({
   data: v.object({
     count: v.number(),
     countByType: v.record(v.string(), v.number()),
+    backgroundJobs: v.optional(v.array(v.string()), []),
   }),
 })
 
@@ -227,6 +237,7 @@ export const useSSE = createGlobalState(() => {
   const cacheStore = useImageCacheStore()
   const taskStore = useTaskQueueStore()
   const downloadsStore = useDownloadsStore()
+  const router = useRouter()
   const { convertErrorCodes } = useErrorCodeFormatter()
 
   const { isAuthenticated } = useCurrentUser()
@@ -392,21 +403,23 @@ export const useSSE = createGlobalState(() => {
       case 'LibraryAdded':
       case 'LibraryChanged':
       case 'LibraryDeleted':
-        void entitiesChanged(QUERY_KEYS_LIBRARIES.root)
+        clearAllLibraries()
         break
       case 'SeriesAdded':
-        void entitiesChanged(QUERY_KEYS_SERIES.root)
+        clearAllSeries()
         break
       case 'SeriesChanged':
+        clearSeries(event.data.seriesId, true)
+        break
       case 'SeriesDeleted':
-        void entityChanged(QUERY_KEYS_SERIES.root, event.data.seriesId)
+        clearSeries(event.data.seriesId, false)
         break
       case 'BookAdded':
-        void entitiesChanged(QUERY_KEYS_BOOKS.root)
+        clearAllBooks()
         break
       case 'BookChanged':
       case 'BookDeleted':
-        void entityChanged(QUERY_KEYS_BOOKS.root, event.data.bookId)
+        clearBook(event.data.bookId)
         break
       case 'BookImported':
         if (event.data.success && event.data.bookId)
@@ -438,36 +451,60 @@ export const useSSE = createGlobalState(() => {
           })
         break
       case 'ReadListAdded':
-        void entitiesChanged(QUERY_KEYS_READLIST.root)
+        clearAllReadLists()
         break
       case 'ReadListChanged':
       case 'ReadListDeleted':
-        void entityChanged(QUERY_KEYS_READLIST.root, event.data.readListId)
+        clearReadList(event.data.readListId)
         break
       case 'CollectionAdded':
-        void entitiesChanged(QUERY_KEYS_COLLECTIONS.root)
+        clearAllCollections()
         break
       case 'CollectionChanged':
       case 'CollectionDeleted':
-        void entityChanged(QUERY_KEYS_COLLECTIONS.root, event.data.collectionId)
+        clearCollection(event.data.collectionId)
         break
       case 'ReadProgressChanged':
       case 'ReadProgressDeleted':
-        void entityChanged(QUERY_KEYS_BOOKS.root, event.data.bookId)
+        clearBook(event.data.bookId)
         break
       case 'ReadProgressSeriesChanged':
       case 'ReadProgressSeriesDeleted':
-        void entityChanged(QUERY_KEYS_SERIES.root, event.data.seriesId)
+        clearSeries(event.data.seriesId, false)
         break
       case 'SessionExpired':
         userLoggedOut()
+        void router.push({ name: '/login', query: { logout: '1' } })
         break
       case 'TaskQueueStatus':
         taskStore.count = event.data.count
         taskStore.countByType = event.data.countByType
+        taskStore.backgroundJobs = event.data.backgroundJobs
+        break
+      case 'ThumbnailBookAdded':
+      case 'ThumbnailBookDeleted':
+        if (event.data.selected) cacheStore.bustCache(event.data.bookId)
+        if (event.data.selected) cacheStore.bustCache(event.data.seriesId)
+        clearThumbnailBook(event.data.bookId)
+        clearThumbnailSeries(event.data.seriesId)
+        break
+      case 'ThumbnailSeriesAdded':
+      case 'ThumbnailSeriesDeleted':
+        if (event.data.selected) cacheStore.bustCache(event.data.seriesId)
+        clearThumbnailSeries(event.data.seriesId)
+        break
+      case 'ThumbnailReadListAdded':
+      case 'ThumbnailReadListDeleted':
+        if (event.data.selected) cacheStore.bustCache(event.data.readListId)
+        clearThumbnailReadList(event.data.readListId)
+        break
+      case 'ThumbnailSeriesCollectionAdded':
+      case 'ThumbnailSeriesCollectionDeleted':
+        if (event.data.selected) cacheStore.bustCache(event.data.collectionId)
+        clearThumbnailCollection(event.data.collectionId)
         break
       case 'DownloadStarted':
-        void entitiesChanged(QUERY_KEYS_DOWNLOADS.root)
+        clearAllDownloads()
         break
       case 'DownloadProgress':
         downloadsStore.update(event.data.downloadId, {
@@ -479,31 +516,29 @@ export const useSSE = createGlobalState(() => {
         })
         break
       case 'DownloadCompleted':
+        downloadsStore.remove(event.data.downloadId)
+        clearAllDownloads()
+        messagesStore.messages.push({
+          titleMessage: defineMessage({
+            description: 'Download notification: completed: title',
+            defaultMessage: 'Download completed',
+            id: 'fork.sse.downloadCompleted',
+          }),
+          message: event.data.title ?? '',
+        })
+        break
       case 'DownloadFailed':
         downloadsStore.remove(event.data.downloadId)
-        void entitiesChanged(QUERY_KEYS_DOWNLOADS.root)
-        break
-      case 'ThumbnailBookAdded':
-      case 'ThumbnailBookDeleted':
-        if (event.data.selected) cacheStore.bustCache(event.data.bookId)
-        if (event.data.selected) cacheStore.bustCache(event.data.seriesId)
-        void entitiesChanged(QUERY_KEYS_BOOKS.posters(event.data.bookId))
-        void entitiesChanged(QUERY_KEYS_SERIES.posters(event.data.seriesId))
-        break
-      case 'ThumbnailSeriesAdded':
-      case 'ThumbnailSeriesDeleted':
-        if (event.data.selected) cacheStore.bustCache(event.data.seriesId)
-        void entitiesChanged(QUERY_KEYS_SERIES.posters(event.data.seriesId))
-        break
-      case 'ThumbnailReadListAdded':
-      case 'ThumbnailReadListDeleted':
-        if (event.data.selected) cacheStore.bustCache(event.data.readListId)
-        void entitiesChanged(QUERY_KEYS_READLIST.posters(event.data.readListId))
-        break
-      case 'ThumbnailSeriesCollectionAdded':
-      case 'ThumbnailSeriesCollectionDeleted':
-        if (event.data.selected) cacheStore.bustCache(event.data.collectionId)
-        void entitiesChanged(QUERY_KEYS_COLLECTIONS.posters(event.data.collectionId))
+        clearAllDownloads()
+        messagesStore.messages.push({
+          titleMessage: defineMessage({
+            description: 'Download notification: failed: title',
+            defaultMessage: 'Download failed',
+            id: 'fork.sse.downloadFailed',
+          }),
+          message: event.data.errorMessage ?? event.data.title ?? '',
+          color: 'error',
+        })
         break
     }
   })

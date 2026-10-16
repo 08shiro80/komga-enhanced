@@ -231,7 +231,7 @@
                 @click="toggleMangaDex(r)"
               />
               <v-btn
-                icon="i-mdi:heart-plus"
+                icon="i-mdi:bookmark-plus"
                 variant="text"
                 :size="btnSize"
                 :disabled="!libraryId || isLocalFollowed(r)"
@@ -412,6 +412,7 @@ function isDownloadable(r: MetadataSearchResult): boolean | undefined {
 }
 
 const LIMIT = 24
+const MANGADEX_MAX_OFFSET_WINDOW = 10000
 const page = ref(1)
 const query = ref('')
 const contentRating = ref<string[]>(['safe', 'suggestive', 'erotica'])
@@ -498,12 +499,13 @@ watch(
       if (token === availabilityToken) availability.value = {}
     }
   },
+  { immediate: true },
 )
 
 const pageCount = computed(() => {
   const total = data.value?.total ?? 0
   if (total <= LIMIT) return 1
-  return Math.min(Math.ceil(total / LIMIT), 417)
+  return Math.min(Math.ceil(total / LIMIT), Math.floor(MANGADEX_MAX_OFFSET_WINDOW / LIMIT))
 })
 
 const tagItems = computed(() =>

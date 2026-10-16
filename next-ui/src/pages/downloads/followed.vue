@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Followed series view: title',
@@ -9,7 +9,7 @@
             id: 'fork/followed/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
       <v-select
         v-model="selectedLibrary"
@@ -18,7 +18,7 @@
         variant="outlined"
         density="compact"
         hide-details
-        style="max-width: 280px"
+        :style="display.xs.value ? undefined : 'max-width: 280px'"
       />
     </div>
 
@@ -88,13 +88,12 @@
               v-for="follow in follows"
               :key="follow.id"
               :title="follow.title || follow.url"
-              :subtitle="follow.url"
+              :subtitle="follow.title ? follow.url : undefined"
             >
               <template #prepend>
                 <v-switch
                   :model-value="follow.enabled"
                   color="primary"
-                  density="compact"
                   hide-details
                   :loading="togglingId === follow.id"
                   @update:model-value="toggleFollow(follow.id, $event as boolean)"
@@ -136,9 +135,12 @@ import {
 } from '@/colada/follows'
 import { useLibraries } from '@/colada/libraries'
 import { useMessagesStore } from '@/stores/messages'
+import { useLocalStorage } from '@vueuse/core'
+import { useDisplay } from 'vuetify'
 import FollowSchedule from '@/components/downloads/FollowSchedule.vue'
 
 const intl = useIntl()
+const display = useDisplay()
 const messagesStore = useMessagesStore()
 const { data: libraries } = useLibraries()
 
@@ -146,13 +148,18 @@ const libraryItems = computed(() =>
   (libraries.value ?? []).map((l) => ({ title: l.name, value: l.id })),
 )
 
-const selectedLibrary = ref<string | undefined>(undefined)
+// Persist the chosen library so navigating away / reloading keeps it (falls back to the first library).
+const selectedLibrary = useLocalStorage<string | undefined>('fork.downloads.followed.library', undefined)
 
-watchEffect(() => {
-  if (!selectedLibrary.value && libraryItems.value.length > 0) {
-    selectedLibrary.value = libraryItems.value[0]?.value
-  }
-})
+watch(
+  libraryItems,
+  (items) => {
+    if (!selectedLibrary.value && items.length > 0) {
+      selectedLibrary.value = items[0]?.value
+    }
+  },
+  { immediate: true },
+)
 
 const { data: follows, isPending: followsPending } = useFollows(selectedLibrary)
 
@@ -225,7 +232,7 @@ const importLabel = defineMessage({ description: 'Followed: import follow.txt', 
 const emptyLabel = defineMessage({ description: 'Followed: empty', defaultMessage: 'No followed series in this library.', id: 'fork/followed/empty' })
 const unfollowLabel = defineMessage({ description: 'Followed: unfollow', defaultMessage: 'Unfollow', id: 'fork/followed/unfollow' })
 const noLibraryLabel = defineMessage({ description: 'Followed: no library', defaultMessage: 'Select a library to manage its followed series.', id: 'fork/followed/noLibrary' })
-const checkResultLabel = defineMessage({ description: 'Followed: check result', defaultMessage: '{count} chapters queued for download', id: 'fork/followed/checkResult' })
+const checkResultLabel = defineMessage<{ count: number | undefined }>({ description: 'Followed: check result', defaultMessage: '{count} chapters queued for download', id: 'fork/followed/checkResult' })
 </script>
 
 <route lang="yaml">

@@ -8,7 +8,7 @@ import {
 } from '@pinia/colada'
 import { type UserRole } from '@/types/UserRoles'
 import { QUERY_KEYS_CLIENT_SETTINGS } from '@/colada/client-settings'
-import { invalidateAll } from '@/colada/cache'
+import { clearAll } from '@/colada/cache'
 import { useAppStore } from '@/stores/app'
 import {
   type ApiKeyRequestDto,
@@ -254,7 +254,7 @@ function userChanged() {
 }
 
 export function userLoggedOut() {
+  clearAll()
   // Leaving the session also leaves guest mode, so the login page is shown again (not auto-guest).
   useAppStore().guestMode = false
-  invalidateAll()
 }

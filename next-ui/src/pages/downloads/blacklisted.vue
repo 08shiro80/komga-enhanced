@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center mb-3">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Blacklisted view: title',
@@ -9,7 +9,7 @@
             id: 'fork/blacklisted/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
       <v-btn
         icon="i-mdi:refresh"
@@ -105,7 +105,9 @@
                     :href="safeExternalHref(ch.chapterUrl)"
                     target="_blank"
                     rel="noreferrer noopener"
-                    class="text-decoration-none"
+                    class="text-decoration-none text-truncate d-inline-block"
+                    style="max-width: 420px; vertical-align: bottom"
+                    :title="ch.chapterUrl"
                   >
                     {{ ch.chapterUrl }}
                   </a>

@@ -11,7 +11,7 @@
     :quick-action-props="quickActionProps"
     :menu-icon="menuIcon"
     :menu-props="menuProps"
-    :card-to="`/book/${book.id}`"
+    :card-to="linkTo"
     v-bind="propsLeft"
     @selection="(val, event) => emit('selection', val, event)"
     @click-quick-action="showEditMetadataDialog()"
@@ -38,6 +38,11 @@ import { useBook } from '@/composables/book/useBook'
 import { bookReaderUrl } from '@/api/links'
 import type { BookDto } from '@/generated/openapi'
 import { useImageCacheStore } from '@/stores/image-cache'
+import { BrowsingContextKey, formatBrowsingContextAsQueryParam } from '@/functions/browsing-context'
+import type { RouteLocationObject } from '@/types/route'
+import type { SortKeysBook } from '@/types/sort'
+import { commonMessages } from '@/utils/i18n/common-messages'
+import { getFileSize } from '@/functions/filesize'
 
 const intl = useIntl()
 const cacheStore = useImageCacheStore()
@@ -61,11 +66,11 @@ const propsLeft = computed(() => {
 })
 const { isRead, progressPercent } = useBookReadProgress(book)
 
-const titleAndLines = computed<{ title: ItemCardTitle; lines: ItemCardLine[] }>(() => {
-  let footer: ItemCardLine
-
+const excludedKeys = ['series', 'metadata.numberSort', 'metadata.title', 'pagesCount'] as const
+type SortKeysSupported = Exclude<SortKeysBook, (typeof excludedKeys)[number]>
+const footer = computed(() => {
   if (book.value.deleted)
-    footer = {
+    return {
       text: intl.formatMessage({
         description: 'Book card subtitle: unavailable',
         defaultMessage: 'Unavailable',
@@ -73,39 +78,79 @@ const titleAndLines = computed<{ title: ItemCardTitle; lines: ItemCardLine[] }>(
       }),
       classes: 'text-error',
     }
-  else if (book.value.media.status === MediaStatus.Error)
-    footer = {
+  if (book.value.media.status === MediaStatus.Error)
+    return {
       text: intl.formatMessage(mediaStatusMessages[MediaStatus.Error]),
       classes: 'text-error',
     }
-  else if (book.value.media.status === MediaStatus.Unsupported)
-    footer = {
+  if (book.value.media.status === MediaStatus.Unsupported)
+    return {
       text: intl.formatMessage(mediaStatusMessages[MediaStatus.Unsupported]),
       classes: 'text-warning',
     }
-  else if (book.value.media.status === MediaStatus.Unknown)
-    footer = {
+  if (book.value.media.status === MediaStatus.Unknown)
+    return {
       text: intl.formatMessage(mediaStatusMessages[MediaStatus.Unknown]),
     }
-  else
-    footer = {
-      text: intl.formatMessage(
-        {
-          description: 'Book card subtitle: count of pages',
-          defaultMessage: `{count, plural,
+
+  const sortKey = props.sortActive?.find(
+    (it) => !(excludedKeys as readonly string[]).includes(it.key),
+  )
+  if (sortKey) {
+    switch (sortKey.key as SortKeysSupported) {
+      case 'createdDate':
+        return {
+          text: intl.formatDate(book.value.created, { dateStyle: 'medium' }),
+        }
+      case 'lastModifiedDate':
+        return {
+          text: intl.formatDate(book.value.lastModified, {
+            dateStyle: 'medium',
+          }),
+        }
+      case 'metadata.releaseDate':
+        return {
+          text: book.value.metadata.releaseDate
+            ? intl.formatDate(book.value.metadata.releaseDate, {
+                dateStyle: 'medium',
+              })
+            : intl.formatMessage(commonMessages.cardSubtitleNoReleaseDate),
+        }
+      case 'readProgress.readDate':
+        return {
+          text: book.value.readProgress
+            ? intl.formatDate(book.value.readProgress.readDate, {
+                dateStyle: 'medium',
+              })
+            : intl.formatMessage(commonMessages.cardSubtitleUnread),
+        }
+      case 'fileSize':
+        return { text: getFileSize(book.value.sizeBytes) }
+      case 'name':
+        return { text: book.value.name }
+    }
+  }
+
+  return {
+    text: intl.formatMessage(
+      {
+        description: 'Book card subtitle: count of pages',
+        defaultMessage: `{count, plural,
 one {# page}
 other {# pages}
 }`,
-          id: 'Ai7bBV',
-        },
-        { count: book.value.media.pagesCount },
-      ),
-    }
+        id: 'Ai7bBV',
+      },
+      { count: book.value.media.pagesCount },
+    ),
+  }
+})
 
+const titleAndLines = computed<{ title: ItemCardTitle; lines: ItemCardLine[] }>(() => {
   if (book.value.oneshot) {
     return {
-      title: { text: book.value.metadata.title, lines: 2, routerLink: `/book/${book.value.id}` },
-      lines: [footer],
+      title: { text: book.value.metadata.title, lines: 2, routerLink: linkTo.value },
+      lines: [footer.value],
     }
   } else {
     const numberedTitle = `${book.value.metadata.number} - ${book.value.metadata.title}`
@@ -114,17 +159,28 @@ other {# pages}
         title: {
           text: book.value.seriesTitle,
           lines: 1,
-          routerLink: `/series/${book.value.seriesId}`,
+          routerLink: {
+            name: '/series/[id]',
+            params: { id: book.value.seriesId },
+            query: formatBrowsingContextAsQueryParam(toValue(context)),
+          },
         },
-        lines: [{ text: numberedTitle, lines: 1, routerLink: `/book/${book.value.id}` }, footer],
+        lines: [{ text: numberedTitle, lines: 1, routerLink: linkTo.value }, footer.value],
       }
     else
       return {
-        title: { text: numberedTitle, lines: 2, routerLink: `/book/${book.value.id}` },
-        lines: [footer],
+        title: { text: numberedTitle, lines: 2, routerLink: linkTo.value },
+        lines: [footer.value],
       }
   }
 })
+
+const context = inject(BrowsingContextKey, undefined)
+const linkTo = computed<RouteLocationObject>(() => ({
+  name: '/book/[id]',
+  params: { id: book.value.id },
+  query: formatBrowsingContextAsQueryParam(toValue(context)),
+}))
 
 const { isAdmin } = useCurrentUser()
 const { canRead, isEpubReader } = useBook(book)

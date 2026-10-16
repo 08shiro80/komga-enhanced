@@ -359,27 +359,26 @@ Komf-style automatic provider matching for new series on scan:
 
 #### Tracker Sync (Scrobblers)
 
-Push read progress to external trackers when a book is marked completed:
+Push read progress to external trackers when a book is marked completed. Scrobbling is **per user**: every user links their own tracker accounts under **My account → Trackers** (classic UI `/account/trackers`, new UI `/next/account/trackers`), and a completed book is only synced to the accounts of the user who read it. There is no server-wide account and no fallback. The administrator enables the scrobbler plugins and sets the server policy (`auto_detect_links`, `mappings`, `exclude_library_ids`) in the Plugin Manager.
 
 **Manga Scrobbler** — AniList / MyAnimeList / Kitsu / MangaDex:
-- OAuth2 auto-refresh for MAL and Kitsu tokens
+- Each user enters their own tokens / credentials (AniList access token; MAL and Kitsu OAuth2 tokens with optional refresh token + client ID/secret for auto-refresh; MangaDex account + personal API client)
+- OAuth2 auto-refresh for MAL and Kitsu tokens, per user — also used by the hourly pull back into Komga
 - Tracker IDs auto-detected from `SeriesMetadata.links` (anilist.co, myanimelist.net, kitsu.app, mangadex.org), or via manual JSON mappings
-- Per-user filtering (`sync_user_id`) and per-library exclusion (`exclude_library_ids`)
+- Per-library exclusion (`exclude_library_ids`)
 
 **Comic Scrobbler** — Metron:
+- Each user links their own Metron account
 - Pushes Western comic issue progress to metron.cloud
 - Resolves issue IDs from `metron.cloud/issue/…` and `metron.cloud/series/…` links
 
-Both scrobblers persist last-known progress and status per (series, tracker) in a `sync_state` table so duplicate submissions are skipped after restarts.
+Both scrobblers persist last-known progress and status per (user, series, tracker) in a `sync_state` table so duplicate submissions are skipped after restarts. API: `GET /api/v1/trackers`, `PUT|DELETE /api/v1/trackers/{tracker}`, `POST /api/v1/trackers/{tracker}/test` (secrets are never returned).
 
 #### Shared MangaDex Credentials
 
-`gallery-dl Downloader` is the single source of truth for MangaDex authentication. Set `mangadex_username` / `mangadex_password` / `mangadex_client_id` / `mangadex_client_secret` once on that plugin and **MangaDex Subscription Sync** + **Manga Scrobbler** read from it automatically (their own equivalent fields stay empty and only act as per-plugin overrides). The Subscription Sync's `default_language` is already read this way today (in `MangaDexSubscriptionSyncer.checkFeed`), and the credential reads follow the same pattern.
+`gallery-dl Downloader` is the single source of truth for the server's MangaDex authentication. Set `mangadex_username` / `mangadex_password` / `mangadex_client_id` / `mangadex_client_secret` once on that plugin and **MangaDex Subscription Sync** reads from it automatically (its own equivalent fields stay empty and only act as an override). The Subscription Sync's `default_language` is read the same way (in `MangaDexSubscriptionSyncer.checkFeed`).
 
-Resolution order for each MangaDex field:
-1. The consuming plugin's own field (if non-blank)
-2. `gallery-dl Downloader` (`mangadex_*`)
-3. `MangaDex Subscription Sync` (`client_id`/`client_secret`/`username`/`password`) — second fallback for the scrobbler only
+The **Manga Scrobbler** does not use these shared credentials: it only marks chapters as read on the MangaDex account each user links under **My account → Trackers**.
 
 #### Custom Plugins (External JARs)
 
@@ -600,12 +599,13 @@ If you have a FlareSolverr instance for Cloudflare-protected sites, set its URL 
 
 ### Follow List Check Interval
 
-Configure via application properties:
+The check schedule is configured **per library** (not via a global application property) through the
+follow-schedule API or the **Downloads → Followed** page in the UI:
 
-```yaml
-komga:
-  download:
-    follow-check-interval: 24h
+```bash
+curl -X PUT http://localhost:25600/api/v1/downloads/follows/{libraryId}/schedule \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled": true, "scheduleMode": "interval", "intervalHours": 24}'
 ```
 
 ---
@@ -658,7 +658,7 @@ The fork stores its database migrations in a separate history table (`flyway_for
 - [Tachiyomi Migration](docs/tachiyomi-import.md)
 - [Page Splitting](docs/page-splitting.md)
 - [Metadata Plugins](docs/metadata-plugins.md)
-- [Plugin Development](docs/plugin-development.md)
+- [Plugin Development](PLUGINS.md)
 - [API Reference](docs/api-reference.md)
 - [Fork Changelog](FORK_CHANGELOG.md) — per-version stability notes, ordered newest-first
 

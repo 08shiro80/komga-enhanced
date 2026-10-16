@@ -57,6 +57,18 @@ const router = new Router({
   },
   routes: [
     {
+      path: '/classic/:pathMatch(.*)*',
+      redirect: to => {
+        // Reconstruct the path without the 'classic' segment
+        const subPath = to.params.pathMatch ? '/' + to.params.pathMatch : '/'
+        // Return the path along with the existing query parameters
+        return {
+          path: subPath,
+          query: to.query,
+        }
+      },
+    },
+    {
       path: '/',
       name: 'home',
       redirect: {name: 'dashboard'},
@@ -208,6 +220,11 @@ const router = new Router({
           path: '/account/settings-ui',
           name: 'account-settings-ui',
           component: () => import(/* webpackChunkName: "account-settings-ui" */ './views/UIUserSettings.vue'),
+        },
+        {
+          path: '/account/trackers',
+          name: 'account-trackers',
+          component: () => import(/* webpackChunkName: "account-trackers" */ './views/AccountTrackers.vue'),
         },
         {
           path: '/account/authentication-activity',
@@ -372,7 +389,7 @@ router.beforeEach(async (to, from, next) => {
     'settings-users', 'settings-users-add', 'settings-server', 'settings-ui',
     'settings-backup', 'settings-plugins', 'metrics', 'announcements', 'updates',
     'settings-logs', 'history', 'account-me', 'account-api-keys',
-    'account-settings-ui', 'account-activity', 'import-books', 'import-readlist',
+    'account-settings-ui', 'account-activity', 'account-trackers', 'import-books', 'import-readlist',
     'downloads', 'media-analysis', 'missing-posters', 'duplicate-files',
     'settings-duplicate-pages-known', 'settings-duplicate-pages-unknown',
     'settings-oversized-pages',

@@ -1,15 +1,12 @@
 import { defineMutation, defineQuery, useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import {
-  komgaClearPluginLogs,
   komgaDeletePlugin,
   komgaGetAllPlugins,
   komgaGetPluginById,
   komgaGetPluginConfig,
-  komgaGetPluginLogs,
   komgaInstallPlugin,
   komgaUpdatePlugin,
   komgaUpdatePluginConfig,
-  type SchemaEnum2,
 } from '@/generated/openapi'
 import { STALE_TIME } from '@/types/time'
 import type { Ref } from 'vue'
@@ -18,29 +15,7 @@ export const QUERY_KEYS_PLUGINS = {
   root: ['plugins'] as const,
   byId: (id: string) => [...QUERY_KEYS_PLUGINS.root, id] as const,
   config: (id: string) => [...QUERY_KEYS_PLUGINS.root, id, 'config'] as const,
-  logs: (id: string) => [...QUERY_KEYS_PLUGINS.root, id, 'logs'] as const,
 }
-
-export function usePluginLogs(id: Ref<string | undefined>, level: Ref<SchemaEnum2 | undefined>) {
-  return useQuery({
-    key: () => [...QUERY_KEYS_PLUGINS.root, id.value ?? '', 'logs', level.value ?? 'ALL'],
-    query: () =>
-      komgaGetPluginLogs({
-        path: { id: id.value! },
-        query: { level: level.value, page: 0, size: 200 },
-      }),
-    enabled: () => !!id.value,
-    staleTime: STALE_TIME.INSTANT,
-  })
-}
-
-export const useClearPluginLogs = defineMutation(() => {
-  const queryCache = useQueryCache()
-  return useMutation({
-    mutation: (id: string) => komgaClearPluginLogs({ path: { id } }),
-    onSuccess: (_data, id) => void queryCache.invalidateQueries({ key: QUERY_KEYS_PLUGINS.logs(id) }),
-  })
-})
 
 export const usePlugins = defineQuery(() =>
   useQuery({

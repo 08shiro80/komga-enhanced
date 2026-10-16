@@ -4,6 +4,7 @@ import java.time.LocalDateTime
 
 data class SyncState(
   val id: String,
+  val userId: String,
   val bookId: String?,
   val seriesId: String,
   val tracker: String,

@@ -169,7 +169,7 @@
           dense
           hide-details
           style="max-width: 90px"
-          @change="loadPages"
+          @change="onPageSizeChange"
         />
       </v-col>
     </v-row>
@@ -523,13 +523,17 @@ export default Vue.extend({
       if (preset.key !== 'custom') {
         this.detectRatio = preset.detect
         this.splitRatio = preset.split
+        this.currentMode = preset.mode
       }
-      this.currentMode = preset.mode
       this.selectedPages = []
       this.page = 1
       this.loadPages()
     },
     searchPages() {
+      this.page = 1
+      this.loadPages()
+    },
+    onPageSizeChange() {
       this.page = 1
       this.loadPages()
     },

@@ -12,6 +12,9 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.time.Duration
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.concurrent.ConcurrentHashMap
 
 private val logger = KotlinLogging.logger {}
@@ -60,8 +63,12 @@ class MangaDexApiClient(
       logger.debug { "Using cached chapter data for $mangaId" }
       return cached.first
     }
-    val chapters = fetchAllChaptersFromMangaDex(mangaId, language)
-    chapterCache[cacheKey] = Pair(chapters, System.currentTimeMillis())
+    val (chapters, complete) = fetchAllChaptersFromMangaDex(mangaId, language)
+    if (complete) {
+      chapterCache[cacheKey] = Pair(chapters, System.currentTimeMillis())
+    } else {
+      logger.warn { "Chapter list for $mangaId is incomplete (a feed page failed), not caching" }
+    }
     return chapters
   }
 
@@ -86,14 +93,7 @@ class MangaDexApiClient(
           .GET()
           .build()
 
-      rateLimiter.waitIfNeeded()
-      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-      if (response.statusCode() == 429) {
-        logger.warn { "MangaDex rate limited (429) for manga $mangaId, waiting 2s and retrying" }
-        Thread.sleep(2000)
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-      }
+      val response = sendWithRetry(request, "manga $mangaId", HttpResponse.BodyHandlers.ofString())
 
       if (response.statusCode() != 200) {
         logger.warn { "MangaDex API returned ${response.statusCode()} for manga $mangaId" }
@@ -256,14 +256,7 @@ class MangaDexApiClient(
           .GET()
           .build()
 
-      rateLimiter.waitIfNeeded()
-      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-      if (response.statusCode() == 429) {
-        logger.warn { "MangaDex rate limited (429) for chapter $chapterId, waiting 2s" }
-        Thread.sleep(2000)
-        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-      }
+      val response = sendWithRetry(request, "chapter $chapterId", HttpResponse.BodyHandlers.ofString())
 
       if (response.statusCode() != 200) {
         logger.warn { "MangaDex chapter API returned ${response.statusCode()} for chapter $chapterId" }
@@ -313,13 +306,14 @@ class MangaDexApiClient(
     }
   }
 
-  fun fetchAllChaptersFromMangaDex(
+  private fun fetchAllChaptersFromMangaDex(
     mangaId: String,
     language: String = "en",
-  ): List<ChapterDownloadInfo> {
+  ): Pair<List<ChapterDownloadInfo>, Boolean> {
     val chapters = mutableListOf<ChapterDownloadInfo>()
     var offset = 0
     val limit = 500
+    var complete = true
 
     try {
       while (true) {
@@ -340,22 +334,20 @@ class MangaDexApiClient(
             .GET()
             .build()
 
-        rateLimiter.waitIfNeeded()
-        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-
-        if (response.statusCode() == 429) {
-          logger.warn { "MangaDex rate limited (429) on feed, waiting 2s" }
-          Thread.sleep(2000)
-          response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        }
+        val response = sendWithRetry(request, "feed", HttpResponse.BodyHandlers.ofString())
 
         if (response.statusCode() != 200) {
           logger.warn { "MangaDex feed API returned ${response.statusCode()}" }
+          complete = false
           break
         }
 
         val jsonResponse = objectMapper.readValue(response.body(), Map::class.java) as Map<*, *>
-        val data = jsonResponse["data"] as? List<*> ?: break
+        val data = jsonResponse["data"] as? List<*>
+        if (data == null) {
+          complete = false
+          break
+        }
 
         if (data.isEmpty()) break
 
@@ -410,9 +402,10 @@ class MangaDexApiClient(
       logger.debug { "Fetched ${chapters.size} chapters from MangaDex for manga $mangaId (language=$language)" }
     } catch (e: Exception) {
       logger.warn(e) { "Failed to fetch chapter list from MangaDex" }
+      complete = false
     }
 
-    return chapters
+    return Pair(chapters, complete)
   }
 
   fun searchManga(
@@ -421,7 +414,7 @@ class MangaDexApiClient(
   ): List<Map<String, Any?>> {
     try {
       val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-      val url = "https://api.mangadex.org/manga?title=$encodedQuery&limit=$limit"
+      val url = "https://api.mangadex.org/manga?title=$encodedQuery&limit=$limit&$CONTENT_RATING_PARAMS"
       val request =
         HttpRequest
           .newBuilder()
@@ -430,8 +423,7 @@ class MangaDexApiClient(
           .GET()
           .build()
 
-      rateLimiter.waitIfNeeded()
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+      val response = sendWithRetry(request, "search $query", HttpResponse.BodyHandlers.ofString())
       if (response.statusCode() != 200) return emptyList()
 
       val jsonResponse = objectMapper.readValue<Map<String, Any?>>(response.body())
@@ -448,7 +440,7 @@ class MangaDexApiClient(
     mangaId: String,
     coverFilename: String,
     destinationPath: Path,
-  ) {
+  ): Boolean {
     try {
       val coverUrl = "https://uploads.mangadex.org/covers/$mangaId/$coverFilename"
       logger.info { "Downloading cover from: $coverUrl" }
@@ -461,11 +453,11 @@ class MangaDexApiClient(
           .GET()
           .build()
 
-      val response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray())
+      val response = sendWithRetry(request, "cover $mangaId", HttpResponse.BodyHandlers.ofByteArray())
 
       if (response.statusCode() != 200) {
         logger.warn { "Cover download failed with status ${response.statusCode()}" }
-        return
+        return false
       }
 
       val extension = coverFilename.substringAfterLast('.', "jpg")
@@ -473,8 +465,55 @@ class MangaDexApiClient(
       coverFile.writeBytes(response.body())
 
       logger.debug { "Cover downloaded successfully: ${coverFile.absolutePath} (${response.body().size} bytes)" }
+      return true
     } catch (e: Exception) {
       logger.warn(e) { "Failed to download cover for manga $mangaId" }
+      return false
     }
+  }
+
+  private fun <T> sendWithRetry(
+    request: HttpRequest,
+    context: String,
+    bodyHandler: HttpResponse.BodyHandler<T>,
+  ): HttpResponse<T> {
+    rateLimiter.waitIfNeeded()
+    val response = httpClient.send(request, bodyHandler)
+    if (response.statusCode() != 429) return response
+
+    val waitMs = parseRetryAfterMillis(response) ?: 2000L
+    logger.warn { "MangaDex rate limited (429) for $context, waiting ${waitMs}ms and retrying" }
+    Thread.sleep(waitMs)
+    rateLimiter.waitIfNeeded()
+    return httpClient.send(request, bodyHandler)
+  }
+
+  private fun parseRetryAfterMillis(response: HttpResponse<*>): Long? = parseStandardRetryAfterMillis(response) ?: parseEpochRetryAfterMillis(response)
+
+  private fun parseStandardRetryAfterMillis(response: HttpResponse<*>): Long? {
+    val header =
+      response
+        .headers()
+        .firstValue("Retry-After")
+        .orElse(null)
+        ?.trim() ?: return null
+    header.toLongOrNull()?.let { return (it * 1000L).coerceIn(0L, 60_000L) }
+    return try {
+      val date = ZonedDateTime.parse(header, DateTimeFormatter.RFC_1123_DATE_TIME)
+      Duration.between(ZonedDateTime.now(), date).toMillis().coerceIn(0L, 60_000L)
+    } catch (_: DateTimeParseException) {
+      null
+    }
+  }
+
+  private fun parseEpochRetryAfterMillis(response: HttpResponse<*>): Long? {
+    val epochSeconds =
+      response
+        .headers()
+        .firstValue("X-RateLimit-Retry-After")
+        .orElse(null)
+        ?.trim()
+        ?.toLongOrNull() ?: return null
+    return ((epochSeconds * 1000L) - System.currentTimeMillis()).coerceIn(0L, 60_000L)
   }
 }

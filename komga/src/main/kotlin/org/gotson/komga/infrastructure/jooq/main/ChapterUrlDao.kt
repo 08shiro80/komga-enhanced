@@ -2,7 +2,6 @@ package org.gotson.komga.infrastructure.jooq.main
 
 import org.gotson.komga.domain.model.ChapterUrl
 import org.gotson.komga.domain.persistence.ChapterUrlRepository
-import org.gotson.komga.language.toCurrentTimeZone
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.jooq.impl.DSL
@@ -247,6 +246,14 @@ class ChapterUrlDao(
       .execute()
   }
 
+  override fun deleteByIds(ids: Collection<String>) {
+    if (ids.isEmpty()) return
+    dslRW
+      .deleteFrom(table)
+      .where(idField.`in`(ids))
+      .execute()
+  }
+
   override fun deleteBySeriesId(seriesId: String) {
     dslRW
       .deleteFrom(table)
@@ -364,19 +371,4 @@ class ChapterUrlDao(
       createdDate = getTimestamp(createdDateField) ?: LocalDateTime.now(),
       lastModifiedDate = getTimestamp(lastModifiedDateField) ?: LocalDateTime.now(),
     )
-
-  private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
-    val raw = get(field.name) ?: return null
-    return when (raw) {
-      is LocalDateTime -> raw.toCurrentTimeZone()
-      is java.sql.Timestamp -> raw.toLocalDateTime()
-      is String ->
-        try {
-          LocalDateTime.parse(raw.replace(" ", "T").substringBefore("+"))
-        } catch (_: Exception) {
-          LocalDateTime.now()
-        }
-      else -> LocalDateTime.now()
-    }
-  }
 }

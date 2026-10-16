@@ -47,11 +47,15 @@ class LuceneHelper(
 
   fun getIndexVersion(): Int {
     val searcher = searcherManager.acquire()
-    val topDocs = searcher.search(TermQuery(Term("type", "index_version")), 1)
-    return topDocs.scoreDocs
-      .map { searcher.storedFields().document(it.doc)["index_version"] }
-      .firstOrNull()
-      ?.toIntOrNull() ?: 1
+    try {
+      val topDocs = searcher.search(TermQuery(Term("type", "index_version")), 1)
+      return topDocs.scoreDocs
+        .map { searcher.storedFields().document(it.doc)["index_version"] }
+        .firstOrNull()
+        ?.toIntOrNull() ?: 1
+    } finally {
+      searcherManager.release(searcher)
+    }
   }
 
   fun searchEntitiesIds(
@@ -84,8 +88,12 @@ class LuceneHelper(
             .build()
 
         val searcher = searcherManager.acquire()
-        val topDocs = searcher.search(booleanQuery, MAX_RESULTS)
-        topDocs.scoreDocs.map { searcher.storedFields().document(it.doc)[entity.id] }
+        try {
+          val topDocs = searcher.search(booleanQuery, MAX_RESULTS)
+          topDocs.scoreDocs.map { searcher.storedFields().document(it.doc)[entity.id] }
+        } finally {
+          searcherManager.release(searcher)
+        }
       } catch (_: ParseException) {
         emptyList()
       } catch (e: Exception) {
@@ -141,20 +149,44 @@ class LuceneHelper(
       processed = processed.replaceRange(match.range, placeholder)
     }
 
-    return processed
-      .split("\\s+".toRegex())
-      .joinToString(" ") { term ->
+    val tokenRegex = Regex("""\S*"[^"]*"\S*|\S+""")
+    return tokenRegex
+      .findAll(processed)
+      .joinToString(" ") { match ->
+        val term = match.value
         if (term in protectedRanges) {
           protectedRanges[term]!!
         } else {
-          val colonIdx = term.indexOf(':')
-          if (colonIdx > 0 && term.substring(0, colonIdx).lowercase() in knownFields) {
-            term
-          } else {
-            QueryParser.escape(term)
-          }
+          val unsigned = term.removePrefix("+").removePrefix("-")
+          val colonIdx = unsigned.indexOf(':')
+          val keepAsIs =
+            (term.contains('"') && term.count { it == '"' } % 2 == 0) ||
+              (colonIdx > 0 && unsigned.substring(0, colonIdx).lowercase() in knownFields)
+          val result =
+            if (keepAsIs) {
+              term
+            } else {
+              val prefix = if (term.length > 1 && (term.startsWith("+") || term.startsWith("-"))) term.substring(0, 1) else ""
+              var core = term.substring(prefix.length)
+              var suffix = ""
+              while (core.length > 1 && (core.endsWith("*") || core.endsWith("?"))) {
+                suffix = core.takeLast(1) + suffix
+                core = core.dropLast(1)
+              }
+              prefix + QueryParser.escape(core) + suffix
+            }
+          restoreRangePlaceholders(result, protectedRanges)
         }
       }
+  }
+
+  private fun restoreRangePlaceholders(
+    term: String,
+    protectedRanges: Map<String, String>,
+  ): String {
+    var restored = term
+    protectedRanges.forEach { (placeholder, range) -> restored = restored.replace(placeholder, range) }
+    return restored
   }
 
   fun upgradeIndex() {

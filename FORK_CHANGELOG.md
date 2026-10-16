@@ -6,6 +6,115 @@ For upstream Komga changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## [0.1.6.1] - 2026-10-13
+
+### 2026-10-16 — Review follow-up fixes
+
+- **The new UI remembers the presentation mode and sort order you pick per view** across reloads — they silently reset to the defaults before.
+- **A user-installed replacement for a bundled plugin survives restarts:** previously the bundled copy was restored on every start and could silently shadow the newer user-installed JAR.
+
+### 2026-10-14 — Bug-hunt fixes
+
+A deep multi-pass review of the fork's own code (backend, classic UI and new UI) confirmed 139 bugs; this release fixes them. The user-visible ones:
+
+**Downloads & subscriptions**
+- A running download's status no longer flips back to "pending" every few seconds, pausing/cancelling is no longer overwritten by progress updates, and a paused-then-resumed download can no longer be marked failed by its old run.
+- An add-chapter download skipped as "already exists" no longer silently blocks the whole queue after a resume.
+- Subscription sync: chapters that only link to an external publisher no longer re-queue the full manga on every run; followed manga rated erotica/pornographic are checked again instead of being skipped as "no chapters"; the same title is no longer queued twice in one run; "Force resync" now reports failure instead of always claiming success; feeds longer than MangaDex's 10 000-entry window no longer wedge the sync forever and continue from where they stopped on the next run; a never-saved default language no longer breaks every check.
+- A chapter that eventually downloaded fine no longer keeps its old failure count (which could auto-blacklist it later); DNS errors ("host not found") are retried again instead of being treated as permanent; a failed MangaDex chapter-list page is no longer cached as a complete (short) list for 30 minutes.
+- The custom chapter-folder naming option no longer breaks sites without chapter numbers (webtoons, imgur, nhentai, exhentai, rawkuma — their chapters all landed in one `cNone` folder).
+- gallery-dl detection no longer falls back to the wrong command on slow cold starts (e.g. NAS), and MangaDex covers are no longer re-downloaded on every run when `series.json` predates the cover tracking.
+- With multiple libraries whose paths share a prefix (e.g. `/data/manga` and `/data/manga2`), downloads/checks no longer match a folder to the wrong library.
+
+**Follow list**
+- Batch-deleting follows can no longer delete follows belonging to other libraries.
+- Saving the follow schedule no longer wipes the recorded last check, so the next run fires on time instead of a full interval later; an invalid check time (e.g. `25:00`) no longer breaks the scheduling of all later libraries.
+
+**Scrobbling** (bugs that also existed in earlier released versions)
+- Kitsu: progress is now read and written on *your* library entry — previously the first public entry of *any* Kitsu user was used, so foreign progress could be imported and updates failed with 403.
+- MyAnimeList: pulling read progress back into Komga works now (the old code called a non-existent API endpoint, so nothing was ever pulled).
+- Trackers are now deduplicated independently: one failing tracker no longer swallows that chapter for the others; Metron scrobbles issues read out of order and no longer re-scrobbles everything after a restart; fractional issues (1.5) are skipped instead of being scrobbled as the wrong whole issue; manual mappings now beat the name search; a `metron.cloud/issue/…` link on a series no longer scrobbles that one issue for every book.
+- An OAuth refresh response without a new refresh token no longer saves the literal string "null" (which broke all later refreshes); temporary tracker outages no longer get cached as "series not found" for the metadata link search.
+
+**Library management & tools**
+- Books protected from deletion can no longer be erased via "Empty trash" or the delete-file action.
+- Backups are now taken as a consistent snapshot of the database (including changes not yet merged from the write-ahead log), so a backup taken while the server is busy writing can no longer be corrupt or missing recent data; a *tasks* backup can no longer be restored over the *main* database; a failed restore shuts the server down instead of leaving it running with dead database connections; listed backup times are no longer off by the UTC offset.
+- Page splitting keeps the colors of palette-based PNG/GIF pages, regenerates the cover thumbnail when page 1 was split, keeps the page hashes of untouched pages, and refuses to rewrite a book that changed on disk since the last scan (previously pages added outside Komga were silently lost).
+- Oversized pages: pages of deleted books no longer appear; after deleting/splitting pages the ignore list of *both* modes is cleared (stale ignores hid the wrong pages); the "Custom" preset no longer switches the mode; a failed page delete is reported instead of claiming success; huge page numbers no longer cause an error.
+- Integrity: ERROR-flagged PDF/CBR books can now be re-analyzed (they always counted as "still corrupt"); one malformed archive no longer aborts the whole verify run.
+- Search: quoted phrases (`title:"one piece"`), wildcards and negation work again; range filters inside parentheses work; titles containing a stray quote, a slash or a lone `-`/`+` (e.g. `Fate - Zero`, `12"`) no longer break the search or return nothing.
+- Duplicate-page detection no longer gives different JPEGs with padding bytes the same hash, and a re-analyzed book keeps its page hashes only when its file is unchanged (stale hashes could delete the wrong pages; wiped hashes disabled the detection).
+- Large JPEGs with an EXIF rotation get correctly rotated thumbnails again.
+- The health check measures disk space on the volume that actually holds the config dir (not `/`), and a low-disk warning now shows as DEGRADED instead of UNKNOWN.
+- Timestamps for downloads, plugins, sync state, backups and Kobo/KOReader progression are stored consistently as UTC — they no longer display shifted by the server's timezone or drift further on every update.
+- Tachiyomi import: a manga listed twice in the backup is only counted once, and uppercase MangaDex IDs are recognized as already-followed.
+- Plugins: uploading a plugin JAR can no longer overwrite or delete a *different* plugin's JAR; installing from a URL works (it always failed with an unsupported-media-type error); a failed URL download reports a clear error instead of a server error; cancelled config edits no longer reappear in the dialog; the read-only SQLite pool is no longer shrunk to 1 connection on default installs (slow UI while tasks ran); an unknown SQLite pragma in the config no longer prevents startup.
+
+**Classic UI**
+- "Retry" on the download dashboard actually retries now (it silently resumed before, bypassing the retry limit).
+- Page size "All" really shows all items (books, collections, read lists, duplicate pages) instead of capping at 2000 or falling back to 20.
+- Opening a oneshot from a series view no longer navigates to the wrong oneshot; the duplicate-files page works on mobile (with paging when there are more duplicates than fit one page); changing "per page" on oversized pages resets to page 1; Japanese title grouping handles ヅ and ペ correctly.
+
+**New UI (`/next`)**
+- Collection/read-list ordering radio buttons were inverted — choosing "Manually" saved "By name/date" and vice versa.
+- Metadata search applies the result from the provider that produced it, even when the dropdown was changed after searching.
+- "Split all" and the fix-page jobs no longer show as running forever when they finish quickly; the logs view applies line-count changes and refreshes while streaming; log level OFF is supported; the MangaDex Discover pagination no longer errors on the last page; a deleted library no longer stays selected on Discover; a failed shutdown request shows an error; backup cleanup rejects keeping fewer than 1 backup (0 deleted everything); a failed duplicate-page action unlocks the card again.
+
+**Upstream merge — base 1.27.1 → 1.29.0** (`baseVersion` → 1.29.0): adopts upstream Komga 1.27.1 → 1.29.0 in full — the Vue 3 UI gains contextual navigation, breadcrumbs and sibling (previous/next) navigation, notable entities (teams/characters/locations from ComicInfo.xml, with filters), a poster filter, OAuth2 login, a server setting to make the new UI the default (classic UI stays reachable under `/classic`), plus the Koreader progress-sync refactor, optional HTTP sessions stored in a database (enabled in Docker: a `sessions.sqlite` appears in the config folder), new database indices and Gradle 9.8.1. See the upstream [CHANGELOG.md](CHANGELOG.md) for the complete list. **junrar 8.1.0 → 8.1.2, jsoup 1.23.1 → 1.23.2, thumbnailator 0.4.21, jbig2-imageio 3.0.5, zxing 3.5.4.** Requires `./gradlew jooq-codegen-primary` on build.
+
+### Scrobblers (user request by CheetahDoesStuff, [#47](https://github.com/08shiro80/komga-enhanced/discussions/47))
+- **Scrobbling is now per user:** every user links their own AniList, MyAnimeList, Kitsu, MangaDex and Metron accounts under **My account → Trackers** (classic and new UI). When a user finishes a book, the progress is synced only to that user's accounts — friends sharing a server no longer end up on one shared tracker account. Each account can be tested, paused or unlinked; stored tokens and passwords are never shown again.
+- **The pull from trackers back into Komga works for every linked user** (AniList / MyAnimeList / Kitsu) and now renews expired MyAnimeList/Kitsu tokens automatically.
+- **Admins keep only the server policy** in the Plugin Manager (scrobbler on/off, link auto-detection, manual mappings, excluded libraries). The old server-wide tracker accounts and the `sync_user_id` option are gone.
+- **Upgrade:** existing tracker settings are moved to the user from `sync_user_id`, or to the first admin when it was empty; trackers that were not selected before stay linked but paused. MangaDex scrobbling no longer falls back to the gallery-dl / Subscription Sync account — link your own MangaDex account. The MyAnimeList client ID used to find MyAnimeList links for series metadata now lives in **Auto Metadata Match** (copied automatically).
+
+### Downloads
+- **Fixed: existing chapters got wrong chapter numbers after a download** (e.g. chapter 69 shown as 127): after every download the series was sorted twice in parallel (a full library scan plus a separate folder scan), and the second sort could overwrite chapter numbers that had just been re-read from `ComicInfo.xml` with plain position numbers. Sorting now only rewrites numbers that actually change, so this can no longer happen. Already affected series are corrected by **Refresh metadata** on the series (or library).
+- **Downloads only import what was downloaded:** a finished download no longer triggers a scan of the whole library. Komga now imports just the downloaded series folder (new, changed and removed chapters) right after each download, so new chapters appear immediately instead of after the whole queue, and other series are no longer re-sorted. PDF/EPUB downloads are picked up too when the library scans those formats, and folders excluded from scanning are respected.
+- **mangadot.net is now a supported download source.** Add a `https://mangadot.net/manga/<id>` URL (or a single `https://mangadot.net/chapter/<id>` chapter) like any other source. Because mangadot serves the same chapter from multiple scanlation groups, each group is kept as its own `[group]` folder so nothing overwrites — the default language follows the plugin's configured language and Cloudflare is handled via the configured FlareSolverr endpoint. Paired with the gallery-dl-fork `mangadot` extractor; both must deploy together.
+
+### Security (behavior from earlier released fork versions)
+- **Download URLs can no longer inject gallery-dl command-line options:** a download or follow-list entry crafted to look like an option (e.g. starting with `--`) was passed to gallery-dl where it could be interpreted as a flag and run arbitrary commands. URLs are now always handed to gallery-dl strictly as a download target.
+- **The gallery-dl updater only accepts trusted sources:** the custom-URL field under **Server → Updates** now rejects anything that isn't a plain `gallery-dl` version pin or an `https` link to an allowed host (codeberg.org, github.com, pypi.org, files.pythonhosted.org), closing an admin-only arbitrary-code-execution path during install.
+- **Custom chapter number/volume/title no longer corrupt `ComicInfo.xml`:** special characters in a manual chapter override could mangle the written metadata; they are now written verbatim.
+- **A custom download filename can no longer escape the series folder:** a crafted "custom filename" containing path segments could move/overwrite a file outside the target folder; the name is now sanitized to a single path component.
+- **Metadata links are sanitized before being made clickable** in the new UI: a `javascript:`-style link smuggled into a series/book's metadata can no longer run when the link is clicked — only `http(s)` links become clickable.
+
+### Reliability
+- **MangaDex metadata no longer mislabels series as "Adult" (18+):** when a title had no content rating from MangaDex, the age rating defaulted to 18; it is now left unset, and only `erotica`/`pornographic` map to 18.
+- **MangaDex search on the Discover page now finds adult-rated titles:** the search request previously defaulted to safe/suggestive only, so erotica/pornographic titles were silently missing from results — all content ratings are now requested.
+- **A chapter download can no longer overwrite a different chapter's file:** when a chapter's identity couldn't be resolved, its `.cbz` could replace an existing, unrelated chapter (data loss). Such collisions now get a distinct filename instead.
+- **A paused download is no longer duplicated:** a follow/subscription check could enqueue a second copy of a download that was merely paused — it now recognizes the paused entry.
+- **MangaDex subscription auth is race-safe:** restarting the subscription sync while a feed check was in flight could leave the access token in an inconsistent state; token refresh/clear is now serialized.
+
+### Plugins
+- **Notifier plugins get a new `NEW_CHAPTERS_QUEUED` event:** when a MangaDex subscription sync queues newly-found manga/chapters, notifier plugins are now informed (with count, source and library) — not just on download completion/failure.
+- **Notifier plugins get a new `CHAPTER_AUTO_BLACKLISTED` event:** when the downloader auto-blacklists a chapter (same-group duplicate, external redirect, or repeated failures), notifier plugins are now informed (with series, chapter URL/number and reason), so you can see when chapters are being skipped.
+
+### Logging
+- **gallery-dl and plugin logs now have their own file:** the full download flow (gallery-dl output), the scrobblers and the MangaDex integration now write to a dedicated `plugins.log` next to `komga.log` (same rotation: 10 MB / 7 days) instead of being mixed into the main log. The log-level control under **Server → Logs** now switches this plugin/download logging together with the core level, so enabling DEBUG captures the complete gallery-dl download flow — making download issues far easier to diagnose.
+- **Plugin logs no longer touch the database:** plugin logging previously wrote to a `PLUGIN_LOG` database table that kept growing with no way to prune it. That table and the per-plugin in-app log viewer are gone; plugin logs live only in the `plugins.log` file above.
+
+### New UI (`/next`)
+- **Running downloads now show in the Activity menu:** the activity indicator in the top bar lists active downloads as background jobs. Previously a download was invisible there and only its follow-up "Scan library" task showed up, which looked like the server was scanning when it was actually still downloading.
+- **Download notifications:** finishing or failing a download now shows a snackbar (success with the title, error with the reason) instead of silently updating the queue — you no longer have to keep the queue page open to notice a failed download.
+- **"Retry all failed"** button in the download queue re-queues every failed download at once.
+- **"Cancel all"** button in the download queue cancels every active, pending and paused download at once (new backend endpoint `POST downloads/cancel/active`).
+- **The Downloads → Followed / Discover pages remember the selected library** across navigation and reloads.
+- **Fork pages are now translatable:** all fork-specific strings (Downloads, Media tools, Server tools, Tachiyomi import, guest mode, …) are now part of the translation catalog, so non-English UIs no longer mix translated and English text on fork pages.
+- **Deleted-page history links to the known page hashes** view; the pagination on the oversized-pages and integrity views no longer overflows on narrow/mobile screens.
+- **The follow list refreshes immediately** after "Check now" or "Sync to MangaDex" instead of showing stale last-checked times until a manual reload.
+- **The add-download dialog no longer keeps stale input** after cancelling, and new downloads default to a normal priority instead of jumping to the front of the queue.
+- **The live log view now notifies you when the stream disconnects** (network drop / session expiry) instead of silently stopping.
+- **Accessibility & polish:** page headings are now real `<h1>` elements (screen-reader navigation); download statuses show translated labels instead of raw codes; the blacklist URL column truncates instead of overflowing; the followed-series list has larger touch targets and a mobile-friendly library picker; a followed entry without a title no longer shows its URL twice; the MangaDex "add to Komga" button uses a distinct bookmark icon.
+
+### Reliability & performance
+- **MangaDex rate-limiting is more robust:** the client now honors the server's `Retry-After` header (instead of a fixed 2 s single retry), and the internal rate limiter no longer serializes concurrent chapter checks while waiting — fewer spurious "0 chapters"/failed checks under load.
+- **Smarter download auto-retry:** failed downloads now back off exponentially (capped) instead of every few minutes, and permanently-broken sources (gone/forbidden/no extractor) are no longer auto-retried (a manual retry still works).
+- **Faster on large libraries:** follow-list imports, the follow check, and the deleted-chapters scan now use batched database writes instead of one statement per item; the deleted-chapters scan fetches each MangaDex chapter's metadata at most once per run; the blacklist lookup no longer loads the whole table; the main database SQLite cache was raised to 32 MiB with in-memory temp storage, and query-planner statistics are refreshed automatically.
+- **Thumbnails now live in a separate database:** book and duplicate-page thumbnail images are stored in a dedicated `thumbnails.sqlite` rather than the main database, keeping the main database small and fast (better cache efficiency, quicker backups). New thumbnails use it automatically; under **Server → Fixes** a one-time **"Externalize thumbnails"** action moves existing images over and a **"Reclaim database space"** action compacts the main database afterwards.
+- **Search index no longer leaks memory:** fixed a reader leak in the Lucene search index that could grow heap usage over time.
+
 ## [0.1.6] - 2026-09-29
 
 **Upstream merge — base 1.25.0 → 1.27.1** (`baseVersion` → 1.27.1): adopts upstream Komga 1.25.0 → 1.27.1 in full (Unicode-aware sorting/collation, content-restriction and Referential v2 APIs, book projection, Kobo updates — see the upstream CHANGELOG for the complete list). **junrar 7.6.0 → 8.1.0.** Requires `./gradlew jooq-codegen-primary` on build.

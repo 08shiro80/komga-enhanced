@@ -1,7 +1,7 @@
 <template>
   <v-container fluid>
     <div class="d-flex align-center flex-wrap ga-2 mb-3">
-      <span class="text-h5">
+      <h1 class="text-h5">
         {{
           $formatMessage({
             description: 'Logs view: page title',
@@ -9,7 +9,7 @@
             id: 'fork/logs/title',
           })
         }}
-      </span>
+      </h1>
       <v-spacer />
 
       <v-text-field
@@ -63,7 +63,7 @@
         icon="i-mdi:refresh"
         variant="text"
         :loading="isPending"
-        @click="refetch()"
+        @click="refreshSnapshot()"
       />
       <v-btn
         icon="i-mdi:download"
@@ -98,7 +98,7 @@
 </template>
 
 <script lang="ts" setup>
-import { defineMessage } from 'vue-intl'
+import { defineMessage, useIntl } from 'vue-intl'
 import { useLogLevel, useLogs, useSetLogLevel } from '@/colada/logs'
 import { komgaDownloadLogs } from '@/generated/openapi'
 import { ApiBaseUrl } from '@/api/base'
@@ -107,6 +107,7 @@ import EmptyStateNetworkError from '@/components/EmptyStateNetworkError.vue'
 import type { VVirtualScroll } from 'vuetify/components'
 
 const messagesStore = useMessagesStore()
+const intl = useIntl()
 
 const lines = ref(500)
 const lineOptions = [100, 250, 500, 1000, 2500, 5000]
@@ -135,16 +136,31 @@ watch(
 
 const logLines = ref<string[]>([])
 
+let snapshotRequested = false
+let initialLoaded = false
+
+watch(lines, () => {
+  snapshotRequested = true
+})
+
 watch(
   logText,
   (text) => {
-    // While streaming, keep the live buffer — a background refetch must not wipe streamed lines.
-    if (streaming.value) return
+    // While streaming, keep the live buffer — a background refetch must not wipe streamed lines,
+    // unless the user explicitly asked for a fresh snapshot (line count change or refresh).
+    if (streaming.value && !snapshotRequested && initialLoaded) return
+    snapshotRequested = false
     logLines.value = (text ?? '').split('\n')
+    if (text !== undefined) initialLoaded = true
     scrollToBottom()
   },
   { immediate: true },
 )
+
+function refreshSnapshot() {
+  snapshotRequested = true
+  void refetch()
+}
 
 const filteredLines = computed(() => {
   if (!search.value) return logLines.value
@@ -206,7 +222,15 @@ function startStream() {
       }, 150)
     }
   }
-  eventSource.onerror = () => stopStream()
+  eventSource.onerror = () => {
+    if (streaming.value) {
+      messagesStore.messages.push({
+        message: intl.formatMessage(streamErrorMessage),
+        color: 'error',
+      })
+    }
+    stopStream()
+  }
   streaming.value = true
   paused.value = false
 }
@@ -260,6 +284,11 @@ async function downloadLogs() {
 onMounted(() => startStream())
 onBeforeUnmount(() => stopStream())
 
+const streamErrorMessage = defineMessage({
+  description: 'Logs view: live stream disconnected error',
+  defaultMessage: 'Live log stream disconnected',
+  id: 'fork/logs/streamError',
+})
 const filterLabel = defineMessage({
   description: 'Logs view: filter field',
   defaultMessage: 'Filter',

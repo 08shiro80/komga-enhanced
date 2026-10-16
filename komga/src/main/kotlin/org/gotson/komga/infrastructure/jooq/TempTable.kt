@@ -21,7 +21,7 @@ class TempTable private constructor(
   private var created = false
 
   fun create() {
-    dslContext.execute("CREATE TABLE $name (STRING varchar NOT NULL);")
+    dslContext.execute("CREATE TABLE $name (STRING varchar NOT NULL PRIMARY KEY );")
     created = true
   }
 
@@ -34,7 +34,10 @@ class TempTable private constructor(
       collection.chunked(batchSize).forEach { chunk ->
         dslContext
           .batch(
-            dslContext.insertInto(DSL.table(DSL.name(name)), DSL.field(DSL.name("STRING"), String::class.java)).values(null as String?),
+            dslContext
+              .insertInto(DSL.table(DSL.name(name)), DSL.field(DSL.name("STRING"), String::class.java))
+              .values(null as String?)
+              .onConflictDoNothing(),
           ).also { step ->
             chunk.forEach {
               step.bind(it)
@@ -56,7 +59,7 @@ class TempTable private constructor(
     fun DSLContext.withTempTable(
       batchSize: Int,
       collection: Collection<String>,
-    ) = TempTable(this, generateName())
+    ) = TempTable(this)
       .also {
         it.insertTempStrings(batchSize, collection)
       }

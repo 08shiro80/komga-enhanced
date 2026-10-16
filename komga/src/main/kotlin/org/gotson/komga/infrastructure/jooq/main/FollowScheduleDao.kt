@@ -2,7 +2,6 @@ package org.gotson.komga.infrastructure.jooq.main
 
 import org.gotson.komga.domain.model.FollowSchedule
 import org.gotson.komga.domain.persistence.FollowScheduleRepository
-import org.gotson.komga.language.toCurrentTimeZone
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.jooq.impl.DSL
@@ -94,19 +93,4 @@ class FollowScheduleDao(
       checkTime = get(checkTimeField),
       lastCheckTime = getTimestamp(lastCheckTimeField),
     )
-
-  private fun Record.getTimestamp(field: org.jooq.Field<LocalDateTime?>): LocalDateTime? {
-    val raw = get(field.name) ?: return null
-    return when (raw) {
-      is LocalDateTime -> raw.toCurrentTimeZone()
-      is java.sql.Timestamp -> raw.toLocalDateTime()
-      is String ->
-        try {
-          LocalDateTime.parse(raw.replace(" ", "T").substringBefore("+"))
-        } catch (_: Exception) {
-          LocalDateTime.now()
-        }
-      else -> LocalDateTime.now()
-    }
-  }
 }

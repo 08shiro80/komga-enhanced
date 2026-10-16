@@ -58,7 +58,7 @@ class ReleaseController(
   ): List<ReleaseDto> =
     cache
       .get("releases") { fetchGitHubReleases(GITHUB_API_UPSTREAM) }
-      ?.let { releases ->
+      .let { releases ->
         releases.mapIndexed { index, ghRel ->
           ReleaseDto(
             ghRel.tagName,
@@ -70,7 +70,6 @@ class ReleaseController(
           )
         }
       }
-      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
   @GetMapping("fork")
   @PreAuthorize("hasRole('ADMIN')")
@@ -80,7 +79,7 @@ class ReleaseController(
   ): List<ReleaseDto> =
     cache
       .get("forkReleases") { fetchGitHubReleases(GITHUB_API_FORK) }
-      ?.let { releases ->
+      .let { releases ->
         releases.mapIndexed { index, ghRel ->
           ReleaseDto(
             ghRel.tagName,
@@ -92,7 +91,6 @@ class ReleaseController(
           )
         }
       }
-      ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
   fun fetchGitHubReleases(apiUrl: String): List<GithubReleaseDto> {
     val response =
@@ -121,7 +119,7 @@ class ReleaseController(
       if (installedSha == null) {
         -1
       } else {
-        val idx = commits.indexOfFirst { it.sha == installedSha }
+        val idx = commits.indexOfFirst { shaMatchesInstalled(it.sha, installedSha) }
         if (idx < 0) commits.size else idx
       }
 
@@ -138,7 +136,7 @@ class ReleaseController(
           author = if (rawAuthor == "Shirogane") "Kasch_X" else rawAuthor,
           date = c.commit.author?.date ?: java.time.ZonedDateTime.now(),
           url = c.htmlUrl,
-          installed = c.sha == installedSha,
+          installed = shaMatchesInstalled(c.sha, installedSha),
         )
       }
 
@@ -148,6 +146,11 @@ class ReleaseController(
       commits = mapped,
     )
   }
+
+  private fun shaMatchesInstalled(
+    commitSha: String,
+    installedSha: String?,
+  ): Boolean = installedSha != null && commitSha.startsWith(installedSha, ignoreCase = true)
 
   private fun fetchGitHubCommits(apiUrl: String): List<GithubCommitDto> {
     val response =

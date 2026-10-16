@@ -1,20 +1,25 @@
 package org.gotson.komga.infrastructure.jooq.main
 
+import org.gotson.komga.application.query.PageResult
+import org.gotson.komga.application.query.buildPage
+import org.gotson.komga.application.query.isEmpty
+import org.gotson.komga.application.query.toPageResult
 import org.gotson.komga.domain.model.Author
 import org.gotson.komga.domain.model.FilterBy
 import org.gotson.komga.domain.model.FilterByEntity
 import org.gotson.komga.domain.model.FilterTags
+import org.gotson.komga.domain.model.NotableEntity
 import org.gotson.komga.domain.model.SearchContext
 import org.gotson.komga.domain.persistence.ReferentialRepository
 import org.gotson.komga.infrastructure.jooq.ContentRestrictionsSearchHelper
 import org.gotson.komga.infrastructure.jooq.RequiredJoin
 import org.gotson.komga.infrastructure.jooq.SplitDslDaoBase
-import org.gotson.komga.infrastructure.jooq.buildPage
 import org.gotson.komga.infrastructure.jooq.udfStripAccents
 import org.gotson.komga.infrastructure.jooq.unicode3
 import org.gotson.komga.jooq.main.Tables
 import org.gotson.komga.jooq.main.tables.records.BookMetadataAggregationAuthorRecord
 import org.gotson.komga.jooq.main.tables.records.BookMetadataAuthorRecord
+import org.gotson.komga.jooq.main.tables.records.BookMetadataNotableEntitiesRecord
 import org.gotson.komga.language.stripAccents
 import org.jooq.Condition
 import org.jooq.DSLContext
@@ -55,6 +60,7 @@ class ReferentialDao(
   private val rb = Tables.READLIST_BOOK
   private val sl = Tables.SERIES_METADATA_SHARING
   private val at = Tables.SERIES_AND_BOOK_TAG
+  private val ne = Tables.BOOK_METADATA_NOTABLE_ENTITIES
 
   @Deprecated("Use findAuthors instead")
   override fun findAllAuthorsByName(
@@ -478,14 +484,18 @@ class ReferentialDao(
         .where(sd.PUBLISHER.ne(""))
         .apply { filterOnLibraryIds?.let { and(s.LIBRARY_ID.`in`(it)) } }
 
-    val count = dslRO.fetchCount(query)
     val sort = sd.PUBLISHER.unicode3()
 
     val items =
-      query
-        .orderBy(sort)
-        .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
-        .fetch(sd.PUBLISHER)
+      if (pageable.isEmpty())
+        emptyList()
+      else
+        query
+          .orderBy(sort)
+          .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+          .fetch(sd.PUBLISHER)
+
+    val count = if (pageable.isUnpaged) items.size else dslRO.fetchCount(query)
 
     val pageSort = Sort.by("name")
     return PageImpl(
@@ -676,6 +686,7 @@ class ReferentialDao(
               .leftJoin(rb)
               .on(b.ID.eq(rb.BOOK_ID))
         }.where(restrictionCondition.first)
+        .and(bma.RELEASE_DATE.isNotNull)
         .apply { context.libraryIds?.let { this.and(s.LIBRARY_ID.`in`(it)) } }
         .apply {
           filterBy?.let {
@@ -687,13 +698,18 @@ class ReferentialDao(
             }
           }
         }
-    val count = dslRO.fetchCount(query)
     val items =
-      query
-        .orderBy(sortField)
-        .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
-        .fetchArray(0)
-        .mapNotNull { it?.toString() }
+      if (pageable.isEmpty())
+        emptyList()
+      else
+        query
+          .orderBy(sortField)
+          .apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+          .fetchArray(0)
+          .mapNotNull { it?.toString() }
+
+    val count = if (pageable.isUnpaged) items.size else dslRO.fetchCount(query)
+
     return buildPage(items, pageable, count, Sort.by(Order.desc("year")))
   }
 
@@ -752,6 +768,28 @@ class ReferentialDao(
 
     return findGeneric(context, search, filterBy, pageable, sl, sl.LABEL, sl.SERIES_ID, null, { it?.label }, Sort.by("label"))
   }
+
+  override fun findNotableEntities(
+    context: SearchContext,
+    search: String?,
+    kind: String?,
+    filterBy: FilterBy?,
+    pageable: Pageable,
+  ): PageResult<NotableEntity> = findGeneric(context, search, filterBy, pageable, ne, ne.NAME, null, ne.BOOK_ID, { it?.toDomain() }, Sort.by("name"), listOf(ne.KIND), kind?.let { ne.KIND.eq(kind) }).toPageResult()
+
+  override fun findNotableEntitiesKinds(
+    context: SearchContext,
+    filterBy: FilterBy?,
+    pageable: Pageable,
+  ): PageResult<String> = findGeneric(context, null, filterBy, pageable, ne, null, null, ne.BOOK_ID, { it?.kind }, Sort.by("kind"), listOf(ne.KIND), sortField = ne.KIND).toPageResult()
+
+  override fun findNotableEntitiesNames(
+    context: SearchContext,
+    search: String?,
+    kind: String?,
+    filterBy: FilterBy?,
+    pageable: Pageable,
+  ): PageResult<String> = findGeneric(context, search, filterBy, pageable, ne, ne.NAME, null, ne.BOOK_ID, { it?.name }, Sort.by("name"), emptyList(), kind?.let { ne.KIND.eq(kind) }).toPageResult()
 
   private fun <R : TableRecordImpl<*>, T : TableImpl<R>, O : Any> findGeneric(
     context: SearchContext,
@@ -819,18 +857,21 @@ class ReferentialDao(
           }
         }
 
-    val count = dslRO.fetchCount(query)
-
     val items =
-      query
-        .apply {
-          if (sortField != null)
-            orderBy(sortField)
-          else if (searchableField != null)
-            orderBy(searchableField.unicode3())
-        }.apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
-        .fetchInto(table)
-        .mapNotNull { mapper(it) }
+      if (pageable.isEmpty())
+        emptyList()
+      else
+        query
+          .apply {
+            if (sortField != null)
+              orderBy(sortField)
+            else if (searchableField != null)
+              orderBy(searchableField.unicode3())
+          }.apply { if (pageable.isPaged) limit(pageable.pageSize).offset(pageable.offset) }
+          .fetchInto(table)
+          .mapNotNull { mapper(it) }
+
+    val count = if (pageable.isUnpaged) items.size else dslRO.fetchCount(query)
 
     return buildPage(items, pageable, count, sort)
   }
@@ -839,6 +880,12 @@ class ReferentialDao(
     Author(
       name = name,
       role = role,
+    )
+
+  private fun BookMetadataNotableEntitiesRecord.toDomain(): NotableEntity =
+    NotableEntity(
+      name = name,
+      kind = kind,
     )
 
   private fun BookMetadataAggregationAuthorRecord.toDomain(): Author =

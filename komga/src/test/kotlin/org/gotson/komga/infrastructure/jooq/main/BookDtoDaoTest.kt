@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.just
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
+import org.gotson.komga.application.query.UnpagedSorted
 import org.gotson.komga.domain.model.Author
 import org.gotson.komga.domain.model.BookSearch
 import org.gotson.komga.domain.model.KomgaUser
@@ -28,7 +29,6 @@ import org.gotson.komga.domain.service.BookLifecycle
 import org.gotson.komga.domain.service.KomgaUserLifecycle
 import org.gotson.komga.domain.service.LibraryLifecycle
 import org.gotson.komga.domain.service.SeriesLifecycle
-import org.gotson.komga.infrastructure.jooq.UnpagedSorted
 import org.gotson.komga.infrastructure.search.SearchIndexLifecycle
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -189,6 +189,58 @@ class BookDtoDaoTest(
       assertThat(page.totalElements).isEqualTo(2)
       assertThat(page.content).hasSize(2)
       assertThat(page.content.map { it.metadata.title }).containsExactly("Éric le rouge", "Éric le bleu")
+    }
+
+    @Test
+    fun `given books when searching by any author then results are matched and not duplicated`() {
+      // given
+      val book1 = makeBook("Éric le rouge", seriesId = series.id, libraryId = library.id)
+      val book2 = makeBook("Éric le bleu", seriesId = series.id, libraryId = library.id)
+      seriesLifecycle.addBooks(
+        series,
+        listOf(
+          book1,
+          book2,
+        ),
+      )
+
+      bookMetadataRepository.findById(book1.id).let {
+        bookMetadataRepository.update(it.copy(authors = listOf(Author("Mark", "writer"), Author("Jim", "inker"))))
+      }
+
+      run {
+        // when
+        val page =
+          bookDtoDao.findAll(
+            BookSearch(
+              SearchCondition.Author(SearchOperator.Is(SearchCondition.AuthorMatch())),
+            ),
+            SearchContext(user),
+            Pageable.unpaged(),
+          )
+
+        // then
+        assertThat(page.totalElements).isEqualTo(1)
+        assertThat(page.content).hasSize(1)
+        assertThat(page.content.map { it.metadata.title }).containsExactly("Éric le rouge")
+      }
+
+      run {
+        // when
+        val page =
+          bookDtoDao.findAll(
+            BookSearch(
+              SearchCondition.Author(SearchOperator.IsNot(SearchCondition.AuthorMatch())),
+            ),
+            SearchContext(user),
+            Pageable.unpaged(),
+          )
+
+        // then
+        assertThat(page.totalElements).isEqualTo(1)
+        assertThat(page.content).hasSize(1)
+        assertThat(page.content.map { it.metadata.title }).containsExactly("Éric le bleu")
+      }
     }
   }
 

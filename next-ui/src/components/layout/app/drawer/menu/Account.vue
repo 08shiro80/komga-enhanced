@@ -47,6 +47,17 @@
       "
     />
     <v-list-item
+      v-if="!isGuest"
+      to="/account/trackers"
+      :title="
+        $formatMessage({
+          description: 'Drawer menu for My Account > Trackers',
+          defaultMessage: 'Trackers',
+          id: 'fork/account/trackers/menu',
+        })
+      "
+    />
+    <v-list-item
       to="/account/activity"
       :title="
         $formatMessage({
